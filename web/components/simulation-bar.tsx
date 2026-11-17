@@ -1,0 +1,235 @@
+"use client";
+
+/**
+ * Persistent simulation and role bar — 44px, sticky, on every screen.
+ *
+ * Theme §4.1. This bar is the single most important safety affordance in the
+ * product: it is the reason a reviewer can never mistake a synthetic journey
+ * for a real one. It must not be collapsible away or hidden on any route.
+ */
+
+import { useState } from "react";
+import { AlertTriangle, RotateCcw, Settings2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  ROLES,
+  ROLE_LABELS,
+  useDemoSession,
+  type Role,
+} from "@/lib/demo-session";
+
+export function SimulationBar() {
+  const { role, setRole, locale, setLocale, resetSession } = useDemoSession();
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    // .on-dark swaps the focus ring to --brand-focus-on-dark for more headroom
+    // against the slate bar (the default teal passes 3:1 at 3.9:1 either way).
+    <div className="on-dark sticky top-0 z-50 w-full bg-sim-bar text-slate-100">
+      <div className="flex h-11 items-center gap-3 px-4">
+        {/* Start: the notice. Always visible, every width. */}
+        <span className="flex shrink-0 items-center gap-1.5 rounded bg-sim-badge px-2 py-1 text-xs font-bold text-sim-badge-fg">
+          <AlertTriangle aria-hidden="true" className="size-3.5" />
+          <span className="hidden sm:inline">
+            SYNTHETIC DEMO DATA — NOT FOR CLINICAL USE
+          </span>
+          <span className="sm:hidden">SYNTHETIC DEMO DATA</span>
+        </span>
+
+        <div className="flex-1" />
+
+        {/* End: session controls. Collapsed behind a toggle under 640px (D002 §9). */}
+        <div className="hidden items-center gap-3 sm:flex">
+          <SessionControls
+            role={role}
+            setRole={setRole}
+            locale={locale}
+            setLocale={setLocale}
+            confirmingReset={confirmingReset}
+            setConfirmingReset={setConfirmingReset}
+            resetSession={resetSession}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setMobileOpen((open) => !open)}
+          aria-expanded={mobileOpen}
+          aria-controls="sim-bar-mobile-panel"
+          className="flex items-center gap-1.5 rounded border border-slate-600 px-2 py-1 text-xs font-medium sm:hidden"
+        >
+          {mobileOpen ? (
+            <X aria-hidden="true" className="size-3.5" />
+          ) : (
+            <Settings2 aria-hidden="true" className="size-3.5" />
+          )}
+          Session
+        </button>
+      </div>
+
+      {mobileOpen ? (
+        <div
+          id="sim-bar-mobile-panel"
+          className="flex flex-col gap-3 border-t border-slate-700 px-4 py-3 sm:hidden"
+        >
+          <SessionControls
+            role={role}
+            setRole={setRole}
+            locale={locale}
+            setLocale={setLocale}
+            confirmingReset={confirmingReset}
+            setConfirmingReset={setConfirmingReset}
+            resetSession={resetSession}
+            stacked
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function SessionControls({
+  role,
+  setRole,
+  locale,
+  setLocale,
+  confirmingReset,
+  setConfirmingReset,
+  resetSession,
+  stacked = false,
+}: {
+  role: Role;
+  setRole: (role: Role) => void;
+  locale: "en" | "ar";
+  setLocale: (locale: "en" | "ar") => void;
+  confirmingReset: boolean;
+  setConfirmingReset: (value: boolean) => void;
+  resetSession: () => void;
+  stacked?: boolean;
+}) {
+  const group = stacked
+    ? "flex flex-col items-start gap-1.5"
+    : "flex items-center gap-2";
+
+  return (
+    <>
+      {/* Simulated role. A native select is keyboard- and screen-reader-correct
+          without pulling in a popover primitive. Switching role NEVER grants
+          permission — the server stays authoritative. */}
+      <div className={group}>
+        <label
+          htmlFor="sim-role"
+          className="text-xs font-medium text-slate-400"
+        >
+          Simulated role
+        </label>
+        <select
+          id="sim-role"
+          value={role}
+          onChange={(event) => setRole(event.target.value as Role)}
+          className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-100"
+        >
+          {ROLES.map((value) => (
+            <option key={value} value={value}>
+              {ROLE_LABELS[value].en}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Language. Arabic copy is unreviewed and is labelled as such (theme §3). */}
+      <div className={group}>
+        <span className="text-xs font-medium text-slate-400">Language</span>
+        <div className="flex items-center gap-1" role="group" aria-label="Language">
+          <LangButton
+            active={locale === "en"}
+            onClick={() => setLocale("en")}
+            label="EN"
+            full="English"
+          />
+          <LangButton
+            active={locale === "ar"}
+            onClick={() => setLocale("ar")}
+            label="عربي"
+            full="Arabic — unreviewed demo translation"
+          />
+        </div>
+      </div>
+
+      {locale === "ar" ? (
+        <span className="rounded border border-dashed border-slate-500 px-2 py-1 text-xs text-slate-300">
+          Unreviewed demo translation
+        </span>
+      ) : null}
+
+      {/* Reset. Two-step, and it states the consequence (D002 §5). */}
+      <div className={group}>
+        {confirmingReset ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-300">
+              Retires this synthetic workspace and starts a new one.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                // TODO: POST /api/v1/demo/reset once the contract lands (Q5).
+                // Until then this resets client state only, and the UI says so.
+                resetSession();
+                setConfirmingReset(false);
+              }}
+              className="rounded bg-status-overdue px-2 py-1 text-xs font-semibold text-white"
+            >
+              Reset session
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(false)}
+              className="rounded border border-slate-600 px-2 py-1 text-xs font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmingReset(true)}
+            className="flex items-center gap-1.5 rounded border border-slate-600 px-2 py-1 text-xs font-medium"
+          >
+            <RotateCcw aria-hidden="true" className="size-3.5" />
+            Reset demo
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+function LangButton({
+  active,
+  onClick,
+  label,
+  full,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  full: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={full}
+      className={cn(
+        "rounded px-2 py-1 text-xs font-semibold",
+        active
+          ? "bg-slate-100 text-slate-900"
+          : "border border-slate-600 text-slate-200",
+      )}
+    >
+      {label}
+    </button>
+  );
+}

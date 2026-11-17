@@ -22,6 +22,7 @@ messaging, no live bookings, no production EHR integration, and no clinically va
 | --- | --- |
 | [00-reference/](00-reference/) | The source documents. Treat as the baseline spec — do not rewrite them in place; supersede them with a dated milestone or decision record. |
 | [01-milestones/](01-milestones/) | One file per major milestone, plus the running [MILESTONE-LOG.md](01-milestones/MILESTONE-LOG.md) index. |
+| [01-milestones/frontend-roadmap.md](01-milestones/frontend-roadmap.md) | Mark's remaining frontend steps to F6, with blockers and estimates. |
 | [02-decisions/](02-decisions/) | Decision records for choices that are hard to reverse, plus the [OPEN-QUESTIONS.md](02-decisions/OPEN-QUESTIONS.md) register. |
 | [03-evidence/](03-evidence/) | Acceptance-check results, screenshots, test output, recordings — the proof behind each milestone claim. |
 
@@ -59,5 +60,6 @@ can *truthfully claim*, document it.
 
 ## Current status
 
-**Pre-kickoff.** No code written. Documentation baseline established 2026-11-17.
-Stack choice is still open — see [OPEN-QUESTIONS.md](02-decisions/OPEN-QUESTIONS.md).
+**Frontend foundation built** (Next.js 16 + Tailwind 4 + shadcn/ui in [web/](../web/)), running on
+labelled mock data — see [M01](01-milestones/M01-frontend-foundation.md). No backend yet.
+Stack choice is still formally open — see [OPEN-QUESTIONS.md](02-decisions/OPEN-QUESTIONS.md).

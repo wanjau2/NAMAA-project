@@ -4,7 +4,13 @@ Newest first. One line per milestone; detail lives in the linked record.
 
 | # | Date | Milestone | Owner | Status | Record |
 | --- | --- | --- | --- | --- | --- |
+| M01 | 2026-11-17 | Frontend foundation, token layer and safety primitives | Mark | Partial | [M01-frontend-foundation.md](M01-frontend-foundation.md) |
 | M00 | 2026-11-17 | Documentation baseline established | Mark | Done | [M00-documentation-baseline.md](M00-documentation-baseline.md) |
+
+## Forward plan
+
+Frontend: [frontend-roadmap.md](frontend-roadmap.md) — every remaining step to F6, with
+dependencies and what the frontend needs from Ismail and Alfred.
 
 ## Planned milestones
 

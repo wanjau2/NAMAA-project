@@ -1,0 +1,26 @@
+{
+  "comment": "Separate config so the checks keep type safety even though Node type-stripping needs explicit .ts import extensions, which the app's tsconfig rejects. Run: npx tsc -p scripts --noEmit",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "baseUrl": "..",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "jsx": "preserve"
+  },
+  "include": [
+    "**/*.ts",
+    "../lib/**/*.ts"
+  ]
+}

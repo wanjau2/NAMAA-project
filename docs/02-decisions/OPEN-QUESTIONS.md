@@ -10,12 +10,13 @@ decision. Recommendations below are suggestions, not settled calls.
 | ID | Question | Status |
 | --- | --- | --- |
 | Q1 | Which stack do we actually build? | **Open — blocks all coding** |
-| Q2 | English only, or bilingual EN/AR with RTL? | **Open — blocks frontend** |
+| Q2 | English only, or bilingual EN/AR with RTL? | **Open** — implementation half settled by [D002](D002-ui-theme-addendum.md) |
 | Q3 | Is MedGemma extraction in the demo or deferred? | **Open — blocks Alfred's scope** |
 | Q4 | What is the real submission deadline and required file list? | **Open — Alfred to verify portal** |
 | Q5 | Which API path convention is authoritative? | **Open — blocks Mark's client** |
 | Q6 | Do we have model hosting and GPU budget? | **Open — prerequisite** |
 | Q7 | Where does the demo get hosted, if anywhere? | **Open** |
+| Q8 | Does the metrics API suppress small cells server-side? | **Open — raised by [D002](D002-ui-theme-addendum.md)** |
 
 ---
 
@@ -104,3 +105,17 @@ whether the team has these. If not, Q3 answers itself.
 Both documents allow a local-startup fallback plus a recording if hosting fails. Decide early
 whether to attempt hosting at all, because "a fresh browser can enter the demo without
 unavailable credentials" is in the release gate.
+
+## Q8 — Does the metrics API suppress small cells server-side?
+
+Raised by [D002](D002-ui-theme-addendum.md) §8. Both reference documents require `n < 10`
+suppression including complementary totals, but neither says **where** it happens.
+
+If the frontend applies it, the true counts still travel in the network response and anyone can
+read the hidden group from DevTools — the suppression is cosmetic. Suppression also depends on
+cohort and complementary-cell logic that lives with the metric definitions, not in the UI.
+
+**Recommendation:** the API returns the cell already suppressed with the value omitted —
+`{ "suppressed": true, "reason": "small_cell", "threshold": 10 }` — and the UI renders only what
+it is given. Owners: Ismail (endpoint) and Alfred (cohort and complementary logic).
+Mark cannot close the suppression acceptance check until this is decided.

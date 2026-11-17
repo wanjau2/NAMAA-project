@@ -1,0 +1,276 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* ===========================================================================
+   Namaa design tokens — "Clinical Desert Calm"
+   Source: docs/00-reference/namaa_ui_theme_prompt.md
+   Corrections applied: docs/02-decisions/D002-ui-theme-addendum.md
+   LIGHT MODE ONLY. No dark variant — see the theme scope guardrail.
+   =========================================================================== */
+
+:root {
+  /* --- Surfaces and brand --- */
+  --bg-canvas: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --border-default: #e2e8f0;
+
+  --brand-primary: #0f5c5c;
+  --brand-primary-hover: #0b4646;
+  --brand-focus: #0d9488; /* 3.6:1 on canvas, 3.9:1 on the sim bar — both pass 3:1 */
+  --brand-focus-on-dark: #5eead4; /* optional, more headroom on the slate bar */
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+
+  /* --- Epistemic and workflow states ---
+     D002 §1: border = the state's FOREGROUND colour. The pale -300 values
+     specified originally sit at ~1.3-1.8:1 against their own backgrounds and
+     fail WCAG 1.4.11 (>=3:1), which breaks the solid-vs-dashed channel the
+     theme relies on for unreviewed AI output. Retained as -edge-soft for
+     decorative use only (row separators), never as the indicator itself. */
+
+  --status-verified-fg: #15803d;
+  --status-verified-bg: #f0fdf4;
+  --status-verified-border: #15803d; /* 4.8:1 */
+  --status-verified-edge-soft: #86efac;
+
+  --status-proposed-fg: #6d28d9;
+  --status-proposed-bg: #f5f3ff;
+  --status-proposed-border: #6d28d9; /* 6.5:1 — rendered DASHED */
+  --status-proposed-edge-soft: #c4b5fd;
+
+  --status-review-fg: #b45309;
+  --status-review-bg: #fffbeb;
+  --status-review-border: #b45309; /* 4.8:1 */
+  --status-review-edge-soft: #fcd34d;
+
+  --status-overdue-fg: #b91c1c;
+  --status-overdue-bg: #fef2f2;
+  --status-overdue-border: #b91c1c; /* 5.9:1 */
+  --status-overdue-edge-soft: #fca5a5;
+
+  /* --- Persistent simulation bar --- */
+  --sim-bar-bg: #1e293b;
+  --sim-badge-bg: #f59e0b;
+  --sim-badge-fg: #0f172a;
+
+  /* ===== shadcn/ui bridge (D002 §4) =================================
+     shadcn primitives read these names and ignore the Namaa ones, so they
+     are aliased here rather than duplicated. Namaa tokens stay the single
+     source of truth: change a value above, not below. ================= */
+
+  --background: var(--bg-canvas);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--brand-primary);
+  --primary-foreground: #ffffff; /* 7.8:1 on brand */
+  --secondary: var(--bg-subtle);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-subtle);
+  --muted-foreground: var(--text-secondary);
+  --accent: var(--bg-subtle);
+  --accent-foreground: var(--text-primary);
+  --destructive: var(--status-overdue-fg);
+  --destructive-foreground: #ffffff;
+  --border: var(--border-default);
+  --input: var(--border-default);
+  --ring: var(--brand-focus);
+
+  --radius: 0.5rem; /* 8px — tighter than the shadcn default for clinical density */
+
+  /* Sidebar surfaces, in case a shadcn component reaches for them */
+  --sidebar: var(--bg-surface);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--brand-primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--bg-subtle);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border-default);
+  --sidebar-ring: var(--brand-focus);
+
+  /* No heavy charting library (theme scope guardrail): these back plain
+     CSS/SVG funnel bars in the metrics view. */
+  --chart-1: #0f5c5c;
+  --chart-2: #0d9488;
+  --chart-3: #5eead4;
+  --chart-4: #475569;
+  --chart-5: #94a3b8;
+}
+
+@theme inline {
+  /* Typography — D002 §6 ramp, replacing the Tailwind defaults so the
+     utilities themselves enforce the scale. */
+  --text-xs: 0.75rem; /* 12/16 — metadata, timestamps, badges. Floor. */
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem; /* 14/20 — dense UI, table cells, labels */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem; /* 16/24 — body copy, explanations */
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem; /* 18/26 — card titles */
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.375rem; /* 22/28 — section headings */
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.75rem; /* 28/34 — page titles */
+  --text-2xl--line-height: 2.125rem;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), var(--font-inter), sans-serif;
+  --font-arabic: var(--font-plex-arabic), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  /* Namaa colour utilities: bg-surface, text-ink-muted, border-status-proposed … */
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-subtle: var(--bg-subtle);
+  --color-ink: var(--text-primary);
+  --color-ink-muted: var(--text-secondary);
+
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-primary-hover);
+  --color-brand-focus: var(--brand-focus);
+
+  --color-status-verified: var(--status-verified-fg);
+  --color-status-verified-bg: var(--status-verified-bg);
+  --color-status-proposed: var(--status-proposed-fg);
+  --color-status-proposed-bg: var(--status-proposed-bg);
+  --color-status-review: var(--status-review-fg);
+  --color-status-review-bg: var(--status-review-bg);
+  --color-status-overdue: var(--status-overdue-fg);
+  --color-status-overdue-bg: var(--status-overdue-bg);
+
+  --color-sim-bar: var(--sim-bar-bg);
+  --color-sim-badge: var(--sim-badge-bg);
+  --color-sim-badge-fg: var(--sim-badge-fg);
+
+  /* shadcn's expected names, pointed at the bridge above */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans text-sm;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  h1 {
+    font-weight: 700;
+  }
+
+  /* Arabic UI: IBM Plex Sans Arabic for body AND headings. The original
+     theme set body only, leaving Arabic headings on the Latin stack. */
+  html[dir="rtl"] body,
+  html[dir="rtl"] h1,
+  html[dir="rtl"] h2,
+  html[dir="rtl"] h3 {
+    font-family: var(--font-arabic);
+  }
+
+  /* Single global focus ring — 2px solid, 2px offset, per the theme. */
+  *:focus-visible {
+    outline: 2px solid var(--brand-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Technical strings (D002 §3)
+   Rule IDs, FHIR logical IDs, UTC timestamps, revisions and denominators.
+   direction/unicode-bidi stop them scrambling inside Arabic text;
+   tabular-nums keeps numerator/denominator columns aligned.
+   --------------------------------------------------------------------------- */
+.font-mono-tech {
+  font-family: var(--font-mono);
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Numeric columns in Latin UI text (counts, denominators). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus ring on the dark simulation bar. */
+.on-dark *:focus-visible {
+  outline-color: var(--brand-focus-on-dark);
+}
+
+/* ---------------------------------------------------------------------------
+   Small-cell suppression (n < 10).
+   Visual only — the value must already be absent from the API response.
+   See OPEN-QUESTIONS Q8. The -45deg hatch does not mirror under RTL; it
+   carries no meaning on its own, so that is acceptable.
+   --------------------------------------------------------------------------- */
+.suppressed-cell {
+  background: repeating-linear-gradient(
+    -45deg,
+    #f1f5f9,
+    #f1f5f9 6px,
+    #e2e8f0 6px,
+    #e2e8f0 12px
+  );
+}
+
+/* Respect reduced-motion for the skeleton pulse and any transition. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
