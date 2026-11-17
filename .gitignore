@@ -1,0 +1,47 @@
+# Secrets — never commit. See docs/00-reference/namaa_software_design_specification.md §2
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+npm-debug.log*
+yarn-error.log*
+
+# Local data stores — synthetic, but regenerable from seed
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+
+# Test and build output (evidence belongs in docs/03-evidence/, committed)
+coverage/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

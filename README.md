@@ -1,0 +1,19 @@
+# Namaa
+
+FHIR-first precision prevention and care-coordination **prototype** — Population Health
+Challenge 04. Finds possible preventive care gaps, explains the evidence, routes them to
+authorized human review, and tracks the next action through attendance and documented
+follow-up.
+
+> **Synthetic demonstration only.** No real patient data, no live messaging, no live bookings,
+> no production EHR integration, no clinically validated rules. Not for clinical use.
+
+**Status:** pre-kickoff. No application code yet; stack not yet locked.
+
+## Start here
+
+- [docs/README.md](docs/README.md) — documentation index, team ownership, the eight non-negotiables
+- [docs/02-decisions/OPEN-QUESTIONS.md](docs/02-decisions/OPEN-QUESTIONS.md) — what must be decided at kickoff
+- [docs/01-milestones/MILESTONE-LOG.md](docs/01-milestones/MILESTONE-LOG.md) — what has actually been delivered
+
+Team: Ismail (backend, FHIR, workflow) · Alfred (rules, AI, evaluation) · Mark (frontend, demo)
