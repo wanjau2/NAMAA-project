@@ -2,7 +2,7 @@
   "protocol": "namaa-extraction-v1",
   "model_id": "google/medgemma-1.5-4b-it",
   "model_revision": "0000000000000000000000000000000000000000",
-  "prompt_version": "extract-v1.0.0",
+  "prompt_version": "extract-v1.0.1",
   "output": {
     "facts": [
       {

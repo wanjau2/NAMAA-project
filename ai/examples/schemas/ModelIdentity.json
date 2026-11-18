@@ -15,8 +15,8 @@
       "type": "string"
     },
     "prompt_version": {
-      "const": "extract-v1.0.0",
-      "default": "extract-v1.0.0",
+      "const": "extract-v1.0.1",
+      "default": "extract-v1.0.1",
       "title": "Prompt Version",
       "type": "string"
     },

@@ -15,12 +15,12 @@
     "model": {
       "model_id": "google/medgemma-1.5-4b-it",
       "model_revision": "simulated-fixture-v1",
-      "prompt_version": "extract-v1.0.0",
+      "prompt_version": "extract-v1.0.1",
       "simulated": true
     },
     "proposals": [
       {
-        "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+        "id": "07bde3ac-dc64-5aab-863b-532c894b7361",
         "version": 1,
         "state": "proposed",
         "workspace_id": "offline-demo",
@@ -45,12 +45,12 @@
         "model": {
           "model_id": "google/medgemma-1.5-4b-it",
           "model_revision": "simulated-fixture-v1",
-          "prompt_version": "extract-v1.0.0",
+          "prompt_version": "extract-v1.0.1",
           "simulated": true
         }
       },
       {
-        "id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+        "id": "672cb70c-bcd7-50bd-8b79-e5b859b09e08",
         "version": 1,
         "state": "proposed",
         "workspace_id": "offline-demo",
@@ -81,13 +81,13 @@
         "model": {
           "model_id": "google/medgemma-1.5-4b-it",
           "model_revision": "simulated-fixture-v1",
-          "prompt_version": "extract-v1.0.0",
+          "prompt_version": "extract-v1.0.1",
           "simulated": true
         }
       }
     ],
     "error_code": null,
-    "latency_ms": 1.7770249978639185,
+    "latency_ms": 1.7304330031038262,
     "attempts": 1,
     "schema_valid": true
   },
@@ -95,7 +95,7 @@
     {
       "command": {
         "request_id": "demo-human-review-0",
-        "proposal_id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+        "proposal_id": "07bde3ac-dc64-5aab-863b-532c894b7361",
         "expected_proposal_version": 1,
         "action": "accept",
         "reviewer_reference": "Practitioner/demo-reviewer",
@@ -107,7 +107,7 @@
       "state": "accepted",
       "fact": {
         "proposal": {
-          "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+          "id": "07bde3ac-dc64-5aab-863b-532c894b7361",
           "version": 1,
           "state": "proposed",
           "workspace_id": "offline-demo",
@@ -132,7 +132,7 @@
           "model": {
             "model_id": "google/medgemma-1.5-4b-it",
             "model_revision": "simulated-fixture-v1",
-            "prompt_version": "extract-v1.0.0",
+            "prompt_version": "extract-v1.0.1",
             "simulated": true
           }
         },
@@ -148,7 +148,7 @@
         },
         "review": {
           "request_id": "demo-human-review-0",
-          "proposal_id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+          "proposal_id": "07bde3ac-dc64-5aab-863b-532c894b7361",
           "expected_proposal_version": 1,
           "action": "accept",
           "reviewer_reference": "Practitioner/demo-reviewer",
@@ -165,7 +165,7 @@
     {
       "command": {
         "request_id": "demo-human-review-1",
-        "proposal_id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+        "proposal_id": "672cb70c-bcd7-50bd-8b79-e5b859b09e08",
         "expected_proposal_version": 1,
         "action": "accept",
         "reviewer_reference": "Practitioner/demo-reviewer",
@@ -179,7 +179,7 @@
       "state": "accepted",
       "fact": {
         "proposal": {
-          "id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+          "id": "672cb70c-bcd7-50bd-8b79-e5b859b09e08",
           "version": 1,
           "state": "proposed",
           "workspace_id": "offline-demo",
@@ -210,7 +210,7 @@
           "model": {
             "model_id": "google/medgemma-1.5-4b-it",
             "model_revision": "simulated-fixture-v1",
-            "prompt_version": "extract-v1.0.0",
+            "prompt_version": "extract-v1.0.1",
             "simulated": true
           }
         },
@@ -226,7 +226,7 @@
         },
         "review": {
           "request_id": "demo-human-review-1",
-          "proposal_id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+          "proposal_id": "672cb70c-bcd7-50bd-8b79-e5b859b09e08",
           "expected_proposal_version": 1,
           "action": "accept",
           "reviewer_reference": "Practitioner/demo-reviewer",
@@ -250,7 +250,7 @@
         "type": "transaction",
         "entry": [
           {
-            "fullUrl": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0",
+            "fullUrl": "urn:uuid:376f0725-f2f9-5487-aa0f-17f61c1cb054",
             "resource": {
               "resourceType": "Observation",
               "status": "final",
@@ -272,7 +272,7 @@
                 }
               ],
               "effectiveDateTime": "2026-09-01",
-              "id": "edfa4634-bcb5-5617-9031-303e675f7bc0",
+              "id": "376f0725-f2f9-5487-aa0f-17f61c1cb054",
               "identifier": [
                 {
                   "system": "https://namaa.example/fhir/review-command",
@@ -295,22 +295,22 @@
             },
             "request": {
               "method": "PUT",
-              "url": "Observation/edfa4634-bcb5-5617-9031-303e675f7bc0"
+              "url": "Observation/376f0725-f2f9-5487-aa0f-17f61c1cb054"
             }
           },
           {
-            "fullUrl": "urn:uuid:5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+            "fullUrl": "urn:uuid:74e7f747-8f17-5db1-8452-32583e3d4ae0",
             "resource": {
               "resourceType": "Provenance",
-              "id": "5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+              "id": "74e7f747-8f17-5db1-8452-32583e3d4ae0",
               "target": [
                 {
-                  "reference": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0"
+                  "reference": "urn:uuid:376f0725-f2f9-5487-aa0f-17f61c1cb054"
                 }
               ],
               "recorded": "2026-11-18T09:00:00+00:00",
               "activity": {
-                "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal fd5d7bbb-02be-5098-bc12-4932e2d31231 version 1"
+                "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal 07bde3ac-dc64-5aab-863b-532c894b7361 version 1"
               },
               "agent": [
                 {
@@ -352,7 +352,7 @@
                       "type": {
                         "text": "Prompt version"
                       },
-                      "value": "extract-v1.0.0"
+                      "value": "extract-v1.0.1"
                     }
                   ]
                 }
@@ -369,7 +369,7 @@
             },
             "request": {
               "method": "PUT",
-              "url": "Provenance/5115366a-2fa1-57a8-87f9-9d1bbba27da0"
+              "url": "Provenance/74e7f747-8f17-5db1-8452-32583e3d4ae0"
             }
           }
         ]
@@ -397,7 +397,7 @@
         "type": "transaction",
         "entry": [
           {
-            "fullUrl": "urn:uuid:b0e69032-1482-5adf-b15e-f803bf355bf8",
+            "fullUrl": "urn:uuid:19e732b5-cbad-5bae-99c9-095a9e3f1733",
             "resource": {
               "resourceType": "FamilyMemberHistory",
               "status": "partial",
@@ -428,7 +428,7 @@
                   ]
                 }
               ],
-              "id": "b0e69032-1482-5adf-b15e-f803bf355bf8",
+              "id": "19e732b5-cbad-5bae-99c9-095a9e3f1733",
               "identifier": [
                 {
                   "system": "https://namaa.example/fhir/review-command",
@@ -446,22 +446,22 @@
             },
             "request": {
               "method": "PUT",
-              "url": "FamilyMemberHistory/b0e69032-1482-5adf-b15e-f803bf355bf8"
+              "url": "FamilyMemberHistory/19e732b5-cbad-5bae-99c9-095a9e3f1733"
             }
           },
           {
-            "fullUrl": "urn:uuid:7ba1c7d6-0a25-58bf-8991-a17c5ba2be05",
+            "fullUrl": "urn:uuid:6b923e0d-bfb6-526b-83e5-a0447ca07c1c",
             "resource": {
               "resourceType": "Provenance",
-              "id": "7ba1c7d6-0a25-58bf-8991-a17c5ba2be05",
+              "id": "6b923e0d-bfb6-526b-83e5-a0447ca07c1c",
               "target": [
                 {
-                  "reference": "urn:uuid:b0e69032-1482-5adf-b15e-f803bf355bf8"
+                  "reference": "urn:uuid:19e732b5-cbad-5bae-99c9-095a9e3f1733"
                 }
               ],
               "recorded": "2026-11-18T09:00:00+00:00",
               "activity": {
-                "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal 2f1f5c12-b5da-5699-88c4-b9789aa786f3 version 1"
+                "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal 672cb70c-bcd7-50bd-8b79-e5b859b09e08 version 1"
               },
               "agent": [
                 {
@@ -503,7 +503,7 @@
                       "type": {
                         "text": "Prompt version"
                       },
-                      "value": "extract-v1.0.0"
+                      "value": "extract-v1.0.1"
                     }
                   ]
                 }
@@ -520,7 +520,7 @@
             },
             "request": {
               "method": "PUT",
-              "url": "Provenance/7ba1c7d6-0a25-58bf-8991-a17c5ba2be05"
+              "url": "Provenance/6b923e0d-bfb6-526b-83e5-a0447ca07c1c"
             }
           }
         ]
@@ -585,11 +585,11 @@
         "version": "demo-v1"
       },
       {
-        "reference": "Observation/edfa4634-bcb5-5617-9031-303e675f7bc0",
+        "reference": "Observation/376f0725-f2f9-5487-aa0f-17f61c1cb054",
         "version": "simulated-commit-v1"
       },
       {
-        "reference": "FamilyMemberHistory/b0e69032-1482-5adf-b15e-f803bf355bf8",
+        "reference": "FamilyMemberHistory/19e732b5-cbad-5bae-99c9-095a9e3f1733",
         "version": "simulated-commit-v1"
       }
     ],

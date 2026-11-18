@@ -77,6 +77,7 @@ and failure behavior, not actual serving compatibility, latency or model quality
 
 Mappings were checked against the official R4 definitions for
 [Observation](https://hl7.org/fhir/R4/observation.html),
+[Condition](https://hl7.org/fhir/R4/condition.html),
 [FamilyMemberHistory](https://hl7.org/fhir/R4/familymemberhistory.html),
 [Provenance](https://hl7.org/fhir/R4/provenance.html), and
 [Bundle request fields](https://hl7.org/fhir/R4/bundle-definitions.html).

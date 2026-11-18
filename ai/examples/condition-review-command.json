@@ -1,0 +1,12 @@
+{
+  "request_id": "condition-review",
+  "proposal_id": "a707dde2-1ade-5f6a-85bf-17215f7bd57f",
+  "expected_proposal_version": 1,
+  "action": "accept",
+  "reviewer_reference": "Practitioner/demo-reviewer",
+  "reason": "Verified the explicitly current diagnosis wording in the fictional source.",
+  "correction": null,
+  "acknowledged_issues": [
+    "missing_date"
+  ]
+}

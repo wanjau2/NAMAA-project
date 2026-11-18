@@ -1,0 +1,119 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:8ce33863-79a6-5d19-b005-7f270eaf54b9",
+      "resource": {
+        "resourceType": "Condition",
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "code": {
+          "text": "The patient is currently diagnosed with hypertension."
+        },
+        "note": [
+          {
+            "text": "Verbatim source statement; human reviewed. Clinical status not inferred."
+          },
+          {
+            "text": "Reviewed source DocumentReference/condition-note/_history/v1; quote [0,53) Unicode code points: The patient is currently diagnosed with hypertension."
+          }
+        ],
+        "id": "8ce33863-79a6-5d19-b005-7f270eaf54b9",
+        "identifier": [
+          {
+            "system": "https://namaa.example/fhir/review-command",
+            "value": "offline-demo:condition-review"
+          }
+        ],
+        "meta": {
+          "tag": [
+            {
+              "system": "https://namaa.example/fhir/data-mode",
+              "code": "simulated"
+            }
+          ]
+        }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Condition/8ce33863-79a6-5d19-b005-7f270eaf54b9"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:eac450a4-8798-5d6e-b906-a7c364933032",
+      "resource": {
+        "resourceType": "Provenance",
+        "id": "eac450a4-8798-5d6e-b906-a7c364933032",
+        "target": [
+          {
+            "reference": "urn:uuid:8ce33863-79a6-5d19-b005-7f270eaf54b9"
+          }
+        ],
+        "recorded": "2026-11-18T09:00:00+00:00",
+        "activity": {
+          "text": "Human review: accept; reason: Verified the explicitly current diagnosis wording in the fictional source.; proposal a707dde2-1ade-5f6a-85bf-17215f7bd57f version 1"
+        },
+        "agent": [
+          {
+            "type": {
+              "text": "Human reviewer"
+            },
+            "who": {
+              "reference": "Practitioner/demo-reviewer"
+            }
+          },
+          {
+            "type": {
+              "text": "Simulated extraction"
+            },
+            "who": {
+              "reference": "#model"
+            }
+          }
+        ],
+        "contained": [
+          {
+            "resourceType": "Device",
+            "id": "model",
+            "status": "active",
+            "deviceName": [
+              {
+                "name": "google/medgemma-1.5-4b-it",
+                "type": "model-name"
+              }
+            ],
+            "version": [
+              {
+                "type": {
+                  "text": "Model revision"
+                },
+                "value": "simulated-fixture-v1"
+              },
+              {
+                "type": {
+                  "text": "Prompt version"
+                },
+                "value": "extract-v1.0.1"
+              }
+            ]
+          }
+        ],
+        "entity": [
+          {
+            "role": "source",
+            "what": {
+              "reference": "DocumentReference/condition-note/_history/v1",
+              "display": "SHA-256 dff3e9295a868794c25efe5003681f70d6f05a991db3a2522f491ce634a8f4a3"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Provenance/eac450a4-8798-5d6e-b906-a7c364933032"
+      }
+    }
+  ]
+}

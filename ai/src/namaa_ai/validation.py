@@ -13,6 +13,9 @@ CONCEPT_WORDS = {
     "caregiver_concern": r"concern|worried|question about",
     "tobacco_use": r"smok|tobacco|cigarette",
     "family_condition": r"asthma|diabetes|cancer|condition|hypertension",
+    # This category is restricted to a condition explicitly named as diagnosed
+    # in the source; it is not a general-purpose disease recognizer.
+    "documented_condition": r"diagnos(?:ed|is)",
 }
 RELATIVES = r"mother|father|sister|brother|sibling|grandmother|grandfather"
 
@@ -55,6 +58,11 @@ def check_fact(request: ExtractionRequest, fact: ProposedFact):
             add("subject_mapping", "Relative conditions must remain FamilyMemberHistory")
         if not fact.relationship or not re.search(rf"\b{fact.relationship}\b", text):
             add("relationship_missing", "An explicit supported relationship is required")
+    elif fact.concept == "documented_condition":
+        if fact.proposed_resource_type != "Condition" or fact.relationship is not None:
+            add("subject_mapping", "Explicit patient diagnosis statements may map only to Condition")
+        if fact.assertion != "present" or not re.search(r"\bcurrently\b.{0,40}\bdiagnos(?:ed|is)\b|\bdiagnos(?:ed|is)\b.{0,40}\bcurrently\b", text, re.I):
+            add("condition_not_currently_documented", "Condition proposals require explicit current diagnosis wording")
     elif fact.concept == "family_condition" or fact.proposed_resource_type != "Observation" or fact.relationship is not None:
         add("subject_mapping", "Patient findings must use the patient Observation mapping")
     if re.search(rf"\b({RELATIVES})\s+(?:has|had|was diagnosed|denies|does not have|may have)", text) and fact.subject != "family_member":

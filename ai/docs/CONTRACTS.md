@@ -1,6 +1,6 @@
 # Backend and frontend handoff
 
-Contract version: package `0.1.0`, prompt `extract-v1.0.0`. Schemas are in
+Contract version: package `0.1.0`, prompt `extract-v1.0.1`. Schemas are in
 [`../examples/schemas`](../examples/schemas). Python's Pydantic 2 dependency matches
 the API's pinned major and version. This package has no dependency on FastAPI,
 SQLAlchemy, React or the backend's application models.
@@ -34,7 +34,8 @@ Store proposals and failed jobs in the application database, outside FHIR.
 
 `value_text` is the original verbatim statement. `excerpt` includes full supporting
 sentence/line context. Concepts are `last_wcv`, `last_adult_screening`,
-`caregiver_concern`, `tobacco_use`, and `family_condition`. Subject, assertion,
+`caregiver_concern`, `tobacco_use`, `family_condition` and
+`documented_condition`. Subject, assertion,
 proposed resource type and relationship have closed enums. Effective date is an
 explicit full date or null; document date never supplies a missing event date.
 
@@ -73,7 +74,12 @@ an optional explicit event date. `final` status is not proof of human review.
 Positive/historical relative statements become FamilyMemberHistory conditions;
 absent/uncertain family statements stay in its note and do not assert a condition.
 FamilyMemberHistory remains `partial`; reviewing one statement does not establish
-complete family history. No patient Condition is created.
+complete family history. A patient `Condition` proposal is permitted only when
+the source explicitly says the patient is currently diagnosed; it preserves the
+verbatim statement as `code.text` without inferring a clinical/verification
+status or terminology code. It remains outside FHIR until human review and is
+not consumed by either demonstration rule. This does not authorize MedGemma to
+diagnose.
 
 Provenance targets the resource and records the source DocumentReference history
 version, source hash, review action/reason, human reference and contained Device.

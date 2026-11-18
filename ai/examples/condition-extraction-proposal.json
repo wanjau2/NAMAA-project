@@ -1,0 +1,36 @@
+{
+  "id": "a707dde2-1ade-5f6a-85bf-17215f7bd57f",
+  "version": 1,
+  "state": "proposed",
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "source_document_id": "condition-note",
+  "source_document_version": "v1",
+  "source_sha256": "dff3e9295a868794c25efe5003681f70d6f05a991db3a2522f491ce634a8f4a3",
+  "fact": {
+    "concept": "documented_condition",
+    "value_text": "The patient is currently diagnosed with hypertension.",
+    "subject": "patient",
+    "assertion": "present",
+    "effective_date": null,
+    "excerpt": "The patient is currently diagnosed with hypertension.",
+    "proposed_resource_type": "Condition",
+    "relationship": null
+  },
+  "offset_start": 0,
+  "offset_end": 53,
+  "offset_unit": "unicode_code_points",
+  "issues": [
+    {
+      "code": "missing_date",
+      "severity": "review",
+      "message": "No supported full event date; source date is not a substitute"
+    }
+  ],
+  "model": {
+    "model_id": "google/medgemma-1.5-4b-it",
+    "model_revision": "simulated-fixture-v1",
+    "prompt_version": "extract-v1.0.1",
+    "simulated": true
+  }
+}

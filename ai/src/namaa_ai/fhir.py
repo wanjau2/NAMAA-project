@@ -50,7 +50,7 @@ def local_mapping_checks(bundle: dict) -> ValidationReport:
     for entry in entries:
         resource = entry["resource"]
         kind, rid = resource.get("resourceType"), resource.get("id", "")
-        if kind not in {"Observation", "FamilyMemberHistory", "Provenance"} or not re.fullmatch(r"[A-Za-z0-9.-]{1,64}", rid):
+        if kind not in {"Observation", "Condition", "FamilyMemberHistory", "Provenance"} or not re.fullmatch(r"[A-Za-z0-9.-]{1,64}", rid):
             raise ValueError("Unsupported resource or logical id")
         if "modifierExtension" in resource or "extension" in resource:
             raise ValueError("This mapping supports no extensions")
@@ -65,6 +65,10 @@ def local_mapping_checks(bundle: dict) -> ValidationReport:
         if fact.get("status") != "partial" or not fact.get("relationship", {}).get("text"):
             raise ValueError("Invalid FamilyMemberHistory mapping")
         patient = fact.get("patient", {}).get("reference", "")
+    elif fact["resourceType"] == "Condition":
+        if not fact.get("code", {}).get("text") or fact.get("verificationStatus"):
+            raise ValueError("Condition must retain source wording and avoid unsupported verification status")
+        patient = fact.get("subject", {}).get("reference", "")
     else:
         raise ValueError("First entry must be a reviewed clinical resource")
     if not re.fullmatch(r"Patient/[A-Za-z0-9.-]{1,64}", patient):
@@ -94,6 +98,12 @@ def propose_transaction(reviewed: ReviewedFact) -> TransactionProposal:
         if fact.assertion in {"present", "historical"}:
             resource["condition"] = [{"code": {"text": fact.value_text},
                                       "note": [{"text": f"Source assertion: {fact.assertion}; explicit event date: {fact.effective_date or 'unknown'}"}]}]
+    elif fact.concept == "documented_condition":
+        if fact.proposed_resource_type != "Condition" or fact.assertion != "present" or fact.relationship:
+            raise ValueError("Only an explicitly current, reviewed patient condition can map to Condition")
+        resource = {"resourceType": "Condition", "subject": {"reference": proposal.patient_reference},
+                    "code": {"text": fact.value_text},
+                    "note": [{"text": "Verbatim source statement; human reviewed. Clinical status not inferred."}]}
     else:
         if fact.proposed_resource_type != "Observation" or fact.concept not in CONCEPT_TEXT or fact.relationship:
             raise ValueError("Unsupported patient mapping")

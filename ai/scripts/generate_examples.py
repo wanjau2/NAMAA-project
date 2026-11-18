@@ -4,10 +4,13 @@ import json
 from pathlib import Path
 
 from namaa_ai.adapters import HostedAdapter, HostedConfig, PROTOCOL, MODEL_ID, PROMPT_VERSION
-from namaa_ai.contracts import ExtractionRequest, ModelIdentity, ProposedFact, VerifiedContext
-from namaa_ai.demo import run_demo, simulated_snapshot
+from namaa_ai.contracts import ExtractionRequest, ModelIdentity, ProposedFact, ReviewCommand, VerifiedContext
+from namaa_ai.demo import DemoAuthorizer, run_demo, simulated_snapshot
+from namaa_ai.fhir import propose_transaction
 from namaa_ai.rules import evaluate
+from namaa_ai.review import apply_review
 from namaa_ai.validation import make_proposals
+from datetime import datetime, timezone
 
 OUT = Path("examples")
 OUT.mkdir(exist_ok=True)
@@ -42,3 +45,22 @@ save("verified-context", ctx.model_dump(mode="json"))
 adapter = HostedAdapter(HostedConfig("https://example.invalid/extract", "not-a-real-token", "0" * 40))
 save("endpoint-request", adapter.payload(ExtractionRequest.model_validate(demo["request"]), False))
 save("endpoint-response", dict(protocol=PROTOCOL, model_id=MODEL_ID, model_revision="0"*40, prompt_version=PROMPT_VERSION, output={"facts": [p["fact"] for p in demo["extraction"]["proposals"]]}))
+condition_text = "The patient is currently diagnosed with hypertension."
+condition_request = ExtractionRequest.model_validate(demo["request"] | {
+    "request_id": "condition-example", "source_id": "condition-note", "source_version": "v1",
+    "note_text": condition_text,
+})
+condition_fact = ProposedFact(concept="documented_condition", value_text=condition_text, subject="patient",
+    assertion="present", effective_date=None, excerpt=condition_text, proposed_resource_type="Condition",
+    relationship=None)
+condition_proposal = make_proposals(condition_request, (condition_fact,),
+    ModelIdentity(model_revision="simulated-fixture-v1", simulated=True))[0]
+save("condition-extraction-proposal", condition_proposal.model_dump(mode="json"))
+condition_review = ReviewCommand(request_id="condition-review", proposal_id=condition_proposal.id,
+    expected_proposal_version=1, action="accept", reviewer_reference="Practitioner/demo-reviewer",
+    reason="Verified the explicitly current diagnosis wording in the fictional source.",
+    acknowledged_issues=[i.code for i in condition_proposal.issues])
+save("condition-review-command", condition_review.model_dump(mode="json"))
+condition_reviewed = apply_review(condition_request, condition_proposal, condition_review, current_version=1,
+    reviewed_at=datetime(2026, 11, 18, 9, tzinfo=timezone.utc), authorizer=DemoAuthorizer()).fact
+save("condition-transaction", propose_transaction(condition_reviewed).bundle)

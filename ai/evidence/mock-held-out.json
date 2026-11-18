@@ -16,7 +16,7 @@
   "models": [
     {
       "revision": "simulated-fixture-v1",
-      "prompt": "extract-v1.0.0",
+      "prompt": "extract-v1.0.1",
       "simulated": true
     }
   ],
@@ -99,8 +99,8 @@
   },
   "latency_ms": {
     "sample_size": 20,
-    "median": 0.17202299932250753,
-    "p95": 0.41473100282019004
+    "median": 0.21437999748741277,
+    "p95": 0.4278479973436333
   },
   "cases": [
     {

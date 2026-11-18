@@ -1,5 +1,5 @@
 {
-  "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+  "id": "07bde3ac-dc64-5aab-863b-532c894b7361",
   "version": 1,
   "state": "proposed",
   "workspace_id": "offline-demo",
@@ -24,7 +24,7 @@
   "model": {
     "model_id": "google/medgemma-1.5-4b-it",
     "model_revision": "simulated-fixture-v1",
-    "prompt_version": "extract-v1.0.0",
+    "prompt_version": "extract-v1.0.1",
     "simulated": true
   }
 }

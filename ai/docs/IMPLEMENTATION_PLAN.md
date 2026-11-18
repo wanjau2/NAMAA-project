@@ -14,7 +14,7 @@ No ancestor AGENTS.md was found. Existing work remains unchanged.
 1. Contracts: isolated importable `ai/`, Pydantic 2 JSON contracts, custom endpoint
    protocol, explicit review and backend trust boundaries. No new web/API service.
 2. Vertical slice: bounded adapter → schema/source checks → explicit authorized
-   review → deterministic Observation/FamilyMemberHistory + Provenance proposal →
+   review → deterministic Observation/Condition/FamilyMemberHistory + Provenance proposal →
    simulated committed snapshot → deterministic rules. A proposed Bundle cannot
    itself become a rule input. Official validation remains visibly pending if absent.
 3. Verification: 40 manually specified synthetic notes, balanced 20/20 development

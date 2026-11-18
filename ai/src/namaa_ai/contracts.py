@@ -12,7 +12,7 @@ LogicalId = Version
 PatientRef = Annotated[str, Field(pattern=r"^Patient/[A-Za-z0-9.-]{1,64}$")]
 ReviewerRef = Annotated[str, Field(pattern=r"^Practitioner(Role)?/[A-Za-z0-9.-]{1,64}$")]
 ResourceRef = Annotated[str, Field(pattern=r"^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$")]
-Concept = Literal["last_wcv", "last_adult_screening", "caregiver_concern", "tobacco_use", "family_condition"]
+Concept = Literal["last_wcv", "last_adult_screening", "caregiver_concern", "tobacco_use", "family_condition", "documented_condition"]
 Assertion = Literal["present", "absent", "uncertain", "historical"]
 
 
@@ -38,7 +38,7 @@ class ProposedFact(Contract):
     assertion: Assertion
     effective_date: date | None  # explicit full ISO date only in this slice
     excerpt: Text
-    proposed_resource_type: Literal["Observation", "FamilyMemberHistory"]
+    proposed_resource_type: Literal["Observation", "Condition", "FamilyMemberHistory"]
     relationship: Literal["mother", "father", "sister", "brother", "sibling", "grandmother", "grandfather"] | None
 
 
@@ -49,7 +49,7 @@ class ModelOutput(Contract):
 class ModelIdentity(Contract):
     model_id: Literal["google/medgemma-1.5-4b-it"] = "google/medgemma-1.5-4b-it"
     model_revision: Text
-    prompt_version: Literal["extract-v1.0.0"] = "extract-v1.0.0"
+    prompt_version: Literal["extract-v1.0.1"] = "extract-v1.0.1"
     simulated: StrictBool
 
 
@@ -57,7 +57,7 @@ class EndpointResponse(Contract):
     protocol: Literal["namaa-extraction-v1"]
     model_id: Literal["google/medgemma-1.5-4b-it"]
     model_revision: Text
-    prompt_version: Literal["extract-v1.0.0"]
+    prompt_version: Literal["extract-v1.0.1"]
     output: ModelOutput
 
 

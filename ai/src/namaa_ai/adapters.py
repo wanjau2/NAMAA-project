@@ -17,7 +17,7 @@ from .contracts import EndpointResponse, ExtractionRequest, ExtractionResult, Mo
 from .validation import make_proposals
 
 PROTOCOL = "namaa-extraction-v1"
-PROMPT_VERSION = "extract-v1.0.0"
+PROMPT_VERSION = "extract-v1.0.1"
 MODEL_ID = "google/medgemma-1.5-4b-it"
 TIMEOUT_SECONDS = 90.0  # entire extraction, including all attempts
 MAX_RESPONSE_BYTES = 131072

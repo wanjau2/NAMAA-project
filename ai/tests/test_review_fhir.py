@@ -77,9 +77,44 @@ def test_observation_and_provenance(request_note, proposal):
     assert p["entity"][0]["what"]["reference"].endswith("source-1/_history/v1")
     assert p["agent"][0]["who"]["reference"] == "Practitioner/demo-reviewer"
     assert p["agent"][1]["who"]["reference"] == "#model"
-    assert {v["value"] for v in p["contained"][0]["version"]} == {"simulated-fixture-v1", "extract-v1.0.0"}
+    assert {v["value"] for v in p["contained"][0]["version"]} == {"simulated-fixture-v1", "extract-v1.0.1"}
     assert transaction.validation.base_r4_validator.startswith("pending") and not transaction.validation.executable
     assert propose_transaction(accepted.fact).bundle == transaction.bundle
+
+
+def test_explicitly_documented_current_condition_maps_only_after_review(request_note, fact):
+    text = "The patient is currently diagnosed with hypertension."
+    req = ExtractionRequest.model_validate(request_note.model_dump() | {"note_text": text})
+    condition = ProposedFact.model_validate(fact.model_dump() | {
+        "concept": "documented_condition", "value_text": text, "excerpt": text,
+        "subject": "patient", "assertion": "present", "effective_date": None,
+        "proposed_resource_type": "Condition", "relationship": None,
+    })
+    prop = make_proposals(req, (condition,), ModelIdentity(model_revision="simulated-fixture-v1", simulated=True))[0]
+    decision = review(req, prop, command(prop, acknowledged_issues=[i.code for i in prop.issues]))
+    transaction = propose_transaction(decision.fact)
+    resource, provenance = [entry["resource"] for entry in transaction.bundle["entry"]]
+    assert resource["resourceType"] == "Condition"
+    assert resource["subject"]["reference"] == req.patient_reference
+    assert resource["code"] == {"text": text}
+    assert "clinicalStatus" not in resource and "verificationStatus" not in resource
+    assert provenance["agent"][0]["who"]["reference"] == "Practitioner/demo-reviewer"
+
+
+def test_condition_category_never_infers_or_maps_noncurrent_statement(request_note, fact):
+    for text, assertion in [("The patient has hypertension.", "present"),
+                            ("The patient was diagnosed with hypertension.", "historical"),
+                            ("The patient is not currently diagnosed with hypertension.", "absent")]:
+        req = ExtractionRequest.model_validate(request_note.model_dump() | {"note_text": text})
+        condition = ProposedFact.model_validate(fact.model_dump() | {
+            "concept": "documented_condition", "value_text": text, "excerpt": text,
+            "subject": "patient", "assertion": assertion, "effective_date": None,
+            "proposed_resource_type": "Condition", "relationship": None,
+        })
+        issues = {issue.code for issue in make_proposals(req, (condition,),
+            ModelIdentity(model_revision="simulated-fixture-v1", simulated=True))[0].issues}
+        assert "condition_not_currently_documented" in issues
+        assert "condition_not_currently_documented" in issues
 
 
 @pytest.mark.parametrize("assertion,text,positive", [

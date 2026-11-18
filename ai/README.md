@@ -54,7 +54,7 @@ not a successful empty extraction.
 | `src/namaa_ai/adapters.py` | Backend-only hosted adapter and labelled fixture replay |
 | `src/namaa_ai/validation.py` | Exact excerpts, offsets, qualifiers, source conflicts |
 | `src/namaa_ai/review.py` | Accept/correct/reject, authorization callback and version checks |
-| `src/namaa_ai/fhir.py` | Deterministic mappings, Provenance and local mapping checks |
+| `src/namaa_ai/fhir.py` | Deterministic reviewed Observation, Condition and FamilyMemberHistory mappings, Provenance and local mapping checks |
 | `src/namaa_ai/rules.py` | Versioned fictional rules over backend resource snapshots |
 | `src/namaa_ai/context.py` | Default-disabled verified-context gate |
 | `src/namaa_ai/evaluation.py` | Field metrics, source/schema validity and latency |
@@ -65,6 +65,13 @@ not a successful empty extraction.
 Read [contracts and integration](docs/CONTRACTS.md), [endpoint protocol](docs/ENDPOINT.md),
 [evaluation methodology](docs/EVALUATION.md), and the pre-implementation
 [phased plan](docs/IMPLEMENTATION_PLAN.md).
+
+Authorization boundary and synthetic security tests are documented in
+[security integration](docs/SECURITY.md). Alfred's `SecurityEnforcer` asks
+Ismail's backend for a fresh decision at each boundary; it does not treat local
+roles, prompts, or Relate paths as authority. The local policy adapter is an
+explicit deterministic test fixture only. Backend guest decisions always carry
+`production_authorization=false`.
 
 ## Demonstration rule definitions
 
@@ -95,8 +102,15 @@ screening authorization. Neither rule consumes proposals or graph context.
 **Implemented:** contracts; input/output limits; hosted HTTP protocol adapter with
 90-second total deadline, one transient retry and one schema-repair regeneration
 (three attempts maximum); source checks; explicit review logic; deterministic
-Observation/FamilyMemberHistory mapping and Provenance; local mapping checks;
+Observation/Condition/FamilyMemberHistory mapping and Provenance; local mapping checks;
 fictional rules; context boundary; tests and evaluation runner.
+
+Condition proposals are limited to verbatim statements explicitly saying the
+patient is currently diagnosed. The lexical guard rejects inferred, historical,
+absent, uncertain and relative conditions. They require the same authenticated
+human review; no clinical status or terminology code is inferred, and the demo
+rules do not consume Condition resources. This is extraction/mapping support, not
+model diagnosis.
 
 **Mocked:** extraction through a configured label replay; the CLI's reviewer
 authorization; FHIR commit and version assignment. Mock metrics test software
@@ -125,7 +139,7 @@ clinical correctness. The stable-ID PUT proposals are deliberately incomplete
 with respect to server state: resolve creates/updates and attach `If-Match` for
 authorized updates, with command-journal reconciliation for retry safety.
 
-Lexical source checks are conservative, limited to five controlled categories,
+Lexical source checks are conservative, limited to six controlled categories,
 and can both overflag and miss semantic errors. They do not establish patient
 identity, automatically detect language, understand arbitrary clinical text or
 prove absence of contradictory records. English is an explicit request contract.

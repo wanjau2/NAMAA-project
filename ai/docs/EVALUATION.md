@@ -3,11 +3,18 @@
 `fixtures/notes.json` contains 40 authored fictional English notes with reference
 labels and expected software-validation issues: 10 straightforward, 10 negation/
 family, 10 missing-date/conflicting-history, and 10 irrelevant/injection/formatting.
-Each group has five `development` and five `held_out` cases. Prompt version
-`extract-v1.0.0` was fixed before constructing the corpus and does not embed its
+Each group has five `development` and five `held_out` cases. The original prompt
+version `extract-v1.0.0` was fixed before constructing the corpus and does not embed its
 notes. Keep held-out cases out of prompt tuning; changes informed by a live
 held-out run require a new untouched test set. The small authored set is not a
 representative clinical dataset, and its labels have not had clinician adjudication.
+
+Prompt `extract-v1.0.1` adds a narrowly gated `documented_condition` category.
+The existing 40-note corpus has no positive gold examples for this new category;
+unit tests cover explicit-current wording, historical/absent/non-current cases
+and review-gated mapping. Do not interpret the existing corpus scores as
+evaluating Condition extraction quality. A separate clinician-adjudicated
+synthetic set is required before reporting such a metric.
 
 The mock command deliberately replays each reference label as a scripted response.
 Perfect field scores from it are expected by construction. They verify parsing,

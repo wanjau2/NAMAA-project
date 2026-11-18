@@ -17,8 +17,8 @@
           "type": "string"
         },
         "prompt_version": {
-          "const": "extract-v1.0.0",
-          "default": "extract-v1.0.0",
+          "const": "extract-v1.0.1",
+          "default": "extract-v1.0.1",
           "title": "Prompt Version",
           "type": "string"
         },
@@ -43,7 +43,8 @@
             "last_adult_screening",
             "caregiver_concern",
             "tobacco_use",
-            "family_condition"
+            "family_condition",
+            "documented_condition"
           ],
           "title": "Concept",
           "type": "string"
@@ -95,6 +96,7 @@
         "proposed_resource_type": {
           "enum": [
             "Observation",
+            "Condition",
             "FamilyMemberHistory"
           ],
           "title": "Proposed Resource Type",

@@ -3,7 +3,7 @@
   "type": "transaction",
   "entry": [
     {
-      "fullUrl": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0",
+      "fullUrl": "urn:uuid:376f0725-f2f9-5487-aa0f-17f61c1cb054",
       "resource": {
         "resourceType": "Observation",
         "status": "final",
@@ -25,7 +25,7 @@
           }
         ],
         "effectiveDateTime": "2026-09-01",
-        "id": "edfa4634-bcb5-5617-9031-303e675f7bc0",
+        "id": "376f0725-f2f9-5487-aa0f-17f61c1cb054",
         "identifier": [
           {
             "system": "https://namaa.example/fhir/review-command",
@@ -48,22 +48,22 @@
       },
       "request": {
         "method": "PUT",
-        "url": "Observation/edfa4634-bcb5-5617-9031-303e675f7bc0"
+        "url": "Observation/376f0725-f2f9-5487-aa0f-17f61c1cb054"
       }
     },
     {
-      "fullUrl": "urn:uuid:5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+      "fullUrl": "urn:uuid:74e7f747-8f17-5db1-8452-32583e3d4ae0",
       "resource": {
         "resourceType": "Provenance",
-        "id": "5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+        "id": "74e7f747-8f17-5db1-8452-32583e3d4ae0",
         "target": [
           {
-            "reference": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0"
+            "reference": "urn:uuid:376f0725-f2f9-5487-aa0f-17f61c1cb054"
           }
         ],
         "recorded": "2026-11-18T09:00:00+00:00",
         "activity": {
-          "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal fd5d7bbb-02be-5098-bc12-4932e2d31231 version 1"
+          "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal 07bde3ac-dc64-5aab-863b-532c894b7361 version 1"
         },
         "agent": [
           {
@@ -105,7 +105,7 @@
                 "type": {
                   "text": "Prompt version"
                 },
-                "value": "extract-v1.0.0"
+                "value": "extract-v1.0.1"
               }
             ]
           }
@@ -122,7 +122,7 @@
       },
       "request": {
         "method": "PUT",
-        "url": "Provenance/5115366a-2fa1-57a8-87f9-9d1bbba27da0"
+        "url": "Provenance/74e7f747-8f17-5db1-8452-32583e3d4ae0"
       }
     }
   ]
