@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "ContextRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/ResourceVersion"
+        },
+        "patient_reference": {
+          "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+          "title": "Patient Reference",
+          "type": "string"
+        },
+        "source_last_updated": {
+          "format": "date-time",
+          "title": "Source Last Updated",
+          "type": "string"
+        },
+        "verified_at": {
+          "format": "date-time",
+          "title": "Verified At",
+          "type": "string"
+        },
+        "authorized": {
+          "title": "Authorized",
+          "type": "boolean"
+        },
+        "source_verified": {
+          "title": "Source Verified",
+          "type": "boolean"
+        },
+        "text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "patient_reference",
+        "source_last_updated",
+        "verified_at",
+        "authorized",
+        "source_verified",
+        "text"
+      ],
+      "title": "ContextRecord",
+      "type": "object"
+    },
+    "ResourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference",
+        "version"
+      ],
+      "title": "ResourceVersion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "workspace_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Workspace Id",
+      "type": "string"
+    },
+    "patient_reference": {
+      "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+      "title": "Patient Reference",
+      "type": "string"
+    },
+    "generation_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Generation Id",
+      "type": "string"
+    },
+    "mapping_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Mapping Version",
+      "type": "string"
+    },
+    "permission_revision": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Permission Revision",
+      "type": "string"
+    },
+    "built_at": {
+      "format": "date-time",
+      "title": "Built At",
+      "type": "string"
+    },
+    "verified_at": {
+      "format": "date-time",
+      "title": "Verified At",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "current",
+        "stale",
+        "dirty",
+        "unavailable"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "authorized": {
+      "title": "Authorized",
+      "type": "boolean"
+    },
+    "source_verified": {
+      "title": "Source Verified",
+      "type": "boolean"
+    },
+    "completeness": {
+      "enum": [
+        "complete_in_checked_scope",
+        "partial",
+        "unknown"
+      ],
+      "title": "Completeness",
+      "type": "string"
+    },
+    "checked_scope": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Checked Scope",
+      "type": "string"
+    },
+    "records": {
+      "items": {
+        "$ref": "#/$defs/ContextRecord"
+      },
+      "title": "Records",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "patient_reference",
+    "generation_id",
+    "mapping_version",
+    "permission_revision",
+    "built_at",
+    "verified_at",
+    "expires_at",
+    "state",
+    "authorized",
+    "source_verified",
+    "completeness",
+    "checked_scope",
+    "records"
+  ],
+  "title": "VerifiedContext",
+  "type": "object"
+}

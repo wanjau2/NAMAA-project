@@ -1,0 +1,30 @@
+{
+  "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+  "version": 1,
+  "state": "proposed",
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "source_document_id": "demo-note",
+  "source_document_version": "v1",
+  "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+  "fact": {
+    "concept": "last_wcv",
+    "value_text": "The patient attended a well-child visit on 2026-09-01.",
+    "subject": "patient",
+    "assertion": "present",
+    "effective_date": "2026-09-01",
+    "excerpt": "The patient attended a well-child visit on 2026-09-01.",
+    "proposed_resource_type": "Observation",
+    "relationship": null
+  },
+  "offset_start": 0,
+  "offset_end": 54,
+  "offset_unit": "unicode_code_points",
+  "issues": [],
+  "model": {
+    "model_id": "google/medgemma-1.5-4b-it",
+    "model_revision": "simulated-fixture-v1",
+    "prompt_version": "extract-v1.0.0",
+    "simulated": true
+  }
+}

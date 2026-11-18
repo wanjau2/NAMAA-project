@@ -1,0 +1,10 @@
+{
+  "request_id": "demo-human-review-0",
+  "proposal_id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+  "expected_proposal_version": 1,
+  "action": "accept",
+  "reviewer_reference": "Practitioner/demo-reviewer",
+  "reason": "Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.",
+  "correction": null,
+  "acknowledged_issues": []
+}

@@ -1,0 +1,17 @@
+{
+  "recorded_on": "2026-11-18",
+  "python": "3.14.10",
+  "dependencies": {
+    "pydantic": "2.12.4",
+    "httpx": "0.28.1",
+    "pytest": "9.0.1"
+  },
+  "live_endpoint_called": false,
+  "hapi_called": false,
+  "fhir_base_validation": "pending: validator unavailable",
+  "namaa_profile_validation": "pending: conformance package unavailable",
+  "sha256": {
+    "fixtures/notes.json": "1c503fbcfbd46b94e707ce0a941008e503941b38fad2364eaeb3186d4d14be28",
+    "src/namaa_ai/prompts/extract-v1.0.0.txt": "53c9ed8760c06d09906715a4241cbf634eae4d8fd37d6e35f2950d45744b3145"
+  }
+}

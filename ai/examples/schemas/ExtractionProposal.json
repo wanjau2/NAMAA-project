@@ -1,0 +1,275 @@
+{
+  "$defs": {
+    "ModelIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "model_id": {
+          "const": "google/medgemma-1.5-4b-it",
+          "default": "google/medgemma-1.5-4b-it",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "model_revision": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Model Revision",
+          "type": "string"
+        },
+        "prompt_version": {
+          "const": "extract-v1.0.0",
+          "default": "extract-v1.0.0",
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "simulated": {
+          "title": "Simulated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "model_revision",
+        "simulated"
+      ],
+      "title": "ModelIdentity",
+      "type": "object"
+    },
+    "ProposedFact": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "enum": [
+            "last_wcv",
+            "last_adult_screening",
+            "caregiver_concern",
+            "tobacco_use",
+            "family_condition"
+          ],
+          "title": "Concept",
+          "type": "string"
+        },
+        "value_text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Value Text",
+          "type": "string"
+        },
+        "subject": {
+          "enum": [
+            "patient",
+            "family_member"
+          ],
+          "title": "Subject",
+          "type": "string"
+        },
+        "assertion": {
+          "enum": [
+            "present",
+            "absent",
+            "uncertain",
+            "historical"
+          ],
+          "title": "Assertion",
+          "type": "string"
+        },
+        "effective_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effective Date"
+        },
+        "excerpt": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "proposed_resource_type": {
+          "enum": [
+            "Observation",
+            "FamilyMemberHistory"
+          ],
+          "title": "Proposed Resource Type",
+          "type": "string"
+        },
+        "relationship": {
+          "anyOf": [
+            {
+              "enum": [
+                "mother",
+                "father",
+                "sister",
+                "brother",
+                "sibling",
+                "grandmother",
+                "grandfather"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Relationship"
+        }
+      },
+      "required": [
+        "concept",
+        "value_text",
+        "subject",
+        "assertion",
+        "effective_date",
+        "excerpt",
+        "proposed_resource_type",
+        "relationship"
+      ],
+      "title": "ProposedFact",
+      "type": "object"
+    },
+    "ValidationIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "block",
+            "review"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message"
+      ],
+      "title": "ValidationIssue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Id",
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "state": {
+      "const": "proposed",
+      "default": "proposed",
+      "title": "State",
+      "type": "string"
+    },
+    "workspace_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Workspace Id",
+      "type": "string"
+    },
+    "patient_reference": {
+      "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+      "title": "Patient Reference",
+      "type": "string"
+    },
+    "source_document_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Source Document Id",
+      "type": "string"
+    },
+    "source_document_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Source Document Version",
+      "type": "string"
+    },
+    "source_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Source Sha256",
+      "type": "string"
+    },
+    "fact": {
+      "$ref": "#/$defs/ProposedFact"
+    },
+    "offset_start": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Offset Start"
+    },
+    "offset_end": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Offset End"
+    },
+    "offset_unit": {
+      "const": "unicode_code_points",
+      "default": "unicode_code_points",
+      "title": "Offset Unit",
+      "type": "string"
+    },
+    "issues": {
+      "items": {
+        "$ref": "#/$defs/ValidationIssue"
+      },
+      "title": "Issues",
+      "type": "array"
+    },
+    "model": {
+      "$ref": "#/$defs/ModelIdentity"
+    }
+  },
+  "required": [
+    "id",
+    "workspace_id",
+    "patient_reference",
+    "source_document_id",
+    "source_document_version",
+    "source_sha256",
+    "fact",
+    "offset_start",
+    "offset_end",
+    "issues",
+    "model"
+  ],
+  "title": "ExtractionProposal",
+  "type": "object"
+}

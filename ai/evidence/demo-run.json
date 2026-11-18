@@ -1,0 +1,606 @@
+{
+  "notice": "SIMULATED extraction, reviewer authorization and FHIR commit; no live model or HAPI calls",
+  "request": {
+    "request_id": "demo-extraction",
+    "workspace_id": "offline-demo",
+    "patient_reference": "Patient/demo-patient",
+    "source_id": "demo-note",
+    "source_version": "v1",
+    "source_date": "2026-11-18",
+    "language": "en",
+    "note_text": "The patient attended a well-child visit on 2026-09-01. Mother has asthma."
+  },
+  "extraction": {
+    "status": "success",
+    "model": {
+      "model_id": "google/medgemma-1.5-4b-it",
+      "model_revision": "simulated-fixture-v1",
+      "prompt_version": "extract-v1.0.0",
+      "simulated": true
+    },
+    "proposals": [
+      {
+        "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+        "version": 1,
+        "state": "proposed",
+        "workspace_id": "offline-demo",
+        "patient_reference": "Patient/demo-patient",
+        "source_document_id": "demo-note",
+        "source_document_version": "v1",
+        "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+        "fact": {
+          "concept": "last_wcv",
+          "value_text": "The patient attended a well-child visit on 2026-09-01.",
+          "subject": "patient",
+          "assertion": "present",
+          "effective_date": "2026-09-01",
+          "excerpt": "The patient attended a well-child visit on 2026-09-01.",
+          "proposed_resource_type": "Observation",
+          "relationship": null
+        },
+        "offset_start": 0,
+        "offset_end": 54,
+        "offset_unit": "unicode_code_points",
+        "issues": [],
+        "model": {
+          "model_id": "google/medgemma-1.5-4b-it",
+          "model_revision": "simulated-fixture-v1",
+          "prompt_version": "extract-v1.0.0",
+          "simulated": true
+        }
+      },
+      {
+        "id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+        "version": 1,
+        "state": "proposed",
+        "workspace_id": "offline-demo",
+        "patient_reference": "Patient/demo-patient",
+        "source_document_id": "demo-note",
+        "source_document_version": "v1",
+        "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+        "fact": {
+          "concept": "family_condition",
+          "value_text": "Mother has asthma.",
+          "subject": "family_member",
+          "assertion": "present",
+          "effective_date": null,
+          "excerpt": "Mother has asthma.",
+          "proposed_resource_type": "FamilyMemberHistory",
+          "relationship": "mother"
+        },
+        "offset_start": 55,
+        "offset_end": 73,
+        "offset_unit": "unicode_code_points",
+        "issues": [
+          {
+            "code": "missing_date",
+            "severity": "review",
+            "message": "No supported full event date; source date is not a substitute"
+          }
+        ],
+        "model": {
+          "model_id": "google/medgemma-1.5-4b-it",
+          "model_revision": "simulated-fixture-v1",
+          "prompt_version": "extract-v1.0.0",
+          "simulated": true
+        }
+      }
+    ],
+    "error_code": null,
+    "latency_ms": 1.7770249978639185,
+    "attempts": 1,
+    "schema_valid": true
+  },
+  "review_decisions": [
+    {
+      "command": {
+        "request_id": "demo-human-review-0",
+        "proposal_id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+        "expected_proposal_version": 1,
+        "action": "accept",
+        "reviewer_reference": "Practitioner/demo-reviewer",
+        "reason": "Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.",
+        "correction": null,
+        "acknowledged_issues": []
+      },
+      "resulting_proposal_version": 2,
+      "state": "accepted",
+      "fact": {
+        "proposal": {
+          "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+          "version": 1,
+          "state": "proposed",
+          "workspace_id": "offline-demo",
+          "patient_reference": "Patient/demo-patient",
+          "source_document_id": "demo-note",
+          "source_document_version": "v1",
+          "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+          "fact": {
+            "concept": "last_wcv",
+            "value_text": "The patient attended a well-child visit on 2026-09-01.",
+            "subject": "patient",
+            "assertion": "present",
+            "effective_date": "2026-09-01",
+            "excerpt": "The patient attended a well-child visit on 2026-09-01.",
+            "proposed_resource_type": "Observation",
+            "relationship": null
+          },
+          "offset_start": 0,
+          "offset_end": 54,
+          "offset_unit": "unicode_code_points",
+          "issues": [],
+          "model": {
+            "model_id": "google/medgemma-1.5-4b-it",
+            "model_revision": "simulated-fixture-v1",
+            "prompt_version": "extract-v1.0.0",
+            "simulated": true
+          }
+        },
+        "fact": {
+          "concept": "last_wcv",
+          "value_text": "The patient attended a well-child visit on 2026-09-01.",
+          "subject": "patient",
+          "assertion": "present",
+          "effective_date": "2026-09-01",
+          "excerpt": "The patient attended a well-child visit on 2026-09-01.",
+          "proposed_resource_type": "Observation",
+          "relationship": null
+        },
+        "review": {
+          "request_id": "demo-human-review-0",
+          "proposal_id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+          "expected_proposal_version": 1,
+          "action": "accept",
+          "reviewer_reference": "Practitioner/demo-reviewer",
+          "reason": "Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.",
+          "correction": null,
+          "acknowledged_issues": []
+        },
+        "reviewed_at": "2026-11-18T09:00:00Z",
+        "source_date": "2026-11-18",
+        "offset_start": 0,
+        "offset_end": 54
+      }
+    },
+    {
+      "command": {
+        "request_id": "demo-human-review-1",
+        "proposal_id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+        "expected_proposal_version": 1,
+        "action": "accept",
+        "reviewer_reference": "Practitioner/demo-reviewer",
+        "reason": "Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.",
+        "correction": null,
+        "acknowledged_issues": [
+          "missing_date"
+        ]
+      },
+      "resulting_proposal_version": 2,
+      "state": "accepted",
+      "fact": {
+        "proposal": {
+          "id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+          "version": 1,
+          "state": "proposed",
+          "workspace_id": "offline-demo",
+          "patient_reference": "Patient/demo-patient",
+          "source_document_id": "demo-note",
+          "source_document_version": "v1",
+          "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+          "fact": {
+            "concept": "family_condition",
+            "value_text": "Mother has asthma.",
+            "subject": "family_member",
+            "assertion": "present",
+            "effective_date": null,
+            "excerpt": "Mother has asthma.",
+            "proposed_resource_type": "FamilyMemberHistory",
+            "relationship": "mother"
+          },
+          "offset_start": 55,
+          "offset_end": 73,
+          "offset_unit": "unicode_code_points",
+          "issues": [
+            {
+              "code": "missing_date",
+              "severity": "review",
+              "message": "No supported full event date; source date is not a substitute"
+            }
+          ],
+          "model": {
+            "model_id": "google/medgemma-1.5-4b-it",
+            "model_revision": "simulated-fixture-v1",
+            "prompt_version": "extract-v1.0.0",
+            "simulated": true
+          }
+        },
+        "fact": {
+          "concept": "family_condition",
+          "value_text": "Mother has asthma.",
+          "subject": "family_member",
+          "assertion": "present",
+          "effective_date": null,
+          "excerpt": "Mother has asthma.",
+          "proposed_resource_type": "FamilyMemberHistory",
+          "relationship": "mother"
+        },
+        "review": {
+          "request_id": "demo-human-review-1",
+          "proposal_id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+          "expected_proposal_version": 1,
+          "action": "accept",
+          "reviewer_reference": "Practitioner/demo-reviewer",
+          "reason": "Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.",
+          "correction": null,
+          "acknowledged_issues": [
+            "missing_date"
+          ]
+        },
+        "reviewed_at": "2026-11-18T09:00:00Z",
+        "source_date": "2026-11-18",
+        "offset_start": 55,
+        "offset_end": 73
+      }
+    }
+  ],
+  "transaction_proposals": [
+    {
+      "bundle": {
+        "resourceType": "Bundle",
+        "type": "transaction",
+        "entry": [
+          {
+            "fullUrl": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0",
+            "resource": {
+              "resourceType": "Observation",
+              "status": "final",
+              "code": {
+                "text": "Reported last well-child visit"
+              },
+              "subject": {
+                "reference": "Patient/demo-patient"
+              },
+              "valueString": "The patient attended a well-child visit on 2026-09-01.",
+              "component": [
+                {
+                  "code": {
+                    "text": "Source assertion"
+                  },
+                  "valueCodeableConcept": {
+                    "text": "present"
+                  }
+                }
+              ],
+              "effectiveDateTime": "2026-09-01",
+              "id": "edfa4634-bcb5-5617-9031-303e675f7bc0",
+              "identifier": [
+                {
+                  "system": "https://namaa.example/fhir/review-command",
+                  "value": "offline-demo:demo-human-review-0"
+                }
+              ],
+              "note": [
+                {
+                  "text": "Reviewed source DocumentReference/demo-note/_history/v1; quote [0,54) Unicode code points: The patient attended a well-child visit on 2026-09-01."
+                }
+              ],
+              "meta": {
+                "tag": [
+                  {
+                    "system": "https://namaa.example/fhir/data-mode",
+                    "code": "simulated"
+                  }
+                ]
+              }
+            },
+            "request": {
+              "method": "PUT",
+              "url": "Observation/edfa4634-bcb5-5617-9031-303e675f7bc0"
+            }
+          },
+          {
+            "fullUrl": "urn:uuid:5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+            "resource": {
+              "resourceType": "Provenance",
+              "id": "5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+              "target": [
+                {
+                  "reference": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0"
+                }
+              ],
+              "recorded": "2026-11-18T09:00:00+00:00",
+              "activity": {
+                "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal fd5d7bbb-02be-5098-bc12-4932e2d31231 version 1"
+              },
+              "agent": [
+                {
+                  "type": {
+                    "text": "Human reviewer"
+                  },
+                  "who": {
+                    "reference": "Practitioner/demo-reviewer"
+                  }
+                },
+                {
+                  "type": {
+                    "text": "Simulated extraction"
+                  },
+                  "who": {
+                    "reference": "#model"
+                  }
+                }
+              ],
+              "contained": [
+                {
+                  "resourceType": "Device",
+                  "id": "model",
+                  "status": "active",
+                  "deviceName": [
+                    {
+                      "name": "google/medgemma-1.5-4b-it",
+                      "type": "model-name"
+                    }
+                  ],
+                  "version": [
+                    {
+                      "type": {
+                        "text": "Model revision"
+                      },
+                      "value": "simulated-fixture-v1"
+                    },
+                    {
+                      "type": {
+                        "text": "Prompt version"
+                      },
+                      "value": "extract-v1.0.0"
+                    }
+                  ]
+                }
+              ],
+              "entity": [
+                {
+                  "role": "source",
+                  "what": {
+                    "reference": "DocumentReference/demo-note/_history/v1",
+                    "display": "SHA-256 8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2"
+                  }
+                }
+              ]
+            },
+            "request": {
+              "method": "PUT",
+              "url": "Provenance/5115366a-2fa1-57a8-87f9-9d1bbba27da0"
+            }
+          }
+        ]
+      },
+      "validation": {
+        "fhir_version": "4.0.1",
+        "local_mapping_checks": "passed (allowlisted subset only)",
+        "base_r4_validator": "pending: HL7 validator not installed or configured",
+        "namaa_profiles": "pending: Namaa conformance package not supplied",
+        "executable": false
+      },
+      "simulated": true,
+      "backend_requirements": [
+        "Authenticate reviewer and scope all references to the authorized workspace/patient",
+        "Journal command and payload hash; compare-and-swap proposal version atomically",
+        "Resolve stable IDs against HAPI; attach If-Match to authorized updates and reconcile prior creates",
+        "Validate base R4, Namaa profiles, terminology, references and authorization",
+        "Execute through HAPI transaction gateway; reconcile uncertain outcomes before retry",
+        "Reload committed versioned resources with review attestations before rule evaluation"
+      ]
+    },
+    {
+      "bundle": {
+        "resourceType": "Bundle",
+        "type": "transaction",
+        "entry": [
+          {
+            "fullUrl": "urn:uuid:b0e69032-1482-5adf-b15e-f803bf355bf8",
+            "resource": {
+              "resourceType": "FamilyMemberHistory",
+              "status": "partial",
+              "patient": {
+                "reference": "Patient/demo-patient"
+              },
+              "relationship": {
+                "text": "mother"
+              },
+              "date": "2026-11-18",
+              "note": [
+                {
+                  "text": "present: Mother has asthma."
+                },
+                {
+                  "text": "Reviewed source DocumentReference/demo-note/_history/v1; quote [55,73) Unicode code points: Mother has asthma."
+                }
+              ],
+              "condition": [
+                {
+                  "code": {
+                    "text": "Mother has asthma."
+                  },
+                  "note": [
+                    {
+                      "text": "Source assertion: present; explicit event date: unknown"
+                    }
+                  ]
+                }
+              ],
+              "id": "b0e69032-1482-5adf-b15e-f803bf355bf8",
+              "identifier": [
+                {
+                  "system": "https://namaa.example/fhir/review-command",
+                  "value": "offline-demo:demo-human-review-1"
+                }
+              ],
+              "meta": {
+                "tag": [
+                  {
+                    "system": "https://namaa.example/fhir/data-mode",
+                    "code": "simulated"
+                  }
+                ]
+              }
+            },
+            "request": {
+              "method": "PUT",
+              "url": "FamilyMemberHistory/b0e69032-1482-5adf-b15e-f803bf355bf8"
+            }
+          },
+          {
+            "fullUrl": "urn:uuid:7ba1c7d6-0a25-58bf-8991-a17c5ba2be05",
+            "resource": {
+              "resourceType": "Provenance",
+              "id": "7ba1c7d6-0a25-58bf-8991-a17c5ba2be05",
+              "target": [
+                {
+                  "reference": "urn:uuid:b0e69032-1482-5adf-b15e-f803bf355bf8"
+                }
+              ],
+              "recorded": "2026-11-18T09:00:00+00:00",
+              "activity": {
+                "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal 2f1f5c12-b5da-5699-88c4-b9789aa786f3 version 1"
+              },
+              "agent": [
+                {
+                  "type": {
+                    "text": "Human reviewer"
+                  },
+                  "who": {
+                    "reference": "Practitioner/demo-reviewer"
+                  }
+                },
+                {
+                  "type": {
+                    "text": "Simulated extraction"
+                  },
+                  "who": {
+                    "reference": "#model"
+                  }
+                }
+              ],
+              "contained": [
+                {
+                  "resourceType": "Device",
+                  "id": "model",
+                  "status": "active",
+                  "deviceName": [
+                    {
+                      "name": "google/medgemma-1.5-4b-it",
+                      "type": "model-name"
+                    }
+                  ],
+                  "version": [
+                    {
+                      "type": {
+                        "text": "Model revision"
+                      },
+                      "value": "simulated-fixture-v1"
+                    },
+                    {
+                      "type": {
+                        "text": "Prompt version"
+                      },
+                      "value": "extract-v1.0.0"
+                    }
+                  ]
+                }
+              ],
+              "entity": [
+                {
+                  "role": "source",
+                  "what": {
+                    "reference": "DocumentReference/demo-note/_history/v1",
+                    "display": "SHA-256 8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2"
+                  }
+                }
+              ]
+            },
+            "request": {
+              "method": "PUT",
+              "url": "Provenance/7ba1c7d6-0a25-58bf-8991-a17c5ba2be05"
+            }
+          }
+        ]
+      },
+      "validation": {
+        "fhir_version": "4.0.1",
+        "local_mapping_checks": "passed (allowlisted subset only)",
+        "base_r4_validator": "pending: HL7 validator not installed or configured",
+        "namaa_profiles": "pending: Namaa conformance package not supplied",
+        "executable": false
+      },
+      "simulated": true,
+      "backend_requirements": [
+        "Authenticate reviewer and scope all references to the authorized workspace/patient",
+        "Journal command and payload hash; compare-and-swap proposal version atomically",
+        "Resolve stable IDs against HAPI; attach If-Match to authorized updates and reconcile prior creates",
+        "Validate base R4, Namaa profiles, terminology, references and authorization",
+        "Execute through HAPI transaction gateway; reconcile uncertain outcomes before retry",
+        "Reload committed versioned resources with review attestations before rule evaluation"
+      ]
+    }
+  ],
+  "before_reviewed_commit": {
+    "patient_reference": "Patient/demo-patient",
+    "as_of": "2026-11-18",
+    "rule_id": "DEMO_WCV_01",
+    "rule_version": "synthetic-1.0.0",
+    "outcome": "needs_review",
+    "input_versions": [
+      {
+        "reference": "Patient/demo-patient",
+        "version": "demo-v1"
+      },
+      {
+        "reference": "Observation/demo-eligibility",
+        "version": "demo-v1"
+      }
+    ],
+    "contributing_factors": [
+      "Fictional eligibility card: True"
+    ],
+    "missing_information": [
+      "Reviewed explicit last-event date; absence of records is not a gap"
+    ],
+    "due_date": null,
+    "simulated": true,
+    "synthetic_rule": true
+  },
+  "after_simulated_commit": {
+    "patient_reference": "Patient/demo-patient",
+    "as_of": "2026-11-18",
+    "rule_id": "DEMO_WCV_01",
+    "rule_version": "synthetic-1.0.0",
+    "outcome": "gap_identified",
+    "input_versions": [
+      {
+        "reference": "Patient/demo-patient",
+        "version": "demo-v1"
+      },
+      {
+        "reference": "Observation/demo-eligibility",
+        "version": "demo-v1"
+      },
+      {
+        "reference": "Observation/edfa4634-bcb5-5617-9031-303e675f7bc0",
+        "version": "simulated-commit-v1"
+      },
+      {
+        "reference": "FamilyMemberHistory/b0e69032-1482-5adf-b15e-f803bf355bf8",
+        "version": "simulated-commit-v1"
+      }
+    ],
+    "contributing_factors": [
+      "Fictional eligibility card: True",
+      "Reviewed last event: 2026-09-01",
+      "Fictional interval: 37 days; due on 2026-10-08"
+    ],
+    "missing_information": [],
+    "due_date": "2026-10-08",
+    "simulated": true,
+    "synthetic_rule": true
+  }
+}

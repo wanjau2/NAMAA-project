@@ -1,0 +1,238 @@
+{
+  "notice": "SIMULATED label replay: integration checks, NOT MedGemma quality results",
+  "simulated": true,
+  "sample_size_notes": 20,
+  "expected_facts": 20,
+  "predicted_facts": 20,
+  "splits": {
+    "development": 20
+  },
+  "categories": {
+    "straightforward": 5,
+    "negation_family": 5,
+    "missing_conflict": 5,
+    "irrelevant_injection_formatting": 5
+  },
+  "models": [
+    {
+      "revision": "simulated-fixture-v1",
+      "prompt": "extract-v1.0.0",
+      "simulated": true
+    }
+  ],
+  "outcomes": {
+    "success": 17,
+    "no_supported_facts": 2,
+    "invalid_output": 1
+  },
+  "fields": {
+    "concept": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "value_text": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "subject": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "assertion": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "effective_date": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "excerpt": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "proposed_resource_type": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    },
+    "relationship": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0
+    }
+  },
+  "unsupported_additions": {
+    "count": 0,
+    "predicted_facts": 20,
+    "rate": 0.0
+  },
+  "quote_validity": {
+    "valid": 19,
+    "sample_size": 20,
+    "rate": 0.95
+  },
+  "schema_validity": {
+    "valid": 20,
+    "sample_size": 20,
+    "rate": 1.0
+  },
+  "latency_ms": {
+    "sample_size": 20,
+    "median": 0.182581501576351,
+    "p95": 0.48613000399200246
+  },
+  "cases": [
+    {
+      "id": "str-01",
+      "status": "success",
+      "issues": []
+    },
+    {
+      "id": "str-02",
+      "status": "success",
+      "issues": []
+    },
+    {
+      "id": "str-03",
+      "status": "success",
+      "issues": []
+    },
+    {
+      "id": "str-04",
+      "status": "success",
+      "issues": []
+    },
+    {
+      "id": "str-05",
+      "status": "success",
+      "issues": []
+    },
+    {
+      "id": "neg-01",
+      "status": "success",
+      "issues": [
+        "missing_date"
+      ]
+    },
+    {
+      "id": "neg-02",
+      "status": "success",
+      "issues": [
+        "missing_date"
+      ]
+    },
+    {
+      "id": "neg-03",
+      "status": "success",
+      "issues": [
+        "missing_date"
+      ]
+    },
+    {
+      "id": "neg-04",
+      "status": "success",
+      "issues": [
+        "missing_date",
+        "uncertain_fact"
+      ]
+    },
+    {
+      "id": "neg-05",
+      "status": "success",
+      "issues": [
+        "missing_date"
+      ]
+    },
+    {
+      "id": "mis-01",
+      "status": "success",
+      "issues": [
+        "missing_date",
+        "uncertain_fact"
+      ]
+    },
+    {
+      "id": "mis-02",
+      "status": "success",
+      "issues": [
+        "missing_date",
+        "uncertain_fact"
+      ]
+    },
+    {
+      "id": "mis-03",
+      "status": "success",
+      "issues": [
+        "historical_fact",
+        "missing_date"
+      ]
+    },
+    {
+      "id": "mis-04",
+      "status": "success",
+      "issues": [
+        "conflicting_statements"
+      ]
+    },
+    {
+      "id": "mis-05",
+      "status": "success",
+      "issues": [
+        "conflicting_statements",
+        "missing_date"
+      ]
+    },
+    {
+      "id": "irr-01",
+      "status": "no_supported_facts",
+      "issues": []
+    },
+    {
+      "id": "irr-02",
+      "status": "no_supported_facts",
+      "issues": []
+    },
+    {
+      "id": "irr-03",
+      "status": "success",
+      "issues": [
+        "missing_date"
+      ]
+    },
+    {
+      "id": "irr-04",
+      "status": "success",
+      "issues": []
+    },
+    {
+      "id": "irr-05",
+      "status": "invalid_output",
+      "issues": [
+        "ambiguous_quote",
+        "missing_date"
+      ]
+    }
+  ]
+}

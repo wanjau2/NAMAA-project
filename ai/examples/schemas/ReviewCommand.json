@@ -1,0 +1,176 @@
+{
+  "$defs": {
+    "ProposedFact": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "enum": [
+            "last_wcv",
+            "last_adult_screening",
+            "caregiver_concern",
+            "tobacco_use",
+            "family_condition"
+          ],
+          "title": "Concept",
+          "type": "string"
+        },
+        "value_text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Value Text",
+          "type": "string"
+        },
+        "subject": {
+          "enum": [
+            "patient",
+            "family_member"
+          ],
+          "title": "Subject",
+          "type": "string"
+        },
+        "assertion": {
+          "enum": [
+            "present",
+            "absent",
+            "uncertain",
+            "historical"
+          ],
+          "title": "Assertion",
+          "type": "string"
+        },
+        "effective_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effective Date"
+        },
+        "excerpt": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "proposed_resource_type": {
+          "enum": [
+            "Observation",
+            "FamilyMemberHistory"
+          ],
+          "title": "Proposed Resource Type",
+          "type": "string"
+        },
+        "relationship": {
+          "anyOf": [
+            {
+              "enum": [
+                "mother",
+                "father",
+                "sister",
+                "brother",
+                "sibling",
+                "grandmother",
+                "grandfather"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Relationship"
+        }
+      },
+      "required": [
+        "concept",
+        "value_text",
+        "subject",
+        "assertion",
+        "effective_date",
+        "excerpt",
+        "proposed_resource_type",
+        "relationship"
+      ],
+      "title": "ProposedFact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "request_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "proposal_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "expected_proposal_version": {
+      "minimum": 1,
+      "title": "Expected Proposal Version",
+      "type": "integer"
+    },
+    "action": {
+      "enum": [
+        "accept",
+        "correct",
+        "reject"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "reviewer_reference": {
+      "pattern": "^Practitioner(Role)?/[A-Za-z0-9.-]{1,64}$",
+      "title": "Reviewer Reference",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Reason",
+      "type": "string"
+    },
+    "correction": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProposedFact"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "acknowledged_issues": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Acknowledged Issues",
+      "type": "array"
+    }
+  },
+  "required": [
+    "request_id",
+    "proposal_id",
+    "expected_proposal_version",
+    "action",
+    "reviewer_reference",
+    "reason"
+  ],
+  "title": "ReviewCommand",
+  "type": "object"
+}

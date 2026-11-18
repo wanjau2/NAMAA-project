@@ -1,0 +1,7 @@
+{
+  "fhir_version": "4.0.1",
+  "local_mapping_checks": "passed (allowlisted subset only)",
+  "base_r4_validator": "pending: HL7 validator not installed or configured",
+  "namaa_profiles": "pending: Namaa conformance package not supplied",
+  "executable": false
+}

@@ -1,0 +1,138 @@
+{
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "as_of": "2026-11-18",
+  "authority": "simulated_fhir",
+  "authorized": true,
+  "complete_for_rule": true,
+  "resources": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "demo-patient",
+        "meta": {
+          "versionId": "demo-v1"
+        }
+      },
+      "review_reference": "simulated-review-receipt",
+      "reviewed": true
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "demo-eligibility",
+        "meta": {
+          "versionId": "demo-v1"
+        },
+        "status": "final",
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "code": {
+          "text": "Demo WCV eligibility"
+        },
+        "valueBoolean": true
+      },
+      "review_reference": "simulated-review-receipt",
+      "reviewed": true
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "text": "Reported last well-child visit"
+        },
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "valueString": "The patient attended a well-child visit on 2026-09-01.",
+        "component": [
+          {
+            "code": {
+              "text": "Source assertion"
+            },
+            "valueCodeableConcept": {
+              "text": "present"
+            }
+          }
+        ],
+        "effectiveDateTime": "2026-09-01",
+        "id": "edfa4634-bcb5-5617-9031-303e675f7bc0",
+        "identifier": [
+          {
+            "system": "https://namaa.example/fhir/review-command",
+            "value": "offline-demo:demo-human-review-0"
+          }
+        ],
+        "note": [
+          {
+            "text": "Reviewed source DocumentReference/demo-note/_history/v1; quote [0,54) Unicode code points: The patient attended a well-child visit on 2026-09-01."
+          }
+        ],
+        "meta": {
+          "tag": [
+            {
+              "system": "https://namaa.example/fhir/data-mode",
+              "code": "simulated"
+            }
+          ],
+          "versionId": "simulated-commit-v1"
+        }
+      },
+      "review_reference": "simulated-review-receipt",
+      "reviewed": true
+    },
+    {
+      "resource": {
+        "resourceType": "FamilyMemberHistory",
+        "status": "partial",
+        "patient": {
+          "reference": "Patient/demo-patient"
+        },
+        "relationship": {
+          "text": "mother"
+        },
+        "date": "2026-11-18",
+        "note": [
+          {
+            "text": "present: Mother has asthma."
+          },
+          {
+            "text": "Reviewed source DocumentReference/demo-note/_history/v1; quote [55,73) Unicode code points: Mother has asthma."
+          }
+        ],
+        "condition": [
+          {
+            "code": {
+              "text": "Mother has asthma."
+            },
+            "note": [
+              {
+                "text": "Source assertion: present; explicit event date: unknown"
+              }
+            ]
+          }
+        ],
+        "id": "b0e69032-1482-5adf-b15e-f803bf355bf8",
+        "identifier": [
+          {
+            "system": "https://namaa.example/fhir/review-command",
+            "value": "offline-demo:demo-human-review-1"
+          }
+        ],
+        "meta": {
+          "tag": [
+            {
+              "system": "https://namaa.example/fhir/data-mode",
+              "code": "simulated"
+            }
+          ],
+          "versionId": "simulated-commit-v1"
+        }
+      },
+      "review_reference": "simulated-review-receipt",
+      "reviewed": true
+    }
+  ]
+}
