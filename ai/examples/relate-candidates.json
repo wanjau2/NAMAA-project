@@ -1,0 +1,16 @@
+{
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "generation_id": "generation-demo-1",
+  "permission_revision": "permissions-v1",
+  "state": "current",
+  "candidates": [
+    {
+      "patient_reference": "Patient/demo-patient",
+      "supporting_references": [
+        "FamilyMemberHistory/demo-history"
+      ],
+      "candidate_kind": "family_history"
+    }
+  ]
+}

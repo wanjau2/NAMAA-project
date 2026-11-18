@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "LayoutBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "title": "Block Id",
+          "type": "string"
+        },
+        "page_number": {
+          "minimum": 1,
+          "title": "Page Number",
+          "type": "integer"
+        },
+        "order": {
+          "minimum": 0,
+          "title": "Order",
+          "type": "integer"
+        },
+        "kind": {
+          "enum": [
+            "heading",
+            "paragraph",
+            "table_cell",
+            "form_field"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "section": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Section"
+        },
+        "text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block_id",
+        "page_number",
+        "order",
+        "kind",
+        "text"
+      ],
+      "title": "LayoutBlock",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Parser output still requires backend source verification/authorization.",
+  "properties": {
+    "source": {
+      "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+      "title": "Source",
+      "type": "string"
+    },
+    "source_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Source Version",
+      "type": "string"
+    },
+    "media_type": {
+      "enum": [
+        "text/plain",
+        "application/pdf",
+        "image/tiff",
+        "image/png",
+        "image/jpeg"
+      ],
+      "title": "Media Type",
+      "type": "string"
+    },
+    "parser_id": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Parser Id",
+      "type": "string"
+    },
+    "parser_revision": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Parser Revision",
+      "type": "string"
+    },
+    "extraction_method": {
+      "enum": [
+        "native_text",
+        "ocr"
+      ],
+      "title": "Extraction Method",
+      "type": "string"
+    },
+    "simulated": {
+      "title": "Simulated",
+      "type": "boolean"
+    },
+    "blocks": {
+      "items": {
+        "$ref": "#/$defs/LayoutBlock"
+      },
+      "maxItems": 500,
+      "title": "Blocks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "source",
+    "source_version",
+    "media_type",
+    "parser_id",
+    "parser_revision",
+    "extraction_method",
+    "simulated",
+    "blocks"
+  ],
+  "title": "ParsedDocument",
+  "type": "object"
+}

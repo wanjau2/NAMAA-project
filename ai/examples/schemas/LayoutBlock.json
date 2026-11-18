@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "block_id": {
+      "maxLength": 80,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "title": "Block Id",
+      "type": "string"
+    },
+    "page_number": {
+      "minimum": 1,
+      "title": "Page Number",
+      "type": "integer"
+    },
+    "order": {
+      "minimum": 0,
+      "title": "Order",
+      "type": "integer"
+    },
+    "kind": {
+      "enum": [
+        "heading",
+        "paragraph",
+        "table_cell",
+        "form_field"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "section": {
+      "anyOf": [
+        {
+          "maxLength": 120,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Section"
+    },
+    "text": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "block_id",
+    "page_number",
+    "order",
+    "kind",
+    "text"
+  ],
+  "title": "LayoutBlock",
+  "type": "object"
+}

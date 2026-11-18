@@ -1,0 +1,27 @@
+{
+  "source": "DocumentReference/synthetic-scan",
+  "source_version": "scan-v1",
+  "media_type": "application/pdf",
+  "parser_id": "namaa-fixture-layout-parser",
+  "parser_revision": "fixture-v1",
+  "extraction_method": "ocr",
+  "simulated": true,
+  "blocks": [
+    {
+      "block_id": "page-1-heading",
+      "page_number": 1,
+      "order": 0,
+      "kind": "heading",
+      "section": null,
+      "text": "Visit history"
+    },
+    {
+      "block_id": "page-1-text",
+      "page_number": 1,
+      "order": 1,
+      "kind": "paragraph",
+      "section": "Visit history",
+      "text": "The patient attended a well-child visit on 2026-09-01."
+    }
+  ]
+}

@@ -4,8 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from namaa_ai.context_engineering import (BM25Retriever, ContextAssembler,
-    ReciprocalRankFusion, render_explanation_context)
-from namaa_ai.contracts import ContextQuery, VerifiedContext
+    InMemoryDenseRetriever, ReciprocalRankFusion, render_explanation_context)
+from namaa_ai.contracts import ContextQuery, RelateCandidateBatch, VerifiedContext
+from namaa_ai.relate import VerifiedCandidateAdapter
+from namaa_ai.ingestion import FixtureDocumentParser, LayoutBlock
 
 NOW = datetime(2026, 11, 18, 9, tzinfo=timezone.utc)
 
@@ -136,3 +138,73 @@ def test_only_explicit_resource_type_filters_are_used():
                             record("FamilyMemberHistory", "fmh-1", "Mother has asthma.")])
     result = assemble(ctx, "asthma", requested_resource_types=("FamilyMemberHistory",))
     assert [i.source.reference for i in result.items] == ["FamilyMemberHistory/fmh-1"]
+
+
+def test_in_memory_dense_ranker_is_scoped_to_authorized_candidates():
+    ctx = verified(records=[record("Observation", "obs-1", "Reviewed visit date."),
+                            record("FamilyMemberHistory", "fmh-1", "Mother has diabetes.")])
+    items = assemble(ctx, "visit diabetes").items
+    vectors = {item.item_id: ((0.0, 1.0) if item.source.reference.startswith("FamilyMemberHistory/") else (1.0, 0.0)) for item in items}
+    vectors["outside-scope"] = (0.0, 100.0)
+    dense = InMemoryDenseRetriever(vectors, query_encoder=lambda _: (0.0, 1.0))
+    dense_rank = dense.rank("query", items)
+    family_item = next(item for item in items if item.source.reference.startswith("FamilyMemberHistory/"))
+    assert dense_rank == (family_item.item_id,)
+    assert "outside-scope" not in dense_rank
+    fused = ReciprocalRankFusion(dense=dense).rank("query", items)
+    assert set(fused) <= {item.item_id for item in items}
+
+
+def test_relate_hints_only_resolve_to_current_verified_resources():
+    ctx = verified(records=[record("FamilyMemberHistory", "fmh-1", "Mother has diabetes.")])
+    batch = RelateCandidateBatch(
+        workspace_id="ws-demo", patient_reference="Patient/pat-demo", generation_id="gen-1",
+        permission_revision="perm-1", state="current", candidates=[{
+            "patient_reference": "Patient/pat-demo", "candidate_kind": "family_history",
+            "supporting_references": ["FamilyMemberHistory/fmh-1"],
+        }, {
+            "patient_reference": "Patient/pat-demo", "candidate_kind": "family_history",
+            "supporting_references": ["FamilyMemberHistory/not-authorized"],
+        }],
+    )
+    adapter = VerifiedCandidateAdapter(enabled=True)
+    result = adapter.resolve(batch, ctx, workspace_id="ws-demo", patient_reference="Patient/pat-demo",
+        permission_revision="perm-1", generation_id="gen-1", now=NOW)
+    assert [item.source.reference for item in result] == ["FamilyMemberHistory/fmh-1"]
+    assert result[0].text == "Mother has diabetes."  # source text comes from verified FHIR context
+
+    stale = RelateCandidateBatch.model_validate(batch.model_dump() | {"state": "stale"})
+    assert adapter.resolve(stale, ctx, workspace_id="ws-demo", patient_reference="Patient/pat-demo",
+        permission_revision="perm-1", generation_id="gen-1", now=NOW) == ()
+    wrong_scope = RelateCandidateBatch.model_validate(batch.model_dump() | {"workspace_id": "other"})
+    assert adapter.resolve(wrong_scope, ctx, workspace_id="ws-demo", patient_reference="Patient/pat-demo",
+        permission_revision="perm-1", generation_id="gen-1", now=NOW) == ()
+
+
+def test_relate_adapter_default_disabled():
+    with pytest.raises(ValueError, match="disabled"):
+        VerifiedCandidateAdapter().resolve(RelateCandidateBatch(
+            workspace_id="ws-demo", patient_reference="Patient/pat-demo", generation_id="gen-1",
+            permission_revision="perm-1", state="current", candidates=[]), verified(),
+            workspace_id="ws-demo", patient_reference="Patient/pat-demo", permission_revision="perm-1",
+            generation_id="gen-1", now=NOW)
+
+
+def test_layout_parser_contract_preserves_pages_and_labels_mock_ocr():
+    blocks = (
+        LayoutBlock(block_id="p1-heading", page_number=1, order=0, kind="heading", text="Visit history"),
+        LayoutBlock(block_id="p1-body", page_number=1, order=1, kind="paragraph",
+                    section="Visit history", text="Patient attended a visit on 2026-09-01."),
+        LayoutBlock(block_id="p2-cell", page_number=2, order=0, kind="table_cell",
+                    section="Family history", text="Mother has asthma."),
+    )
+    parser = FixtureDocumentParser({("DocumentReference/scan-1", "v3"): blocks})
+    result = parser.parse(source="DocumentReference/scan-1", source_version="v3",
+                          media_type="application/pdf", payload=b"synthetic-pdf-fixture")
+    assert result.simulated and result.extraction_method == "ocr"
+    assert [block.page_number for block in result.blocks] == [1, 1, 2]
+    assert [block.order for block in result.blocks] == [0, 1, 0]
+    assert result.source_version == "v3"
+    with pytest.raises(ValueError, match="fixture_not_found"):
+        parser.parse(source="DocumentReference/other", source_version="v3",
+                     media_type="application/pdf", payload=b"synthetic")

@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "RelateCandidate": {
+      "additionalProperties": false,
+      "description": "Untrusted graph hint: references only, never a permission or clinical fact.",
+      "properties": {
+        "patient_reference": {
+          "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+          "title": "Patient Reference",
+          "type": "string"
+        },
+        "supporting_references": {
+          "items": {
+            "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Supporting References",
+          "type": "array"
+        },
+        "candidate_kind": {
+          "enum": [
+            "family_history",
+            "care_plan_link",
+            "provider_handoff"
+          ],
+          "title": "Candidate Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "patient_reference",
+        "supporting_references",
+        "candidate_kind"
+      ],
+      "title": "RelateCandidate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Metadata returned by the fixed backend Relate operation.",
+  "properties": {
+    "workspace_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Workspace Id",
+      "type": "string"
+    },
+    "patient_reference": {
+      "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+      "title": "Patient Reference",
+      "type": "string"
+    },
+    "generation_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Generation Id",
+      "type": "string"
+    },
+    "permission_revision": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Permission Revision",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "current",
+        "stale",
+        "unavailable"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/RelateCandidate"
+      },
+      "maxItems": 100,
+      "title": "Candidates",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "patient_reference",
+    "generation_id",
+    "permission_revision",
+    "state",
+    "candidates"
+  ],
+  "title": "RelateCandidateBatch",
+  "type": "object"
+}

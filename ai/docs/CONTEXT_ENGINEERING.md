@@ -27,6 +27,32 @@
   automatic explanation call. The extraction adapter and deterministic rules do
   not consume assembled context.
 
+## A4–A7 implementation status
+
+- **A4 — layout/OCR ingestion boundary:** `ParsedDocument` and `LayoutBlock`
+  preserve source reference/version, parser identity/revision, page, order,
+  section and block kind. `FixtureDocumentParser` is a labelled synthetic
+  adapter. It does not run OCR or parse real PDFs; production parsing must be
+  injected by the backend and register a versioned, source-verifiable output.
+- **A5 — hybrid/vector retrieval boundary:** BM25 and reciprocal-rank fusion
+  are implemented. `InMemoryDenseRetriever` exercises cosine ranking over
+  externally supplied vectors for local tests only; it generates no embeddings
+  and persists no index. A production vector adapter must receive only the
+  authorized candidate set and use an explicitly authorized embedding
+  destination.
+- **A6 — Relate candidate verification:** `RelateCandidateBatch` contains only
+  bounded references and generation/permission metadata. `FixedRelateOperations`
+  exposes named parameterized operations; no query language or graph client is
+  exposed. `VerifiedCandidateAdapter` is disabled by default, suppresses stale
+  or wrong-scope batches, and resolves hints only to records already verified
+  in the current backend context. Relate never grants access or supplies model
+  text directly.
+- **A7 — grounding and acceptance coverage:** tests cover stale/unauthorized
+  contexts, candidate-reference filtering, vector adapter ID confinement,
+  untrusted prompt-like source text, bounded context, source/version retention,
+  empty-result uncertainty, and rule/review separation. These are synthetic
+  software checks, not OCR, embedding, graph relevance, or clinical validation.
+
 The current API's verified-context endpoint is synthetic and does not yet supply
 all the production metadata needed for rich passage retrieval. In particular,
 Ismail must populate real source excerpts, correct versions, offsets, and any
@@ -103,8 +129,8 @@ are not clinical relevance, model quality, or population generalization results.
 
 ## Deliberately not implemented
 
-There is no PDF/OCR ingestion, document parser, embedding generation, vector
-database, live hybrid search, Relate query, context synchronization, HAPI
+There is no real PDF/OCR engine, document parser deployment, embedding
+generation, vector database, live hybrid search, Relate query service, context synchronization, HAPI
 verification, automatic model explanation, policy-guideline retrieval, or
 condition-based risk adjustment in this package. Those features require their
 own source, authorization, validation and evaluation contracts. The current

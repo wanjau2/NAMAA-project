@@ -60,6 +60,8 @@ not a successful empty extraction.
 | `src/namaa_ai/rules.py` | Versioned fictional rules over backend resource snapshots |
 | `src/namaa_ai/context.py` | Default-disabled verified-context gate |
 | `src/namaa_ai/context_engineering.py` | FHIR-resource-bounded retrieval, BM25, optional dense adapter, rank fusion and bounded context assembly |
+| `src/namaa_ai/ingestion.py` | Layout/OCR parser protocol and explicitly simulated fixture parser |
+| `src/namaa_ai/relate.py` | Default-disabled Relate candidate verification against current backend context |
 | `src/namaa_ai/evaluation.py` | Field metrics, source/schema validity and latency |
 | `fixtures/notes.json` | 40 labelled notes with 20 development / 20 held-out records |
 | `fixtures/context-queries.json` | Synthetic retrieval fixtures with development / held-out splits |
@@ -81,9 +83,11 @@ explicit deterministic test fixture only. Backend guest decisions always carry
 The context assembler is disabled by default and accepts only current,
 backend-verified context envelopes. It ranks source-versioned resources using
 deterministic BM25; an optional dense retriever can be injected through the
-rank-fusion interface, but no vector database or embedding model is selected or
-implemented. Context evaluation uses separate synthetic development and held-out
-queries; it tests retrieval plumbing, not clinical relevance. Rules continue to
+rank-fusion interface. The in-memory cosine adapter uses supplied vectors only;
+there is no embedding model or vector database. The layout/OCR parser and Relate
+candidate adapters are test boundaries, not deployed parsers or graph services.
+Context evaluation uses separate synthetic development and held-out queries; it
+tests retrieval plumbing, not clinical relevance. Rules continue to
 consume reviewed committed snapshots directly and never retrieval results.
 
 ## Demonstration rule definitions

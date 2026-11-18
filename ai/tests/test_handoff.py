@@ -18,6 +18,7 @@ EXAMPLES = Path(__file__).parents[1] / "examples"
     ("reviewed-fact", contracts.ReviewedFact), ("rule-evaluation", contracts.RuleEvaluation),
     ("rule-needs-review", contracts.RuleEvaluation), ("rule-input-snapshot", contracts.RuleSnapshot),
     ("verified-context", contracts.VerifiedContext), ("endpoint-response", contracts.EndpointResponse),
+    ("parsed-document", contracts.ParsedDocument), ("relate-candidates", contracts.RelateCandidateBatch),
     ("condition-extraction-proposal", contracts.ExtractionProposal),
     ("condition-review-command", contracts.ReviewCommand),
     ("context-query", ContextQuery), ("assembled-context", AssembledContext),

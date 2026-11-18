@@ -82,6 +82,14 @@ def test_observation_and_provenance(request_note, proposal):
     assert propose_transaction(accepted.fact).bundle == transaction.bundle
 
 
+def test_reviewed_offsets_are_tied_to_selected_excerpt(request_note, proposal):
+    accepted = review(request_note, proposal, command(proposal))
+    forged = accepted.fact.model_dump()
+    forged["offset_end"] += 1
+    with pytest.raises(ValidationError, match="offsets"):
+        type(accepted.fact).model_validate(forged)
+
+
 def test_explicitly_documented_current_condition_maps_only_after_review(request_note, fact):
     text = "The patient is currently diagnosed with hypertension."
     req = ExtractionRequest.model_validate(request_note.model_dump() | {"note_text": text})

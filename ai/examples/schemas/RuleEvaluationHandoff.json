@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "ResourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference",
+        "version"
+      ],
+      "title": "ResourceVersion",
+      "type": "object"
+    },
+    "RuleEvaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "patient_reference": {
+          "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+          "title": "Patient Reference",
+          "type": "string"
+        },
+        "as_of": {
+          "format": "date",
+          "title": "As Of",
+          "type": "string"
+        },
+        "rule_id": {
+          "enum": [
+            "DEMO_WCV_01",
+            "DEMO_ADULT_01"
+          ],
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "const": "synthetic-1.0.0",
+          "default": "synthetic-1.0.0",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "gap_identified",
+            "no_gap_identified_in_available_data",
+            "needs_review",
+            "not_eligible"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "input_versions": {
+          "items": {
+            "$ref": "#/$defs/ResourceVersion"
+          },
+          "title": "Input Versions",
+          "type": "array"
+        },
+        "contributing_factors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contributing Factors",
+          "type": "array"
+        },
+        "missing_information": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Information",
+          "type": "array"
+        },
+        "due_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Due Date"
+        },
+        "simulated": {
+          "title": "Simulated",
+          "type": "boolean"
+        },
+        "synthetic_rule": {
+          "const": true,
+          "default": true,
+          "title": "Synthetic Rule",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "patient_reference",
+        "as_of",
+        "rule_id",
+        "outcome",
+        "input_versions",
+        "contributing_factors",
+        "missing_information",
+        "due_date",
+        "simulated"
+      ],
+      "title": "RuleEvaluation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Lossless Alfred-to-backend handoff; not a direct API EvaluationResult.",
+  "properties": {
+    "evaluation": {
+      "$ref": "#/$defs/RuleEvaluation"
+    },
+    "legacy_flag_status": {
+      "anyOf": [
+        {
+          "enum": [
+            "gap",
+            "needs_review",
+            "no_gap"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Legacy Flag Status"
+    },
+    "api_compatibility": {
+      "enum": [
+        "current_api_outcome_supported",
+        "api_outcome_extension_required"
+      ],
+      "title": "Api Compatibility",
+      "type": "string"
+    }
+  },
+  "required": [
+    "evaluation",
+    "legacy_flag_status",
+    "api_compatibility"
+  ],
+  "title": "RuleEvaluationHandoff",
+  "type": "object"
+}

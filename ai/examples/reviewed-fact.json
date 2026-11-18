@@ -52,5 +52,6 @@
   "reviewed_at": "2026-11-18T09:00:00Z",
   "source_date": "2026-11-18",
   "offset_start": 0,
-  "offset_end": 54
+  "offset_end": 54,
+  "offset_unit": "unicode_code_points"
 }

@@ -380,6 +380,12 @@
       "minimum": 1,
       "title": "Offset End",
       "type": "integer"
+    },
+    "offset_unit": {
+      "const": "unicode_code_points",
+      "default": "unicode_code_points",
+      "title": "Offset Unit",
+      "type": "string"
     }
   },
   "required": [

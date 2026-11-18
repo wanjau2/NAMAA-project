@@ -36,6 +36,39 @@ class DenseRetriever(Protocol):
     def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]: ...
 
 
+class InMemoryDenseRetriever:
+    """Synthetic/test cosine ranker over precomputed vectors; not an embedding model.
+
+    Production implementations can wrap a vector store behind DenseRetriever,
+    but must receive only the currently authorized candidate set and recheck
+    access before disclosure. This class persists nothing and calls no service.
+    """
+    def __init__(self, vectors: dict[str, Sequence[float]], query_encoder):
+        self.vectors = {key: tuple(float(value) for value in vector) for key, vector in vectors.items()}
+        self.query_encoder = query_encoder
+
+    def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]:
+        query_vector = tuple(float(value) for value in self.query_encoder(query))
+        if not query_vector or not all(math.isfinite(value) for value in query_vector):
+            return ()
+        query_norm = math.sqrt(sum(value * value for value in query_vector))
+        if not query_norm:
+            return ()
+        allowed_ids = {item.item_id for item in items}
+        scores = []
+        for item_id in allowed_ids:
+            vector = self.vectors.get(item_id)
+            if not vector or len(vector) != len(query_vector) or not all(math.isfinite(v) for v in vector):
+                continue
+            norm = math.sqrt(sum(value * value for value in vector))
+            if not norm:
+                continue
+            score = sum(a * b for a, b in zip(query_vector, vector, strict=True)) / (query_norm * norm)
+            scores.append((score, item_id))
+        scores.sort(key=lambda pair: (-pair[0], pair[1]))
+        return tuple(item_id for score, item_id in scores if score > 0)
+
+
 def _tokens(text: str) -> list[str]:
     return [x.lower() for x in TOKEN_RE.findall(text)]
 

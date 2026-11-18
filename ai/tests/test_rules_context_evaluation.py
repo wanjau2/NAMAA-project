@@ -10,6 +10,7 @@ from namaa_ai.contracts import RuleSnapshot, VerifiedContext
 from namaa_ai.demo import run_demo, simulated_snapshot
 from namaa_ai.evaluation import evaluate_context_retrieval, evaluate_corpus
 from namaa_ai.fhir import CONCEPT_TEXT
+from namaa_ai.handoff import prepare_rule_handoff
 from namaa_ai.rules import RULES, evaluate
 
 
@@ -33,6 +34,22 @@ def test_four_rule_outcomes_and_versions(rule_id):
     data = snap.model_dump()
     data["resources"][1]["resource"]["valueBoolean"] = False
     assert evaluate(RuleSnapshot.model_validate(data), rule_id).outcome == "not_eligible"
+
+
+def test_backend_handoff_preserves_canonical_outcome_and_versions():
+    gap = evaluate(snapshot("DEMO_WCV_01"), "DEMO_WCV_01")
+    handoff = prepare_rule_handoff(gap)
+    assert handoff.legacy_flag_status == "gap"
+    assert handoff.evaluation == gap
+    assert handoff.evaluation.input_versions == gap.input_versions
+
+    data = snapshot("DEMO_WCV_01").model_dump()
+    data["resources"][1]["resource"]["valueBoolean"] = False
+    excluded = evaluate(RuleSnapshot.model_validate(data), "DEMO_WCV_01")
+    handoff = prepare_rule_handoff(excluded)
+    assert handoff.evaluation.outcome == "not_eligible"
+    assert handoff.legacy_flag_status is None
+    assert handoff.api_compatibility == "api_outcome_extension_required"
 
 
 @pytest.mark.parametrize("change", ["unreviewed", "incomplete", "missing_date", "future", "conflict", "uncertain", "negated", "eligibility_conflict", "missing_eligibility", "duplicate_version"])

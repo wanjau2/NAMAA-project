@@ -15,6 +15,7 @@ SQLAlchemy, React or the backend's application models.
 | ReviewedFact | `reviewed-fact.json` | Trusted review logic → deterministic mapper |
 | RuleSnapshot | `rule-input-snapshot.json` | Authorized committed FHIR gateway → evaluator |
 | RuleEvaluation | `rule-evaluation.json`, `rule-needs-review.json` | Evaluator → backend → UI |
+| RuleEvaluationHandoff | `rule-evaluation-handoff.json` | Lossless canonical result with an explicitly limited legacy flag projection |
 | VerifiedContext | `verified-context.json` | Backend verification layer → optional explanation boundary |
 | ContextItem / ContextQuery / AssembledContext | Typed contracts | Verified sources → optional explanation context assembler |
 
@@ -134,6 +135,17 @@ Display outcomes as “Gap identified”, “No gap identified in available data
 outcome; integration must preserve it rather than force it into `gap`/`no_gap`.
 Display no-gap wording exactly with its available-data limitation. Existing UI
 fact verification defaults are not accepted as authoritative review receipts.
+
+`prepare_rule_handoff()` retains the complete canonical `RuleEvaluation` (rule
+ID/version, all input resource versions, factors, missing information, due date
+and simulation marker) and adds a legacy `flag_status` projection only for
+outcomes representable by Ismail's current enum. `not_eligible` gets a null
+projection and `api_outcome_extension_required`; it is never coerced to `no_gap`
+or `needs_review`. This envelope is an Alfred-to-backend integration contract,
+not a direct `EvaluationResult` response: that API response has additional
+required fields and does not retain Alfred's complete provenance. Ismail must
+persist the canonical nested result or extend the API schema before wiring the
+evaluation into API persistence/UI flows.
 
 ## Optional context
 

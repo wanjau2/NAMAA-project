@@ -1,0 +1,38 @@
+{
+  "evaluation": {
+    "patient_reference": "Patient/demo-patient",
+    "as_of": "2026-11-18",
+    "rule_id": "DEMO_WCV_01",
+    "rule_version": "synthetic-1.0.0",
+    "outcome": "gap_identified",
+    "input_versions": [
+      {
+        "reference": "Patient/demo-patient",
+        "version": "demo-v1"
+      },
+      {
+        "reference": "Observation/demo-eligibility",
+        "version": "demo-v1"
+      },
+      {
+        "reference": "Observation/376f0725-f2f9-5487-aa0f-17f61c1cb054",
+        "version": "simulated-commit-v1"
+      },
+      {
+        "reference": "FamilyMemberHistory/19e732b5-cbad-5bae-99c9-095a9e3f1733",
+        "version": "simulated-commit-v1"
+      }
+    ],
+    "contributing_factors": [
+      "Fictional eligibility card: True",
+      "Reviewed last event: 2026-09-01",
+      "Fictional interval: 37 days; due on 2026-10-08"
+    ],
+    "missing_information": [],
+    "due_date": "2026-10-08",
+    "simulated": true,
+    "synthetic_rule": true
+  },
+  "legacy_flag_status": "gap",
+  "api_compatibility": "current_api_outcome_supported"
+}

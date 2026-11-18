@@ -5,11 +5,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from namaa_ai.adapters import HostedAdapter, HostedConfig, PROTOCOL, MODEL_ID, PROMPT_VERSION
-from namaa_ai.contracts import ContextQuery, ExtractionRequest, ModelIdentity, ProposedFact, ReviewCommand, VerifiedContext
+from namaa_ai.contracts import (ContextQuery, ExtractionRequest, LayoutBlock, ModelIdentity,
+    ParsedDocument, ProposedFact, RelateCandidateBatch, ReviewCommand, VerifiedContext)
 from namaa_ai.demo import DemoAuthorizer, run_demo, simulated_snapshot
 from namaa_ai.context_engineering import ContextAssembler
 from namaa_ai.fhir import propose_transaction
 from namaa_ai.rules import evaluate
+from namaa_ai.handoff import prepare_rule_handoff
 from namaa_ai.review import apply_review
 from namaa_ai.validation import make_proposals
 from datetime import datetime, timezone
@@ -39,10 +41,26 @@ for name, tx in zip(("observation", "family-history"), demo["transaction_proposa
     save(f"{name}-transaction", tx["bundle"])
     save(f"{name}-validation", tx["validation"])
 save("rule-evaluation", demo["after_simulated_commit"])
+save("rule-evaluation-handoff", prepare_rule_handoff(evaluate(
+    simulated_snapshot([t["bundle"]["entry"][0]["resource"] for t in demo["transaction_proposals"]]),
+    "DEMO_WCV_01",
+)).model_dump(mode="json"))
 save("rule-needs-review", demo["before_reviewed_commit"])
 save("rule-input-snapshot", simulated_snapshot([t["bundle"]["entry"][0]["resource"] for t in demo["transaction_proposals"]]).model_dump(mode="json"))
 ctx = VerifiedContext.model_validate(dict(workspace_id="offline-demo", patient_reference="Patient/demo-patient", generation_id="generation-demo-1", mapping_version="mapping-v1", permission_revision="permissions-v1", built_at="2026-11-18T08:00:00Z", verified_at="2026-11-18T09:00:00Z", expires_at="2026-11-18T09:01:00Z", state="current", authorized=True, source_verified=True, completeness="partial", checked_scope="Fictional patient journey; no exhaustive absence checks", records=[dict(source=dict(reference="Observation/demo-observation", version="opaque-v1"), patient_reference="Patient/demo-patient", source_last_updated="2026-11-18T08:30:00Z", verified_at="2026-11-18T09:00:00Z", authorized=True, source_verified=True, text="Fictional source-verified record summary supplied by the backend.")]))
 save("verified-context", ctx.model_dump(mode="json"))
+parsed = ParsedDocument(source="DocumentReference/synthetic-scan", source_version="scan-v1",
+    media_type="application/pdf", parser_id="namaa-fixture-layout-parser", parser_revision="fixture-v1",
+    extraction_method="ocr", simulated=True, blocks=[
+        LayoutBlock(block_id="page-1-heading", page_number=1, order=0, kind="heading", text="Visit history"),
+        LayoutBlock(block_id="page-1-text", page_number=1, order=1, kind="paragraph",
+                    section="Visit history", text="The patient attended a well-child visit on 2026-09-01.")])
+save("parsed-document", parsed.model_dump(mode="json"))
+save("relate-candidates", RelateCandidateBatch(workspace_id="offline-demo",
+    patient_reference="Patient/demo-patient", generation_id="generation-demo-1",
+    permission_revision="permissions-v1", state="current", candidates=[{
+        "patient_reference": "Patient/demo-patient", "candidate_kind": "family_history",
+        "supporting_references": ["FamilyMemberHistory/demo-history"]}]).model_dump(mode="json"))
 context_query = ContextQuery(query="What source-verified observation is available?", max_items=5)
 assembled = ContextAssembler(enabled=True).assemble(ctx, context_query, workspace_id="offline-demo",
     patient_reference="Patient/demo-patient", permission_revision="permissions-v1",

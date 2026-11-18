@@ -119,6 +119,7 @@ class ReviewedFact(Contract):
     source_date: date
     offset_start: int = Field(ge=0)
     offset_end: int = Field(ge=1)
+    offset_unit: Literal["unicode_code_points"] = "unicode_code_points"
 
     @model_validator(mode="after")
     def accepted_only(self):
@@ -129,6 +130,8 @@ class ReviewedFact(Contract):
         expected = self.review.correction if self.review.action == "correct" else self.proposal.fact
         if self.fact != expected:
             raise ValueError("Reviewed content must equal the explicit review selection")
+        if self.offset_end <= self.offset_start or self.offset_end - self.offset_start != len(self.fact.excerpt):
+            raise ValueError("Reviewed source offsets must be a non-empty Unicode code-point span matching the excerpt")
         return self
 
 
@@ -173,6 +176,28 @@ class RuleEvaluation(Contract):
     due_date: date | None
     simulated: StrictBool
     synthetic_rule: Literal[True] = True
+
+
+class RuleEvaluationHandoff(Contract):
+    """Lossless Alfred-to-backend handoff; not a direct API EvaluationResult."""
+    evaluation: RuleEvaluation
+    legacy_flag_status: Literal["gap", "needs_review", "no_gap"] | None
+    api_compatibility: Literal["current_api_outcome_supported", "api_outcome_extension_required"]
+
+    @model_validator(mode="after")
+    def projection_matches_evaluation(self):
+        expected = {
+            "gap_identified": "gap",
+            "no_gap_identified_in_available_data": "no_gap",
+            "needs_review": "needs_review",
+            "not_eligible": None,
+        }[self.evaluation.outcome]
+        if self.legacy_flag_status != expected:
+            raise ValueError("Legacy flag must be an explicit projection of the canonical outcome")
+        status = "api_outcome_extension_required" if expected is None else "current_api_outcome_supported"
+        if self.api_compatibility != status:
+            raise ValueError("API compatibility marker does not match projected outcome")
+        return self
 
 
 class ContextRecord(Contract):
@@ -266,3 +291,41 @@ class AssembledContext(Contract):
     exhaustive: Literal[False] = False
     absence_claims_allowed: Literal[False] = False
     notice: str = "Context is limited to current authorized sources in the backend checked scope."
+
+
+class RelateCandidate(Contract):
+    """Untrusted graph hint: references only, never a permission or clinical fact."""
+    patient_reference: PatientRef
+    supporting_references: tuple[ResourceRef, ...] = Field(min_length=1, max_length=8)
+    candidate_kind: Literal["family_history", "care_plan_link", "provider_handoff"]
+
+
+class RelateCandidateBatch(Contract):
+    """Metadata returned by the fixed backend Relate operation."""
+    workspace_id: LogicalId
+    patient_reference: PatientRef
+    generation_id: LogicalId
+    permission_revision: Version
+    state: Literal["current", "stale", "unavailable"]
+    candidates: tuple[RelateCandidate, ...] = Field(max_length=100)
+
+
+class LayoutBlock(Contract):
+    block_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    page_number: int = Field(ge=1)
+    order: int = Field(ge=0)
+    kind: Literal["heading", "paragraph", "table_cell", "form_field"]
+    section: str | None = Field(default=None, max_length=120)
+    text: str = Field(min_length=1, max_length=6000)
+
+
+class ParsedDocument(Contract):
+    """Parser output still requires backend source verification/authorization."""
+    source: ResourceRef
+    source_version: Version
+    media_type: Literal["text/plain", "application/pdf", "image/tiff", "image/png", "image/jpeg"]
+    parser_id: str = Field(min_length=1, max_length=80)
+    parser_revision: Version
+    extraction_method: Literal["native_text", "ocr"]
+    simulated: StrictBool
+    blocks: tuple[LayoutBlock, ...] = Field(max_length=500)

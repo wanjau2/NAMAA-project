@@ -1,0 +1,37 @@
+{
+  "additionalProperties": false,
+  "description": "Untrusted graph hint: references only, never a permission or clinical fact.",
+  "properties": {
+    "patient_reference": {
+      "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+      "title": "Patient Reference",
+      "type": "string"
+    },
+    "supporting_references": {
+      "items": {
+        "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+        "type": "string"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Supporting References",
+      "type": "array"
+    },
+    "candidate_kind": {
+      "enum": [
+        "family_history",
+        "care_plan_link",
+        "provider_handoff"
+      ],
+      "title": "Candidate Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "patient_reference",
+    "supporting_references",
+    "candidate_kind"
+  ],
+  "title": "RelateCandidate",
+  "type": "object"
+}
