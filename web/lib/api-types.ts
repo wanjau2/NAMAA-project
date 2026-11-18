@@ -196,3 +196,99 @@ export const PATHWAY_LABELS: Record<Pathway, string> = {
   child_wcv: "Child Well-Child",
   adult_screening: "Adult Screening",
 };
+
+/* ---------------------------------------------------------------------------
+   Extraction and proposals (D004). Mirrors api/app/schemas_extraction.py and
+   the proposal projection in api/app/services/extractions.py.
+   --------------------------------------------------------------------------- */
+
+export type ExtractionState =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed_out";
+
+export type ReviewState = "proposed" | "accepted" | "corrected" | "rejected";
+export type Assertion = "present" | "absent" | "uncertain" | "historical";
+export type ProposalSubject = "patient" | "family_member";
+
+export type ApiProposal = {
+  id: string;
+  concept: string;
+  value_text: string;
+  subject: ProposalSubject;
+  assertion: Assertion;
+  effective_date: string | null;
+  proposed_resource_type: string;
+  source_document_id: string;
+  source_document_version: number;
+  /**
+   * Exact supporting excerpt. Offsets are Unicode CODE POINTS
+   * (ai/docs/CONTRACTS.md), not JavaScript string indices — compare them with
+   * lib/text-offsets.ts. Null means the source match failed or was ambiguous,
+   * and nothing may be highlighted.
+   */
+  excerpt: string;
+  offset_start: number | null;
+  offset_end: number | null;
+  offset_unit?: "unicode_code_points";
+  /** Server-side review state. Currently always "proposed": no write endpoint. */
+  review_state: ReviewState;
+};
+
+export type ExtractionAccepted = {
+  job_id: string;
+  state: ExtractionState;
+  events_url: string;
+  status_url: string;
+  notice: string;
+};
+
+export type ExtractionJobOut = {
+  event?: string | null;
+  job_id: string;
+  document_id: string;
+  document_version: number;
+  state: ExtractionState;
+  progress_percent: number;
+  message: string;
+  elapsed_ms: number;
+  timeout_ms: number;
+  model_revision: string;
+  prompt_version: string;
+  error_code: string | null;
+  error_message: string | null;
+  synthetic: boolean;
+  /** "offline_fixture" today — must never be presented as live inference. */
+  inference_mode: string;
+  proposals: ApiProposal[];
+};
+
+export type DocumentOut = {
+  id: string;
+  version: number;
+  document_date: string;
+  patient_id: string | null;
+  case_id: string | null;
+  text: string;
+  policy_adapter: string;
+  production_authorization: boolean;
+};
+
+export const ASSERTION_LABELS: Record<Assertion, string> = {
+  present: "Present",
+  absent: "Absent",
+  uncertain: "Uncertain",
+  historical: "Historical",
+};
+
+export const SUBJECT_LABELS: Record<ProposalSubject, string> = {
+  patient: "Patient",
+  family_member: "Family member",
+};
+
+/* Traceability now lives in lib/text-offsets.ts, which compares by Unicode
+   code point rather than UTF-16 code unit. */
+

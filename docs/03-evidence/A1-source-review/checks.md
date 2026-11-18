@@ -51,3 +51,73 @@ browser-driven run to count as journey evidence — scheduled in D4/E1.
   permits labelled offline fixtures for rehearsal but forbids presenting them as live inference,
   so the label is shown in the UI.
 - Not yet run: axe-core, keyboard-only completion, RTL snapshot.
+
+---
+
+# A1 read-path cutover to the API — 2026-11-18
+
+**Change:** the source review screen no longer uses fixtures. Proposals, note text, offsets and
+extraction progress all come from the API. `lib/source-review-fixtures.ts` is **deleted**.
+
+| Was | Now |
+| --- | --- |
+| `lib/source-review-fixtures.ts` | `GET /api/v1/documents/{id}` + `POST .../extractions` |
+| Static proposal list | `GET /api/v1/extractions/{job}` proposals |
+| No progress | SSE `/api/v1/extractions/{job}/events` (D004), with the elapsed line against the 90s timeout |
+| Static route | Dynamic route (`instant = false`) |
+
+New client pieces: `lib/use-source-review.ts` (resolve → queue → subscribe → proposals),
+`lib/source-documents.ts` (case → document resolution), extraction types and client methods in
+`lib/api-types.ts` / `lib/api.ts`.
+
+## Contract checks — now 49/49 (was 34)
+
+Fifteen extraction checks added to `npm run verify:api`, all against live API data:
+
+| Check | Result |
+| --- | --- |
+| Authorized note returns text, version and its case link | ✅ |
+| Note reports its policy adapter and `production_authorization: false` | ✅ |
+| **Instruction-like text is retained in the note as data** | ✅ |
+| A cited but absent document returns `not_found`, not an empty note | ✅ |
+| Extraction accepted with job id and events url | ✅ `202` |
+| Extraction reaches a terminal state | ✅ `succeeded` |
+| **Labelled `offline_fixture`, not live inference** | ✅ |
+| Job reports a timeout budget and elapsed time | ✅ |
+| Proposals returned for the note | ✅ |
+| Every proposal carries subject, assertion and a proposed resource type | ✅ |
+| **Every proposal arrives `review_state: "proposed"`** | ✅ |
+| **Every excerpt matches the note at its stated offsets** | ✅ |
+| **No proposal derives from the instruction-like sentence** | ✅ |
+| **A relative's condition maps to `FamilyMemberHistory`, never a patient `Condition`** | ✅ |
+| The adult note belongs to `case-0003` | ✅ |
+
+The three bolded safety properties were previously demonstrated against fixtures I wrote. They
+are now verified against what the server actually returns, which is a stronger claim.
+
+## Rendering checks
+
+| Check | Observed |
+| --- | --- |
+| Build, both typechecks, lint | Clean |
+| Review route is dynamic | Build output shows Partial Prerender |
+| Not-persisted banner | `Review decisions are not persisted… no fact-review endpoint yet` |
+| Fixture content gone from the bundle | `Caregiver attended with the child today`, `prop-1105`, `Immunisations are complete`, `offline-fixture-v1` — all **GONE** |
+
+## Regressions and gaps introduced by the cutover
+
+1. **The broken-offset safety demo is lost.** My fixtures contained `prop-1105`, whose excerpt
+   deliberately did not match its offsets, proving the UI refuses an untraceable quote. The API
+   fixture set has no such case. **The check still runs** — `quoteMatchesSource` is applied to
+   every API proposal and all currently match — but nothing exercises the refusal path on
+   screen. Ask Alfred to add a deliberately mismatched proposal to
+   `api/app/services/extraction_fixtures.py`.
+2. **Fewer proposals.** 2 per note (4 across both documents) versus 7 in the fixtures. The
+   contact-preference proposal is gone.
+3. **Review decisions still do not persist** — no write endpoint (Q10). Local state only, with
+   no reviewer identity and no provenance. Stated on screen.
+4. **Case → document resolution is unreliable** — see Q11. `case-0002` and `case-0006` cite
+   documents that return 404, and `case-0003` cites none although `doc-synthetic-31` is linked
+   to it. The resolver tries cited ids, then a small labelled fallback map, and verifies the
+   returned `case_id` in both paths so a wrong guess can never show another patient's note.
+5. Still not run: axe-core, keyboard-only pass, RTL snapshot, browser-driven journey.

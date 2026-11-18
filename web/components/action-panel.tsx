@@ -47,6 +47,9 @@ export function ActionPanel({
 }) {
   const { role } = useDemoSession();
   const [openAction, setOpenAction] = useState<string | null>(null);
+  // Held at panel level: a successful action usually makes its own row invalid,
+  // so the row unmounts and any message inside it would vanish with it.
+  const [lastOutcome, setLastOutcome] = useState<string | null>(null);
 
   // Display hints only — the server decides what is actually valid. Actions
   // belonging to another role stay visible so the boundary is legible.
@@ -68,6 +71,16 @@ export function ActionPanel({
         display hint and the server may still refuse an action.
       </p>
 
+      {lastOutcome ? (
+        <p
+          role="status"
+          className="mt-3 flex items-start gap-1.5 rounded-md border border-status-verified bg-status-verified-bg p-2 text-xs text-status-verified"
+        >
+          <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+          <span>{lastOutcome}</span>
+        </p>
+      ) : null}
+
       {applicable.length === 0 ? (
         <p className="mt-4 rounded-md border border-border bg-subtle p-3 text-sm text-ink-muted">
           No actions are valid from this state.
@@ -82,6 +95,7 @@ export function ActionPanel({
                 role={role}
                 open={openAction === spec.id}
                 onChanged={onChanged}
+                onOutcome={setLastOutcome}
                 onToggle={() =>
                   setOpenAction((current) =>
                     current === spec.id ? null : spec.id,
@@ -103,6 +117,7 @@ function ActionRow({
   open,
   onToggle,
   onChanged,
+  onOutcome,
 }: {
   spec: ActionSpec;
   caseState: CaseOut;
@@ -110,6 +125,7 @@ function ActionRow({
   open: boolean;
   onToggle: () => void;
   onChanged?: () => void;
+  onOutcome: (message: string) => void;
 }) {
   // Role is the only gate the client applies, and only to avoid offering a
   // control that is certain to be refused. Preconditions are the server's:
@@ -174,6 +190,7 @@ function ActionRow({
           caseState={caseState}
           onDone={onToggle}
           onChanged={onChanged}
+          onOutcome={onOutcome}
         />
       ) : null}
     </div>
@@ -194,11 +211,13 @@ function ActionForm({
   caseState,
   onDone,
   onChanged,
+  onOutcome,
 }: {
   spec: ActionSpec;
   caseState: CaseOut;
   onDone: () => void;
   onChanged?: () => void;
+  onOutcome: (message: string) => void;
 }) {
   const { submit, newRequestId } = useCaseStore();
   const [values, setValues] = useState(() => initialValues(spec));
@@ -231,9 +250,9 @@ function ActionForm({
     setPending(false);
     if (result.ok) {
       setError(null);
-      setSuccess(
-        `Recorded by the server. ${result.event.prior_state} → ${result.event.new_state}.`,
-      );
+      const message = `Recorded by the server. ${result.event.prior_state} → ${result.event.new_state}.`;
+      setSuccess(message);
+      onOutcome(message);
       onChanged?.();
     } else {
       // Entered values are deliberately NOT cleared (D002 §4).
@@ -299,17 +318,8 @@ function ActionForm({
         </p>
       ) : null}
 
-      {success ? (
-        <p
-          className={cn(
-            "mt-3 flex items-start gap-1.5 rounded-md border p-2 text-xs",
-            "border-status-verified bg-status-verified-bg text-status-verified",
-          )}
-        >
-          <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          <span>{success}</span>
-        </p>
-      ) : null}
+      {/* Confirmation lives at panel level: this row usually becomes invalid
+          after a successful action and would unmount with its own message. */}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button

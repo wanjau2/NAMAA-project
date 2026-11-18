@@ -17,6 +17,8 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { AlertOctagon, ArrowLeft, RotateCcw } from "lucide-react";
 import { StatusBadge, StatusCard } from "@/components/status-badge";
+import { RuleOutcomeBadge, RuleOutcomeCard } from "@/components/rule-outcome";
+import { resolveOutcome } from "@/lib/rule-outcomes";
 import { ActionPanel } from "@/components/action-panel";
 import { useCase, useCaseStore } from "@/lib/case-store";
 import {
@@ -24,14 +26,15 @@ import {
   PATHWAY_LABELS,
   STAGE_LABELS,
 } from "@/lib/api-types";
-import { getSourceReview } from "@/lib/source-review-fixtures";
+import { candidateDocumentIds } from "@/lib/source-documents";
 
 export function CaseDetailView({ id }: { id: string }) {
   const { case: row, loading, error, reload } = useCase(id);
   const { status, connectionMessage } = useCaseStore();
 
-  // Source review still runs on fixtures: the API has no proposal endpoints yet.
-  const review = getSourceReview(id);
+  // Offer source review when the case cites a document. Whether an accessible
+  // note actually exists is decided by the API on that screen.
+  const hasSource = row ? candidateDocumentIds(row).length > 0 : false;
 
   useEffect(() => {
     if (row) document.title = `${row.patient_label} — Namaa`;
@@ -82,6 +85,9 @@ export function CaseDetailView({ id }: { id: string }) {
   }
 
   const detail = row.detail;
+  // All four rule outcomes are shown as themselves. Previously a `gap` case
+  // displayed no outcome at all, and `not_eligible` had nowhere to appear.
+  const outcome = resolveOutcome(row.flag_status);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -105,9 +111,7 @@ export function CaseDetailView({ id }: { id: string }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {row.flag_status === "needs_review" ? (
-              <StatusBadge state="review" label="Needs review" />
-            ) : null}
+            <RuleOutcomeBadge outcome={outcome.outcome} />
             {row.overdue ? <StatusBadge state="overdue" label="Overdue" /> : null}
             {row.disposition === "completed" ? (
               <StatusBadge
@@ -118,11 +122,20 @@ export function CaseDetailView({ id }: { id: string }) {
           </div>
         </div>
 
+        {/* Owner, next action and deadline belong here, not only on the
+            worklist: the design specification §8 requires the case view to
+            show who is responsible and by when. */}
         <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           <Meta label="Stage" value={STAGE_LABELS[row.stage]} />
           <Meta
             label="Disposition"
             value={DISPOSITION_LABELS[row.disposition]}
+          />
+          <Meta label="Owner" value={row.owner} />
+          <Meta
+            label="Due"
+            value={row.due_time ? row.due_time.replace("T", " ") : "—"}
+            mono={Boolean(row.due_time)}
           />
           <Meta
             label="Preferred contact"
@@ -134,6 +147,11 @@ export function CaseDetailView({ id }: { id: string }) {
           />
           <Meta label="Caregiver authority" value="Verified (synthetic)" />
         </dl>
+
+        <p className="mt-3 text-sm text-ink">
+          <span className="font-medium text-ink-muted">Next action: </span>
+          {row.next_action}
+        </p>
 
         {detail.completion_evidence ? (
           <p className="mt-3 text-xs text-ink-muted">
@@ -160,6 +178,10 @@ export function CaseDetailView({ id }: { id: string }) {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-5">
+          {/* The rule result, with its limitation, kept separate from the
+              explanation below it and from any review decision. */}
+          <RuleOutcomeCard resolution={outcome} />
+
           {/* Equal-weight pair: recommendation and uncertainty, same size. */}
           <div className="grid gap-4 md:grid-cols-2">
             <StatusCard
@@ -199,15 +221,12 @@ export function CaseDetailView({ id }: { id: string }) {
                   influence the rule.
                 </p>
               </div>
-              {review ? (
+              {hasSource ? (
                 <Link
                   href={`/cases/${id}/review`}
                   className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
                 >
                   Review source facts
-                  <span className="tabular text-xs text-ink-muted">
-                    ({review.proposals.length})
-                  </span>
                 </Link>
               ) : null}
             </div>
@@ -357,11 +376,21 @@ function Problem({
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
     <div>
       <dt className="text-xs font-medium text-ink-muted">{label}</dt>
-      <dd className="mt-1 text-ink">{value}</dd>
+      <dd className={`mt-1 text-ink${mono ? " font-mono-tech text-xs" : ""}`}>
+        {value}
+      </dd>
     </div>
   );
 }

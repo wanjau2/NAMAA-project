@@ -138,12 +138,17 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const session = await api.createSession();
+        // Reuse this tab's workspace across reloads; the API provisions an
+        // unknown-but-well-formed session id on first use.
+        const existing = readStoredSession();
+        const sessionId =
+          existing ?? (await api.createSession()).session_id;
         if (cancelled) return;
-        setSessionId(session.session_id);
+        storeSession(sessionId);
+        setSessionId(sessionId);
         setStatus("ready");
         setConnectionMessage(null);
-        await fetchRows(session.session_id);
+        await fetchRows(sessionId);
       } catch (caught) {
         if (cancelled) return;
         const { error } = toStructured(caught);
@@ -271,6 +276,30 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
       {children}
     </CaseStoreContext.Provider>
   );
+}
+
+const SESSION_KEY = "namaa.guest.session";
+
+/**
+ * Per-tab session persistence. sessionStorage, not localStorage: the workspace
+ * stays scoped to this tab and disappears when it closes, so a "clean browser
+ * session" still means a clean session — but a refresh no longer throws away
+ * everything the reviewer just did.
+ */
+function readStoredSession(): string | null {
+  try {
+    return sessionStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeSession(id: string): void {
+  try {
+    sessionStorage.setItem(SESSION_KEY, id);
+  } catch {
+    // Private mode or blocked storage: fall back to an in-memory session.
+  }
 }
 
 /** Worklist rows carry no `detail`; drop it when folding an action response in. */

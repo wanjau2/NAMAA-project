@@ -18,6 +18,9 @@ import type {
   CaseRow,
   DemoResetOut,
   DemoSessionOut,
+  DocumentOut,
+  ExtractionAccepted,
+  ExtractionJobOut,
   Role,
   StructuredError,
 } from "@/lib/api-types";
@@ -144,6 +147,35 @@ export const api = {
     request<ActionResponse>(
       `/api/v1/cases/${encodeURIComponent(id)}/actions`,
       { method: "POST", session, role, body },
+    ),
+
+  /** Authorized note retrieval; the server applies a policy check first. */
+  getDocument: (
+    session: string,
+    role: Role,
+    documentId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<DocumentOut>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}`,
+      { session, role, signal },
+    ),
+
+  startExtraction: (session: string, role: Role, documentId: string) =>
+    request<ExtractionAccepted>(
+      `/api/v1/documents/${encodeURIComponent(documentId)}/extractions`,
+      { method: "POST", session, role },
+    ),
+
+  getExtraction: (
+    session: string,
+    role: Role,
+    jobId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<ExtractionJobOut>(
+      `/api/v1/extractions/${encodeURIComponent(jobId)}`,
+      { session, role, signal },
     ),
 
   analyticsOverview: (session: string, signal?: AbortSignal) =>

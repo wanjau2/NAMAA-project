@@ -14,6 +14,7 @@ import Link from "next/link";
 import { AlertOctagon, Clock, Filter, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
+import { OutcomeFromApi } from "@/components/rule-outcome";
 import type { EpistemicState } from "@/components/status-badge";
 import { useCaseStore } from "@/lib/case-store";
 import {
@@ -205,12 +206,8 @@ export default function WorklistPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        {row.flag_status === "needs_review" ? (
-                          <StatusBadge
-                            state="review"
-                            label="Needs review — information missing"
-                          />
-                        ) : null}
+                        {/* Every outcome is labelled, not just needs_review. */}
+                        <OutcomeFromApi value={row.flag_status} />
                         {row.overdue ? (
                           <StatusBadge state="overdue" label="Overdue" />
                         ) : null}

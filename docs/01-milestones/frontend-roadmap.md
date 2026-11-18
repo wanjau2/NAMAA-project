@@ -19,6 +19,17 @@ case detail (partial).
 
 **Progress: A1, A2, A4 complete** (plus a minimal nav from A6). Next: A3 or A5.
 
+**Alfred's contract work started 2026-11-18** — code-point offsets and the four-outcome
+display layer are done ([evidence](../03-evidence/F-contracts/checks.md)); the enum itself is Q12.
+
+**Delivery assets 2026-11-18** — demo footage and the 12-slide deck are done (E3 footage, E4);
+see [E-delivery](../03-evidence/E-delivery/README.md). E5 is blocked on the standalone question.
+
+**Browser pass complete 2026-11-18** — see [M04](M04-browser-verification.md). D3–D6 and E1–E2
+done; six defects found and fixed.
+
+**A1 read path cut over to the API 2026-11-18** (proposals, note text, SSE progress).
+
 **Phase C landed 2026-11-18** — see [M03](M03-api-integration.md). The local transition layer is
 deleted; the server is authoritative. B1, B4, B5, B6 and C1/C2/C4 came with it.
 
@@ -26,7 +37,7 @@ No backend required. Builds on contract-matching mocks, per the work plan's depe
 
 | # | Step | Acceptance | Est. |
 | --- | --- | --- | --- |
-| ~~A1~~ | ~~**Source review panel**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A1-source-review/checks.md) | 12/12 checks pass on the production build | 1.5h |
+| ~~A1~~ | ~~**Source review panel**~~ — **DONE 2026-11-17**, **API read path 2026-11-18** · [evidence](../03-evidence/A1-source-review/checks.md) | 49/49 contract checks incl. 15 extraction checks; fixtures deleted. Review *writes* still blocked on Q10 | 1.5h |
 | ~~A2~~ | ~~**Action forms**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A2-action-forms/checks.md) | 26/26 transition checks pass (`npm run verify:actions`); offered actions verified per state | 1.5h |
 | A3 | **Patient overview** — clinical history, caregiver information, contact preferences | Caregiver authority shown separately from relationship | 0.75h |
 | ~~A4~~ | ~~**`/metrics` population dashboard**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A4-population-dashboard/checks.md) | 53/53 definition + suppression checks pass (`npm run verify:metrics`). Q8 now **demonstrated**: hidden counts are readable in the JS bundle | 1.25h |
@@ -68,21 +79,21 @@ Estimated 3h once unblocked.
 | --- | --- | --- | --- |
 | D1 | Extract all strings into a dictionary | No hardcoded copy left in components | 1h |
 | D2 | Integrate Arabic copy with `Unreviewed demo translation` badges | Gated on Q2. Unreviewed copy is never presented as clinically approved | 0.75h |
-| D3 | RTL audit — lint rule banning physical direction classes, plus RTL snapshots | Timestamps, rule IDs and denominators do not scramble in Arabic | 0.75h |
-| D4 | Keyboard pass — focus order, skip link, `aria-disabled` reachability | Both journeys complete with keyboard only; every gated control's reason is announced | 0.75h |
-| D5 | axe-core via Playwright | Zero critical violations on every screen | 0.5h |
-| D6 | Responsive pass, desktop and mobile, incl. simulation bar collapse | Both journeys work at both widths | 0.5h |
+| ~~D3~~ | ~~RTL audit~~ — **DONE 2026-11-18** | Every `.font-mono-tech` node verified `direction: ltr; unicode-bidi: isolate` under `dir="rtl"` | 0.75h |
+| ~~D4~~ | ~~Keyboard pass~~ — **DONE 2026-11-18** | Tab-to-link, Enter activation, visible focus, `aria-disabled` controls reachable with announced reasons | 0.75h |
+| ~~D5~~ | ~~axe-core via Playwright~~ — **DONE 2026-11-18** | Zero critical or serious on 4 pages × 2 viewports | 0.5h |
+| ~~D6~~ | ~~Responsive pass~~ — **DONE 2026-11-18** | No horizontal scroll at 390px; simulation bar collapse verified | 0.5h |
 | D7 | Re-verify contrast on the final badge set; confirm reduced-motion | Ratios recomputed, not estimated | 0.25h |
 
 ## Phase E — Delivery assets (F6)
 
 | # | Step | Acceptance | Est. |
 | --- | --- | --- | --- |
-| E1 | Playwright E2E for both journeys | Child and adult journeys pass on the same build | 1h |
-| E2 | Guest journey on a clean browser session | No cached state; no unavailable credentials | 0.5h |
-| E3 | Record the demonstration | No real credentials or sensitive information in frame | 0.75h |
-| E4 | Assemble deck and screenshots | Built / mocked / future clearly separated | 0.5h |
-| E5 | Deployment instructions and local fallback | A fresh reviewer can start the UI from the guide | 0.25h |
+| ~~E1~~ | ~~Playwright E2E for both journeys~~ — **DONE 2026-11-18** · [evidence](../03-evidence/D-browser-pass/checks.md) | 36/36 across desktop and mobile against the live API | 1h |
+| ~~E2~~ | ~~Guest journey on a clean browser session~~ — **DONE 2026-11-18** | Fresh context per test; no credentials required | 0.5h |
+| ~~E3~~ | ~~Record the demonstration~~ — **FOOTAGE DONE 2026-11-18** · [50s walkthrough](../03-evidence/E-delivery/recording/namaa-demo-walkthrough.webm) | Reproducible via `npm run demo`; narration still to record over it | 0.75h |
+| ~~E4~~ | ~~Assemble deck and screenshots~~ — **DONE 2026-11-18** · [12-slide deck](https://claude.ai/artifact/XCVbNx8Kf2Gy8q8XEJi4nE) · 18 screenshots | Built / simulated / not built separated on slide 9 | 0.5h |
+| E5 | Deployment instructions and local fallback — **blocked**: `output: "standalone"` makes `next start` unsupported; the command to document is unsettled | A fresh reviewer can start the UI from the guide | 0.25h |
 
 ## Polish backlog
 

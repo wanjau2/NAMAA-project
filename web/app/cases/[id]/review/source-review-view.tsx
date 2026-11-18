@@ -1,46 +1,49 @@
 "use client";
 
 /**
- * Source review (design specification §5 and §8, theme §5).
+ * Source review — API-backed read path.
  *
- * The screen exists to enforce one boundary: a proposed fact has NO influence
- * on rule evaluation until a clinical reviewer accepts or corrects it. Three
- * things follow from that, and all three are load-bearing:
+ * Proposals, note text, offsets and extraction progress all come from the
+ * server now (`GET /api/v1/documents/{id}`, `POST .../extractions`, SSE at
+ * `/api/v1/extractions/{id}/events`). The fixtures are gone.
  *
- *  1. Proposed, verified, corrected and rejected are visually distinct.
- *  2. The excerpt is shown beside the proposal, highlighted in the source note,
- *     and verified against the offsets. An excerpt that does not match its
- *     source is NOT reviewable — a matching quote establishes traceability,
- *     not correctness.
- *  3. After a correction the reviewer sees exactly what changed.
+ * Review decisions are the one thing still local: the API exposes no write
+ * endpoint for them (Q10), so accept / correct / reject are held in component
+ * state and the screen says plainly that nothing is persisted. They must not be
+ * read as an authorization receipt.
  *
- * Note text is untrusted input. It is rendered as plain text, never markup, and
- * instruction-like sentences inside it are data. No proposal is created from
- * them, and the summary says so.
- *
- * Nothing here is persisted and no FHIR resource is written. Review decisions
- * live in component state until Ismail's review endpoint lands (F4).
+ * The boundary this screen exists to enforce is unchanged: a proposed fact has
+ * no influence on rule evaluation until a clinical reviewer accepts or corrects
+ * it, the excerpt is verified against the source, and a failed extraction is
+ * never rendered as "no care gap".
  */
 
 import { useId, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertOctagon, ArrowLeft, Check, Info, Pencil, X } from "lucide-react";
+import {
+  AlertOctagon,
+  ArrowLeft,
+  Check,
+  Info,
+  Pencil,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import type { EpistemicState } from "@/components/status-badge";
 import { useDemoSession } from "@/lib/demo-session";
-import { useCase } from "@/lib/case-store";
+import { useCase, useCaseStore } from "@/lib/case-store";
+import { useSourceReview } from "@/lib/use-source-review";
+import { traceability, type Traceability } from "@/lib/text-offsets";
 import {
   ASSERTION_LABELS,
   SUBJECT_LABELS,
-  getSourceReview,
-  quoteMatchesSource,
+  type ApiProposal,
   type Assertion,
-  type Proposal,
   type ProposalSubject,
   type ReviewState,
-  type SourceNote,
-} from "@/lib/source-review-fixtures";
+} from "@/lib/api-types";
 
 type CorrectedFields = {
   value_text: string;
@@ -65,32 +68,29 @@ const REVIEW_BADGE: Record<ReviewState, { state: EpistemicState; label: string }
 
 export function SourceReviewView({ id }: { id: string }) {
   const { role } = useDemoSession();
-  const bundle = getSourceReview(id);
-  // Patient identity from the API; proposals from fixtures until Q10 lands.
+  const { sessionId } = useCaseStore();
   const { case: row } = useCase(id);
+  const review = useSourceReview(row, sessionId, role);
 
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
-  const [selected, setSelected] = useState<string | null>(
-    bundle?.proposals[0]?.id ?? null,
-  );
+  const [selected, setSelected] = useState<string | null>(null);
 
   const isReviewer = role === "clinical_reviewer";
   const gateId = useId();
 
   const counts = useMemo(() => {
-    const all = bundle?.proposals ?? [];
     const tally = { proposed: 0, accepted: 0, corrected: 0, rejected: 0 };
-    for (const proposal of all) {
-      const state = decisions[proposal.id]?.state ?? "proposed";
-      tally[state] += 1;
+    for (const proposal of review.proposals) {
+      tally[decisions[proposal.id]?.state ?? "proposed"] += 1;
     }
     return tally;
-  }, [bundle, decisions]);
+  }, [review.proposals, decisions]);
 
-  if (!bundle) return null;
-
-  const { note, proposals } = bundle;
-  const selectedProposal = proposals.find((p) => p.id === selected) ?? null;
+  const noteText = review.document?.text ?? "";
+  const selectedProposal =
+    review.proposals.find((p) => p.id === selected) ??
+    review.proposals[0] ??
+    null;
   const influencing = counts.accepted + counts.corrected;
 
   return (
@@ -103,126 +103,265 @@ export function SourceReviewView({ id }: { id: string }) {
         Back to case detail
       </Link>
 
-      <header className="mt-4">
-        <h1 className="text-2xl text-ink">Source review</h1>
-        <p className="mt-1 max-w-3xl text-sm text-ink-muted">
-          {row ? `${row.patient_label} · ` : ""}Facts proposed from one source
-          note. Nothing here influences the demonstration rule until it is
-          accepted or corrected by a clinical reviewer.
-        </p>
+      <header className="mt-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl text-ink">Source review</h1>
+          <p className="mt-1 max-w-3xl text-sm text-ink-muted">
+            {row ? `${row.patient_label} · ` : ""}Facts proposed from one source
+            note. Nothing here influences the demonstration rule until it is
+            accepted or corrected by a clinical reviewer.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={review.rerun}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+        >
+          <RotateCcw aria-hidden="true" className="size-3.5" />
+          Re-run extraction
+        </button>
       </header>
 
-      {/* Boundary summary — the safety claim of this screen, stated plainly. */}
-      <section
-        aria-label="Review progress"
-        className="mt-4 rounded-lg border border-border bg-surface p-4"
-      >
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <Tally label="Pending" value={counts.proposed} />
-          <Tally label="Accepted" value={counts.accepted} />
-          <Tally label="Corrected" value={counts.corrected} />
-          <Tally label="Rejected" value={counts.rejected} />
-        </div>
-        <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-muted">
-          <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            The rule is evaluated from{" "}
-            <span className="tabular font-medium text-ink">{influencing}</span>{" "}
-            reviewed fact{influencing === 1 ? "" : "s"}.{" "}
-            <span className="tabular font-medium text-ink">
-              {counts.proposed}
-            </span>{" "}
-            pending proposal{counts.proposed === 1 ? " is" : "s are"} excluded.
-            Re-evaluation happens on the server after review — this screen does
-            not compute clinical logic.
-          </span>
-        </p>
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-ink-muted">
-          <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            Instruction-like sentences in the source note are treated as data. No
-            proposal was created from them.
-          </span>
-        </p>
-      </section>
-
+      {/* Review decisions are not persisted — stated before anything else. */}
       <p className="mt-3 flex items-start gap-1.5 rounded-lg border border-dashed border-status-proposed bg-status-proposed-bg p-3 text-xs text-status-proposed">
         <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
         <span>
-          This screen is not yet server-backed. The API has no proposal or
-          fact-review endpoints, so these proposals come from local fixtures and
-          review decisions are not persisted. Everything else in the demo is
-          served by the API.
+          Proposals, note text and offsets are served by the API. Review
+          decisions are <strong>not persisted</strong>: the API has no
+          fact-review endpoint yet, so accepting or correcting here records no
+          reviewer identity and no provenance, and is not an authorization
+          receipt.
         </span>
       </p>
 
-      {!isReviewer ? (
-        <p
-          id={gateId}
-          className="mt-4 flex items-start gap-2 rounded-lg border border-status-review bg-status-review-bg p-3 text-sm text-status-review"
-        >
-          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>
-            Requires the Clinical Reviewer role to accept, correct or reject a
-            proposed fact. Switch role in the simulation bar to demonstrate
-            review. Role switching is a labelled simulation, not authorization.
-          </span>
-        </p>
+      {/* Extraction progress. A failure is never "no care gap". */}
+      <ExtractionStatus review={review} />
+
+      {review.phase === "empty" && !review.document ? (
+        <div className="mt-4 rounded-lg border border-border bg-subtle p-6">
+          <p className="text-base font-semibold text-ink">
+            No source note is available for this case
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">
+            This is an absence of an accessible note, not evidence that nothing
+            was documented.
+            {review.triedDocumentIds.length > 0 ? (
+              <>
+                {" "}
+                Tried:{" "}
+                <span className="font-mono-tech">
+                  {review.triedDocumentIds.join(", ")}
+                </span>
+                .
+              </>
+            ) : null}
+          </p>
+        </div>
       ) : null}
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-2">
-        {/* Source note — read-only subtle pane per the theme. */}
-        <section className="lg:sticky lg:top-16 lg:self-start">
-          <h2 className="text-lg text-ink">Source note</h2>
-          <p className="mt-1 text-xs text-ink-muted">
-            <span className="font-mono-tech">{note.id}</span> · version{" "}
-            <span className="font-mono-tech">{note.version}</span> ·{" "}
-            <span className="font-mono-tech">{note.document_date}</span>
-          </p>
-          <div className="mt-2 rounded-lg border border-border bg-subtle p-4">
-            <p className="text-base leading-relaxed text-ink">
-              <NoteText note={note} proposal={selectedProposal} />
+      {review.document ? (
+        <>
+          {/* Boundary summary. */}
+          <section
+            aria-label="Review progress"
+            className="mt-4 rounded-lg border border-border bg-surface p-4"
+          >
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <Tally label="Pending" value={counts.proposed} />
+              <Tally label="Accepted" value={counts.accepted} />
+              <Tally label="Corrected" value={counts.corrected} />
+              <Tally label="Rejected" value={counts.rejected} />
+            </div>
+            <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-muted">
+              <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                The rule is evaluated from{" "}
+                <span className="tabular font-medium text-ink">
+                  {influencing}
+                </span>{" "}
+                reviewed fact{influencing === 1 ? "" : "s"}.{" "}
+                <span className="tabular font-medium text-ink">
+                  {counts.proposed}
+                </span>{" "}
+                pending proposal{counts.proposed === 1 ? " is" : "s are"}{" "}
+                excluded. Re-evaluation happens on the server — this screen does
+                not compute clinical logic.
+              </span>
             </p>
-          </div>
-          <p className="mt-2 text-xs text-ink-muted">
-            Extracted with{" "}
-            <span className="font-mono-tech">{bundle.model_revision}</span> ·
-            prompt{" "}
-            <span className="font-mono-tech">{bundle.prompt_version}</span>.
-            Retained for provenance; the reviewer is recorded separately.
-          </p>
-        </section>
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-ink-muted">
+              <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                Instruction-like sentences in the source note are treated as
+                data. No proposal was created from them.
+              </span>
+            </p>
+          </section>
 
-        {/* Proposals */}
-        <section>
-          <h2 className="text-lg text-ink">
-            Proposed facts{" "}
-            <span className="tabular text-sm font-normal text-ink-muted">
-              ({proposals.length})
-            </span>
-          </h2>
-          <ul className="mt-2 space-y-3">
-            {proposals.map((proposal) => (
-              <li key={proposal.id}>
-                <ProposalCard
-                  note={note}
-                  proposal={proposal}
-                  decision={decisions[proposal.id] ?? { state: "proposed" }}
-                  selected={selected === proposal.id}
-                  onSelect={() => setSelected(proposal.id)}
-                  isReviewer={isReviewer}
-                  gateId={isReviewer ? undefined : gateId}
-                  onDecide={(decision) =>
-                    setDecisions((prev) => ({ ...prev, [proposal.id]: decision }))
-                  }
-                />
-              </li>
-            ))}
-          </ul>
-        </section>
-      </div>
+          {!isReviewer ? (
+            <p
+              id={gateId}
+              className="mt-4 flex items-start gap-2 rounded-lg border border-status-review bg-status-review-bg p-3 text-sm text-status-review"
+            >
+              <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Requires the Clinical Reviewer role to accept, correct or reject
+                a proposed fact. Switch role in the simulation bar to
+                demonstrate review. Role switching is a labelled simulation, not
+                authorization.
+              </span>
+            </p>
+          ) : null}
+
+          <div className="mt-5 grid gap-5 lg:grid-cols-2">
+            {/* Source note — read-only subtle pane. Untrusted input, rendered
+                as text only, never markup. */}
+            <section className="lg:sticky lg:top-16 lg:self-start">
+              <h2 className="text-lg text-ink">Source note</h2>
+              <p className="mt-1 text-xs text-ink-muted">
+                <span className="font-mono-tech">{review.document.id}</span> ·
+                version{" "}
+                <span className="font-mono-tech">
+                  {review.document.version}
+                </span>{" "}
+                ·{" "}
+                <span className="font-mono-tech">
+                  {review.document.document_date}
+                </span>
+              </p>
+              <div className="mt-2 rounded-lg border border-border bg-subtle p-4">
+                <p className="text-base leading-relaxed text-ink">
+                  <NoteText text={noteText} proposal={selectedProposal} />
+                </p>
+              </div>
+              <p className="mt-2 text-xs text-ink-muted">
+                Retrieved under policy adapter{" "}
+                <span className="font-mono-tech">
+                  {review.document.policy_adapter}
+                </span>
+                {review.document.production_authorization
+                  ? ""
+                  : " · not production-authorized"}
+                . Extracted with{" "}
+                <span className="font-mono-tech">
+                  {review.modelRevision ?? "unknown"}
+                </span>
+                {review.inferenceMode ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <span className="font-mono-tech">
+                      {review.inferenceMode}
+                    </span>
+                  </>
+                ) : null}
+                . The reviewer is recorded separately from the extractor.
+              </p>
+            </section>
+
+            {/* Proposals */}
+            <section>
+              <h2 className="text-lg text-ink">
+                Proposed facts{" "}
+                <span className="tabular text-sm font-normal text-ink-muted">
+                  ({review.proposals.length})
+                </span>
+              </h2>
+              {review.proposals.length === 0 && review.phase === "ready" ? (
+                <p className="mt-2 rounded-lg border border-border bg-subtle p-4 text-sm text-ink-muted">
+                  The extractor proposed nothing from this note. That is not a
+                  finding of no care gap.
+                </p>
+              ) : null}
+              <ul className="mt-2 space-y-3">
+                {review.proposals.map((proposal) => (
+                  <li key={proposal.id}>
+                    <ProposalCard
+                      noteText={noteText}
+                      proposal={proposal}
+                      decision={decisions[proposal.id] ?? { state: "proposed" }}
+                      selected={selectedProposal?.id === proposal.id}
+                      onSelect={() => setSelected(proposal.id)}
+                      isReviewer={isReviewer}
+                      gateId={isReviewer ? undefined : gateId}
+                      onDecide={(decision) =>
+                        setDecisions((prev) => ({
+                          ...prev,
+                          [proposal.id]: decision,
+                        }))
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+        </>
+      ) : null}
     </div>
   );
+}
+
+function ExtractionStatus({
+  review,
+}: {
+  review: ReturnType<typeof useSourceReview>;
+}) {
+  if (review.phase === "idle") return null;
+
+  if (review.phase === "error") {
+    return (
+      <div className="mt-4 rounded-lg border border-status-overdue bg-status-overdue-bg p-4">
+        <p className="flex items-start gap-2 text-sm font-semibold text-status-overdue">
+          <AlertOctagon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>Extraction did not complete</span>
+        </p>
+        <p className="mt-2 text-sm text-ink">
+          {review.message ?? review.progressLine ?? "The job did not finish."}
+        </p>
+        <p className="mt-2 text-xs text-ink-muted">
+          A failed or timed-out extraction is <strong>not</strong> a finding of
+          no care gap. The note remains unreviewed.
+        </p>
+        <button
+          type="button"
+          onClick={review.rerun}
+          className="mt-3 inline-flex items-center gap-1.5 rounded border border-status-overdue px-2 py-1 text-xs font-semibold text-status-overdue"
+        >
+          <RotateCcw aria-hidden="true" className="size-3" />
+          Retry extraction
+        </button>
+      </div>
+    );
+  }
+
+  if (review.phase === "resolving" || review.phase === "extracting") {
+    return (
+      <div
+        className="mt-4 rounded-lg border border-border bg-surface p-4"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <p className="text-sm text-ink">
+          {review.phase === "resolving"
+            ? "Locating the source note…"
+            : review.progressLine || "Queued…"}
+        </p>
+        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-subtle">
+          <div
+            className="h-full rounded-full bg-brand transition-[width]"
+            style={{ width: `${Math.max(review.progressPercent, 5)}%` }}
+          />
+        </div>
+        {review.jobId ? (
+          <p className="mt-2 font-mono-tech text-xs text-ink-muted">
+            {review.jobId} · {review.extractionState}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function Tally({ label, value }: { label: string; value: number }) {
@@ -234,30 +373,33 @@ function Tally({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** Renders the note with the selected proposal's excerpt highlighted. */
 function NoteText({
-  note,
+  text,
   proposal,
 }: {
-  note: SourceNote;
-  proposal: Proposal | null;
+  text: string;
+  proposal: ApiProposal | null;
 }) {
-  if (!proposal || !quoteMatchesSource(note, proposal)) {
-    return <>{note.text}</>;
+  // Highlight only a verified span. With no offsets, or offsets that do not
+  // match, nothing is highlighted — never the first occurrence of the excerpt,
+  // which would invent a provenance the extractor did not claim.
+  const trace = proposal ? traceability(text, proposal) : null;
+  if (!trace || trace.state !== "verified") {
+    return <>{text}</>;
   }
   return (
     <>
-      {note.text.slice(0, proposal.offset_start)}
+      {trace.before}
       <mark className="rounded bg-status-proposed-bg px-0.5 text-status-proposed underline decoration-dashed decoration-1 underline-offset-2">
-        {note.text.slice(proposal.offset_start, proposal.offset_end)}
+        {trace.match}
       </mark>
-      {note.text.slice(proposal.offset_end)}
+      {trace.after}
     </>
   );
 }
 
 function ProposalCard({
-  note,
+  noteText,
   proposal,
   decision,
   selected,
@@ -266,8 +408,8 @@ function ProposalCard({
   gateId,
   onDecide,
 }: {
-  note: SourceNote;
-  proposal: Proposal;
+  noteText: string;
+  proposal: ApiProposal;
   decision: Decision;
   selected: boolean;
   onSelect: () => void;
@@ -285,11 +427,12 @@ function ProposalCard({
     effective_date: proposal.effective_date ?? "",
   });
 
-  const traceable = quoteMatchesSource(note, proposal);
+  const trace = traceability(noteText, proposal);
+  const traceable = trace.state === "verified";
   const badge = REVIEW_BADGE[decision.state];
   const reasonId = useId();
 
-  // An untraceable quote is not reviewable at all — accepting it would put an
+  // An untraceable quote is not reviewable: accepting it would put an
   // unsupported statement into the verified record.
   const actionable = isReviewer && traceable;
 
@@ -344,9 +487,6 @@ function ProposalCard({
         <StatusBadge state={badge.state} label={badge.label} />
       </div>
 
-      {/* Subject and assertion. Subject is called out because converting a
-          relative's condition into a patient diagnosis is the error this
-          screen exists to prevent. */}
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         <Chip label="Subject" value={SUBJECT_LABELS[displayed.subject]} />
         <Chip label="Assertion" value={ASSERTION_LABELS[displayed.assertion]} />
@@ -364,7 +504,6 @@ function ProposalCard({
         </p>
       ) : null}
 
-      {/* Supporting excerpt and its traceability check. */}
       <figure className="mt-3 rounded-md border-s-4 border-s-border bg-subtle p-3">
         <blockquote className="text-sm text-ink">
           &ldquo;{proposal.excerpt}&rdquo;
@@ -373,24 +512,22 @@ function ProposalCard({
           <span className="font-mono-tech">
             {proposal.source_document_id} v{proposal.source_document_version}
           </span>{" "}
-          · offsets{" "}
-          <span className="font-mono-tech">
-            {proposal.offset_start}–{proposal.offset_end}
-          </span>
+          ·{" "}
+          {proposal.offset_start === null || proposal.offset_end === null ? (
+            <span>no source offsets</span>
+          ) : (
+            <>
+              code points{" "}
+              <span className="font-mono-tech">
+                {proposal.offset_start}–{proposal.offset_end}
+              </span>
+            </>
+          )}
         </figcaption>
       </figure>
 
-      {!traceable ? (
-        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-status-overdue bg-status-overdue-bg p-2 text-xs text-status-overdue">
-          <AlertOctagon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            Quote does not match the source at these offsets. Not reviewable —
-            this proposal cannot be accepted. Return it for re-extraction.
-          </span>
-        </p>
-      ) : null}
+      {!traceable ? <TraceabilityProblem trace={trace} /> : null}
 
-      {/* What changed after a correction. */}
       {decision.state === "corrected" ? (
         <div className="mt-3 rounded-md border border-border bg-canvas p-3 text-xs">
           <p className="font-semibold text-ink">What changed</p>
@@ -414,19 +551,14 @@ function ProposalCard({
             was={proposal.effective_date ?? "Not stated"}
             now={decision.corrected.effective_date || "Not stated"}
           />
-          <p className="mt-2 text-ink-muted">
-            Reason: {decision.reason}
-          </p>
+          <p className="mt-2 text-ink-muted">Reason: {decision.reason}</p>
         </div>
       ) : null}
 
       {decision.state === "rejected" ? (
-        <p className="mt-3 text-xs text-ink-muted">
-          Reason: {decision.reason}
-        </p>
+        <p className="mt-3 text-xs text-ink-muted">Reason: {decision.reason}</p>
       ) : null}
 
-      {/* Actions */}
       {mode === "idle" ? (
         <div className="mt-4 flex flex-wrap gap-2">
           <ReviewButton
@@ -605,9 +737,31 @@ function ProposalCard({
 }
 
 /**
- * aria-disabled rather than disabled, so the control stays focusable and the
- * explanation it points at is reachable by keyboard (D002 §2).
+ * The three ways traceability fails, told apart. "We could not locate it" is a
+ * different statement from "the quote disagrees with the source", and a
+ * reviewer needs to know which one they are looking at.
  */
+function TraceabilityProblem({ trace }: { trace: Traceability }) {
+  const copy =
+    trace.state === "no_offsets"
+      ? "No source offsets were returned, so this excerpt cannot be located in the note. The extractor did not claim a position for it, and the interface will not guess one."
+      : trace.state === "out_of_range"
+        ? "The stated offsets fall outside this note, so the excerpt cannot be verified against its source."
+        : `The text at these offsets does not match the excerpt. The note reads \u201c${
+            "found" in trace ? trace.found : ""
+          }\u201d.`;
+
+  return (
+    <p className="mt-2 flex items-start gap-1.5 rounded-md border border-status-overdue bg-status-overdue-bg p-2 text-xs text-status-overdue">
+      <AlertOctagon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+      <span>
+        {copy} Not reviewable — this proposal cannot be accepted. Return it for
+        re-extraction.
+      </span>
+    </p>
+  );
+}
+
 function ReviewButton({
   children,
   allowed,
@@ -723,15 +877,7 @@ function Chip({
   );
 }
 
-function Diff({
-  label,
-  was,
-  now,
-}: {
-  label: string;
-  was: string;
-  now: string;
-}) {
+function Diff({ label, was, now }: { label: string; was: string; now: string }) {
   if (was === now) return null;
   return (
     <p className="mt-1.5">

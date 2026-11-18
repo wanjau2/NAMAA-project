@@ -6,6 +6,7 @@ Newest first. One line per milestone; detail lives in the linked record.
 | --- | --- | --- | --- | --- | --- |
 | M03 | 2026-11-18 | Extraction SSE + FHIR outbox/DLQ compensation | Ismail | Partial | [M03-sse-and-outbox.md](M03-sse-and-outbox.md) |
 | M02 | 2026-11-18 | Backend foundation: FastAPI workflow API + seed + actions | Ismail | Partial | [M02-backend-foundation.md](M02-backend-foundation.md) |
+| M04 | 2026-11-18 | Browser verification: journeys, accessibility, RTL, responsive | Mark | Done | [M04-browser-verification.md](M04-browser-verification.md) |
 | M03 | 2026-11-18 | Frontend pointed at the API; local transition layer deleted | Mark | Partial | [M03-api-integration.md](M03-api-integration.md) |
 | M01 | 2026-11-17 | Frontend foundation, token layer and safety primitives | Mark | Partial | [M01-frontend-foundation.md](M01-frontend-foundation.md) |
 | M00 | 2026-11-17 | Documentation baseline established | Mark | Done | [M00-documentation-baseline.md](M00-documentation-baseline.md) |

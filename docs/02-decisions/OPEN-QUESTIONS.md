@@ -18,7 +18,9 @@ decision. Recommendations below are suggestions, not settled calls.
 | Q7 | Where does the demo get hosted, if anywhere? | **Open** |
 | Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side. Verified live; see note below |
 | Q9 | Should the API return `available_actions` per case? | **Open — Mark → Ismail** |
-| Q10 | Are there proposal / fact-review endpoints this sprint? | **Open — blocks persisting A1** |
+| Q10 | Are there proposal / fact-review endpoints this sprint? | **Half answered** — read path shipped; **no write endpoint** |
+| Q11 | How does a client find a case's source documents? | **Open — no listing endpoint** |
+| Q12 | Which rule-outcome vocabulary is authoritative? | **Open — three in play; Alfred's M0** |
 
 ---
 
@@ -174,3 +176,57 @@ proposal read + review write endpoints backed by the existing seed, with no mode
 
 **Recommendation:** (b) if time allows, since human review of proposed facts is the concept's
 central safety claim. Otherwise (a), stated plainly.
+
+## Q11 — How does a client find a case's source documents?
+
+Raised by Mark, 2026-11-18, during the A1 read-path cutover. There is no documents-by-case
+listing, and the two available routes are each incomplete:
+
+| Case | Cites in `detail.factors` | Document actually exists? |
+| --- | --- | --- |
+| `case-0001` | `doc-synthetic-11` | yes |
+| `case-0002` | `doc-synthetic-01` | **404** |
+| `case-0003` | **none** | `doc-synthetic-31` exists and is linked to it |
+| `case-0006` | `doc-synthetic-06` | **404** |
+
+`GET /api/v1/documents/{id}` returns the document's `case_id`, but there is no way to search in
+the other direction. The UI therefore tries cited ids first, then a small explicitly labelled
+fallback map in `web/lib/source-documents.ts`, and in both paths verifies the returned
+`case_id` before rendering — a wrong guess can never show another patient's note.
+
+**Recommendation:** add `GET /api/v1/cases/{id}/documents` (or `documents?case_id=`) and delete
+the fallback map. Separately, either seed the cited documents for `case-0002` / `case-0006` or
+stop citing them in those cases' factors, because a care gap that references a note nobody can
+open is confusing in a demo about transparent evidence.
+
+### Also for Alfred — restore the mismatched-quote fixture
+
+The fixture set lost the proposal whose excerpt deliberately does not match its offsets. The UI
+still refuses untraceable quotes and the contract suite still verifies every excerpt against the
+note, but nothing exercises the refusal on screen any more. One bad proposal in
+`api/app/services/extraction_fixtures.py` restores a demonstration of the safeguard.
+
+## Q12 — Which rule-outcome vocabulary is authoritative?
+
+Raised by Mark, 2026-11-18, after Alfred's handoff. Three vocabularies describe the same four
+concepts:
+
+| Concept | Alfred (`ai/src/namaa_ai/contracts.py`) | API today | UI before today |
+| --- | --- | --- | --- |
+| A gap was found | `gap_identified` | `gap` | `gap` |
+| None found in available data | `no_gap_identified_in_available_data` | `no_gap` (evaluations only) | not shown |
+| Information missing | `needs_review` | `needs_review` | `needs_review` |
+| Pathway does not apply | `not_eligible` | **absent everywhere** | not shown |
+
+`CaseRow.flag_status` is `gap | needs_review`, so two of the four outcomes cannot reach the
+interface at all from live data, whatever the UI supports.
+
+The frontend now renders all four with their limitations and maps the API's current spellings,
+flagging anything unrecognised rather than coercing it — see
+[F-contracts evidence](../03-evidence/F-contracts/checks.md). That is a display layer, not an
+agreement.
+
+**Recommendation:** adopt Alfred's four names verbatim, since his package is where the rules
+actually run, and widen `CaseRow.flag_status` to carry all four. This is Alfred's **M0** and it
+gates his M1–M3. It is a short conversation, not a build task — but nothing downstream should be
+treated as settled until it happens.

@@ -8,7 +8,7 @@
  * for a real one. It must not be collapsible away or hidden on any route.
  */
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AlertTriangle, RotateCcw, Settings2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCaseStore } from "@/lib/case-store";
@@ -31,7 +31,10 @@ export function SimulationBar() {
     <div className="on-dark sticky top-0 z-50 w-full bg-sim-bar text-slate-100">
       <div className="flex h-11 items-center gap-3 px-4">
         {/* Start: the notice. Always visible, every width. */}
-        <span className="flex shrink-0 items-center gap-1.5 rounded bg-sim-badge px-2 py-1 text-xs font-bold text-sim-badge-fg">
+        <span
+          data-testid="sim-notice"
+          className="flex shrink-0 items-center gap-1.5 rounded bg-sim-badge px-2 py-1 text-xs font-bold text-sim-badge-fg"
+        >
           <AlertTriangle aria-hidden="true" className="size-3.5" />
           <span className="hidden sm:inline">
             SYNTHETIC DEMO DATA — NOT FOR CLINICAL USE
@@ -41,9 +44,10 @@ export function SimulationBar() {
 
         <div className="flex-1" />
 
+        <ApiStatus status={status} sessionId={sessionId} />
+
         {/* End: session controls. Collapsed behind a toggle under 640px (D002 §9). */}
         <div className="hidden items-center gap-3 sm:flex">
-          <ApiStatus status={status} sessionId={sessionId} />
           <SessionControls
             role={role}
             setRole={setRole}
@@ -119,6 +123,11 @@ function SessionControls({
     ? "flex flex-col items-start gap-1.5"
     : "flex items-center gap-2";
 
+  // This component is rendered twice (desktop row and mobile panel), so the
+  // control ids must be unique per instance or the label points at the wrong,
+  // hidden control.
+  const roleSelectId = useId();
+
   return (
     <>
       {/* Simulated role. A native select is keyboard- and screen-reader-correct
@@ -126,13 +135,13 @@ function SessionControls({
           permission — the server stays authoritative. */}
       <div className={group}>
         <label
-          htmlFor="sim-role"
+          htmlFor={roleSelectId}
           className="text-xs font-medium text-slate-400"
         >
           Simulated role
         </label>
         <select
-          id="sim-role"
+          id={roleSelectId}
           value={role}
           onChange={(event) => setRole(event.target.value as Role)}
           className="rounded border border-slate-600 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-100"
@@ -153,13 +162,13 @@ function SessionControls({
             active={locale === "en"}
             onClick={() => setLocale("en")}
             label="EN"
-            full="English"
+            full="EN — English"
           />
           <LangButton
             active={locale === "ar"}
             onClick={() => setLocale("ar")}
             label="عربي"
-            full="Arabic — unreviewed demo translation"
+            full="عربي — Arabic (unreviewed demo translation)"
           />
         </div>
       </div>
@@ -257,9 +266,13 @@ function ApiStatus({
         ? "Connecting…"
         : "API unreachable";
   return (
+    // role="status" both permits aria-label (a bare span does not) and is the
+    // right semantics: connection state changes should be announced.
     <span
+      role="status"
+      aria-label={text}
       className={cn(
-        "flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium",
+        "flex shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium",
         status === "ready"
           ? "border-slate-600 text-slate-300"
           : status === "connecting"
@@ -279,7 +292,9 @@ function ApiStatus({
               : "bg-status-overdue",
         )}
       />
-      {text}
+      {/* Below 640px only the dot is shown; the bar must not overflow, and the
+          accessible name still carries the full state. */}
+      <span className="hidden sm:inline">{text}</span>
     </span>
   );
 }
