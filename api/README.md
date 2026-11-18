@@ -5,7 +5,17 @@ Synthetic demo backend for Population Health Challenge 04.
 
 Stack (sprint): FastAPI + SQLite — see [D003](../docs/02-decisions/D003-backend-stack-and-api.md).
 
-## One-command start
+## Docker (preferred for full stack)
+
+From the repo root:
+
+```bash
+docker compose up --build
+```
+
+See [DOCKER.md](../DOCKER.md).
+
+## One-command start (local)
 
 ```bash
 cd api

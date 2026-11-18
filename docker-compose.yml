@@ -1,0 +1,44 @@
+# Namaa — synthetic precision-prevention demo
+# NOT FOR CLINICAL USE. No real patient data.
+#
+# Start:  docker compose up --build
+# Stop:   docker compose down
+# Reset DB volume: docker compose down -v
+
+services:
+  api:
+    build:
+      context: ./api
+    image: namaa-api:local
+    ports:
+      - "${NAMAA_API_PORT:-8000}:8000"
+    environment:
+      NAMAA_DATABASE_URL: sqlite:////data/namaa_demo.sqlite3
+      NAMAA_CORS_ORIGINS: ${NAMAA_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      NAMAA_DEMO_NOW: ${NAMAA_DEMO_NOW:-2026-11-17T09:00:00Z}
+      NAMAA_SMALL_CELL_THRESHOLD: ${NAMAA_SMALL_CELL_THRESHOLD:-10}
+    volumes:
+      - api-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  web:
+    build:
+      context: ./web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    image: namaa-web:local
+    ports:
+      - "${NAMAA_WEB_PORT:-3000}:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api-data:

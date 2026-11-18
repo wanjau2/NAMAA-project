@@ -12,10 +12,15 @@ follow-up.
 
 ## Start here
 
+- [DOCKER.md](DOCKER.md) — run the full stack with Docker Compose
 - [docs/README.md](docs/README.md) — documentation index, team ownership, the eight non-negotiables
 - [docs/02-decisions/D003-backend-stack-and-api.md](docs/02-decisions/D003-backend-stack-and-api.md) — locked sprint stack and API paths
 - [api/README.md](api/README.md) — Ismail: one-command API startup and contract
 - [docs/02-decisions/OPEN-QUESTIONS.md](docs/02-decisions/OPEN-QUESTIONS.md) — remaining open questions
 - [docs/01-milestones/MILESTONE-LOG.md](docs/01-milestones/MILESTONE-LOG.md) — what has actually been delivered
+
+```bash
+docker compose up --build
+```
 
 Team: Ismail (backend, FHIR, workflow) · Alfred (rules, AI, evaluation) · Mark (frontend, demo)
