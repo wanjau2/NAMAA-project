@@ -87,7 +87,7 @@ and journal the intended transaction. Read committed resource versions back from
 HAPI before making a RuleSnapshot. Never manufacture canonical versions from a
 proposal Bundle. The demo performs this step through an explicitly named simulator.
 
-Suggested backend API surfaces from the design (not implemented here):
+Suggested backend API surfaces (Ismail — D005 security handoff):
 
 | Endpoint | Backend action |
 | --- | --- |
@@ -95,6 +95,12 @@ Suggested backend API surfaces from the design (not implemented here):
 | `GET /api/v1/extractions/{id}` | Return scoped job status and stored proposals |
 | `POST /api/v1/facts/{id}/review` | Authenticate, bind identity, journal ReviewCommand and apply review |
 | `POST /api/v1/patients/{id}/evaluations` | Retrieve authorized reviewed resource versions and evaluate |
+| `GET /api/v1/security/context` | Trusted request context (backend-minted) |
+| `POST /api/v1/authz/evaluation` | AuthZEN 1.0 PDP (synthetic_guest_v1) |
+| `POST /api/v1/audit/events` | Protected audit sink |
+| `POST /api/v1/security/verified-context` | Scope + version check before Relate/context disclosure |
+
+Full wiring notes: [`../../docs/00-reference/authz-audit-integration-for-alfred.md`](../../docs/00-reference/authz-audit-integration-for-alfred.md).
 
 Map PermissionError to 403; `stale_proposal_version` or changed source to 409;
 schema/source/review errors to 422; exhausted transport to failed job/503. Preserve

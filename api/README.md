@@ -61,6 +61,8 @@ uvicorn app.main:app --reload --port 8000
 
 Extraction UI helper: `web/lib/extraction-sse.ts`. See [D004](../docs/02-decisions/D004-sse-and-outbox.md).
 
+AuthZ / audit for Alfred: [authz-audit-integration-for-alfred.md](../docs/00-reference/authz-audit-integration-for-alfred.md) (D005).
+
 Action names match `web/lib/case-actions.ts`. Mutation body:
 
 ```json

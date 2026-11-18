@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models import (
+    AuditEvent,
     CareGap,
     Case,
     Command,
@@ -45,6 +46,7 @@ def ensure_workspace(db: Session, workspace_id: str | None = None) -> Workspace:
 
 def wipe_workspace_data(db: Session, workspace_id: str) -> None:
     for model in (
+        AuditEvent,
         Proposal,
         ExtractionJob,
         OutboxEntry,

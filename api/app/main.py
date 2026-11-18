@@ -7,7 +7,7 @@ from app import __version__
 from app.config import get_settings
 from app.db import init_db
 from app.errors import AppError, app_error_handler
-from app.routers import analytics, cases, demo, extractions, health, meta, ops, patients
+from app.routers import analytics, cases, demo, extractions, health, meta, ops, patients, security
 from app.workers import runtime
 
 
@@ -30,7 +30,8 @@ def create_app(*, start_workers: bool = True) -> FastAPI:
         description=(
             "Synthetic precision-prevention workflow API. "
             "NOT FOR CLINICAL USE. No real patient data. "
-            "Extraction progress via SSE; FHIR dual-store via transactional outbox (D004)."
+            "Extraction progress via SSE; FHIR outbox (D004); "
+            "AuthZEN PDP + audit sink + trusted context (D005, synthetic guest only)."
         ),
         version=__version__,
         lifespan=_lifespan,
@@ -52,6 +53,7 @@ def create_app(*, start_workers: bool = True) -> FastAPI:
     app.include_router(meta.router)
     app.include_router(extractions.router)
     app.include_router(ops.router)
+    app.include_router(security.router)
     return app
 
 

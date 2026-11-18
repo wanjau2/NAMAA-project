@@ -177,6 +177,12 @@ class ExtractionJob(Base):
     started_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
     finished_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
     timeout_ms: Mapped[int] = mapped_column(Integer, default=90_000)
+    # Preserved initiating principal for re-authorization (D005)
+    initiating_user_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    initiating_role: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    initiating_purpose: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    initiating_request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    principal_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Proposal(Base):
@@ -269,3 +275,36 @@ class RuleEvaluation(Base):
     input_snapshot_json: Mapped[str] = mapped_column(Text)
     result_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(String(64))
+
+
+class AuditEvent(Base):
+    """Protected audit sink rows — no note text, tokens, or full prompts (D005)."""
+
+    __tablename__ = "audit_events"
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(64), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    timestamp: Mapped[str] = mapped_column(String(64), index=True)
+    event_type: Mapped[str] = mapped_column(String(64))
+    request_id: Mapped[str] = mapped_column(String(64), index=True)
+    job_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(128))
+    service_id: Mapped[str] = mapped_column(String(64))
+    action: Mapped[str] = mapped_column(String(64))
+    purpose_of_use: Mapped[str] = mapped_column(String(64))
+    resource_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    resource_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    patient_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    decision: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    decision_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    policy_revision: Mapped[str] = mapped_column(String(64))
+    permission_revision: Mapped[str] = mapped_column(String(64))
+    policy_adapter: Mapped[str] = mapped_column(String(64))
+    production_authorization: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_versions_json: Mapped[str] = mapped_column(Text, default="{}")
+    model_revision: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reviewer_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    safe_detail_json: Mapped[str] = mapped_column(Text, default="{}")

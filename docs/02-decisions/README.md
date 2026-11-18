@@ -12,6 +12,9 @@ Unresolved choices live in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) until someone 
 | D002 | 2026-11-17 | [UI theme addendum: corrected tokens and missing layers](D002-ui-theme-addendum.md) | Proposed |
 | D003 | 2026-11-18 | [Backend stack, API paths, and metrics suppression](D003-backend-stack-and-api.md) | Accepted |
 | D004 | 2026-11-18 | [Extraction SSE and FHIR outbox compensation](D004-sse-and-outbox.md) | Accepted |
+| D005 | 2026-11-18 | [Trusted context, AuthZEN PDP, enforcement, audit](D005-authz-audit-pdp.md) | Accepted |
 
 To add one: copy [TEMPLATE.md](TEMPLATE.md) to `DNNN-short-slug.md`, fill it in, add a row above,
 and strike the matching row out of the open-questions register.
+
+Alfred security wiring: [authz-audit-integration-for-alfred.md](../00-reference/authz-audit-integration-for-alfred.md).

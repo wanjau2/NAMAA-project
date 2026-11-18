@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -8,8 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.errors import AppError
-from app.models import Document, ExtractionJob, Proposal
+from app.models import Document, ExtractionJob, Proposal, Workspace
 from app.realtime import extraction_channel, extraction_hub
+from app.security.audit import emit_audit
+from app.security.context import TrustedRequestContext, build_trusted_context
+from app.security.enforce import authorize
 from app.services.extraction_fixtures import proposals_for_document
 
 
@@ -70,6 +74,7 @@ def queue_extraction(
     workspace_id: str,
     document_id: str,
     document_version: int | None = None,
+    ctx: TrustedRequestContext | None = None,
 ) -> ExtractionJob:
     settings = get_settings()
     q = db.query(Document).filter(
@@ -84,6 +89,27 @@ def queue_extraction(
             code="not_found",
             message=f"Document '{document_id}' was not found in this guest session.",
             status_code=404,
+        )
+
+    if ctx is not None:
+        # Fresh checks before note retrieval and model dispatch (D005).
+        authorize(
+            db,
+            ctx,
+            action="note.retrieve",
+            resource_type="DocumentReference",
+            resource_id=doc.id,
+            patient_id=doc.patient_id,
+            extra_context={"document_version": str(doc.version)},
+        )
+        authorize(
+            db,
+            ctx,
+            action="model.dispatch",
+            resource_type="ExtractionJob",
+            resource_id=doc.id,
+            patient_id=doc.patient_id,
+            extra_context={"model_destination": ctx.approved_model_destination},
         )
 
     # Reuse an active job for the same document version (avoid duplicate inference).
@@ -101,6 +127,7 @@ def queue_extraction(
         return active
 
     now = _iso(_utcnow())
+    snapshot = ctx.to_public_dict() if ctx else None
     job = ExtractionJob(
         id=f"ext-{uuid.uuid4().hex[:12]}",
         workspace_id=workspace_id,
@@ -120,11 +147,94 @@ def queue_extraction(
         progress_message="Queued for extraction",
         created_at=now,
         timeout_ms=settings.extraction_timeout_ms,
+        initiating_user_id=ctx.user_id if ctx else None,
+        initiating_role=ctx.membership_role if ctx else None,
+        initiating_purpose=ctx.purpose_of_use if ctx else None,
+        initiating_request_id=ctx.request_id if ctx else None,
+        principal_snapshot_json=json.dumps(snapshot) if snapshot else None,
     )
     db.add(job)
+    if ctx is not None:
+        emit_audit(
+            db,
+            event_type="extraction.queued",
+            ctx=ctx,
+            action="model.dispatch",
+            resource_type="ExtractionJob",
+            resource_id=job.id,
+            patient_id=doc.patient_id,
+            job_id=job.id,
+            source_versions={f"DocumentReference/{doc.id}": str(doc.version)},
+            model_revision=job.model_revision,
+            prompt_version=job.prompt_version,
+            reason_code="queued",
+        )
     db.commit()
     db.refresh(job)
     return job
+
+
+def reauthorize_job_execution(db: Session, job: ExtractionJob) -> TrustedRequestContext:
+    """Re-authorize when a worker claims a job (preserved initiating scope)."""
+    workspace = db.get(Workspace, job.workspace_id)
+    if workspace is None:
+        raise AppError(code="not_found", message="Workspace missing for job.", status_code=404)
+    ctx = build_trusted_context(
+        db,
+        workspace=workspace,
+        role="service",
+        request_id=job.initiating_request_id or f"job-{job.id}",
+        user_id=f"service:namaa-api",
+        user_type="service",
+        purpose_of_use=job.initiating_purpose or "demo_model_extraction",
+        patient_id=job.patient_id,
+    )
+    authorize(
+        db,
+        ctx,
+        action="model.dispatch",
+        resource_type="ExtractionJob",
+        resource_id=job.id,
+        patient_id=job.patient_id,
+        extra_context={
+            "initiating_role": job.initiating_role,
+            "initiating_user_id": job.initiating_user_id,
+            "model_destination": ctx.approved_model_destination,
+        },
+    )
+    authorize(
+        db,
+        ctx,
+        action="note.retrieve",
+        resource_type="DocumentReference",
+        resource_id=job.document_id,
+        patient_id=job.patient_id,
+    )
+    return ctx
+
+
+def authorize_proposal_disclosure(
+    db: Session,
+    ctx: TrustedRequestContext,
+    job: ExtractionJob,
+) -> None:
+    authorize(
+        db,
+        ctx,
+        action="proposal.disclose",
+        resource_type="ExtractionJob",
+        resource_id=job.id,
+        patient_id=job.patient_id,
+        extra_context={"initiating_user_id": job.initiating_user_id},
+    )
+    authorize(
+        db,
+        ctx,
+        action="excerpt.display",
+        resource_type="DocumentReference",
+        resource_id=job.document_id,
+        patient_id=job.patient_id,
+    )
 
 
 def get_job(db: Session, *, workspace_id: str, job_id: str) -> ExtractionJob:

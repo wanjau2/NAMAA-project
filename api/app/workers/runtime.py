@@ -14,6 +14,7 @@ from app.services.extractions import (
     claim_queued_jobs,
     proposals_for_job,
     publish_job,
+    reauthorize_job_execution,
 )
 from app.services.outbox import claim_due_entries, process_entry
 
@@ -73,8 +74,10 @@ class WorkerRuntime:
         try:
             jobs = claim_queued_jobs(db, worker_id=self.worker_id)
             for job in jobs:
+                # D005: re-authorize at execution start using preserved initiating scope.
+                reauthorize_job_execution(db, job)
+                db.commit()
                 await publish_job(job)
-                # Simulate multi-step progress without hammering DB every 100ms.
                 while job.state not in TERMINAL:
                     await asyncio.sleep(0.35)
                     job = advance_job(db, job)
@@ -82,7 +85,6 @@ class WorkerRuntime:
                     await publish_job(job, proposals=props)
                     if job.state in TERMINAL:
                         break
-                    # Sparse DB already updated inside advance_job; SSE carries the rest.
         finally:
             db.close()
 
