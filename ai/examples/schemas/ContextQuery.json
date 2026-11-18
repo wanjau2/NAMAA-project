@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "description": "Internal query over an already backend-authorized context envelope.",
+  "properties": {
+    "query": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Query",
+      "type": "string"
+    },
+    "max_items": {
+      "default": 12,
+      "maximum": 30,
+      "minimum": 1,
+      "title": "Max Items",
+      "type": "integer"
+    },
+    "max_context_characters": {
+      "default": 12000,
+      "maximum": 24000,
+      "minimum": 256,
+      "title": "Max Context Characters",
+      "type": "integer"
+    },
+    "requested_resource_types": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Requested Resource Types",
+      "type": "array"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "title": "ContextQuery",
+  "type": "object"
+}

@@ -23,7 +23,11 @@
       "verified_at": "2026-11-18T09:00:00Z",
       "authorized": true,
       "source_verified": true,
-      "text": "Fictional source-verified record summary supplied by the backend."
+      "text": "Fictional source-verified record summary supplied by the backend.",
+      "reviewed": false,
+      "offset_start": null,
+      "offset_end": null,
+      "offset_unit": "unicode_code_points"
     }
   ]
 }

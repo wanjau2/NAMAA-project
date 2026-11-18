@@ -183,6 +183,20 @@ class ContextRecord(Contract):
     authorized: StrictBool
     source_verified: StrictBool
     text: Text
+    reviewed: StrictBool = False
+    offset_start: int | None = Field(default=None, ge=0)
+    offset_end: int | None = Field(default=None, ge=1)
+    offset_unit: Literal["unicode_code_points"] = "unicode_code_points"
+
+    @model_validator(mode="after")
+    def paired_offsets(self):
+        if (self.offset_start is None) != (self.offset_end is None):
+            raise ValueError("Context source offsets must both be present or both be null")
+        if self.offset_start is not None and self.offset_end <= self.offset_start:
+            raise ValueError("Context source offsets must be a non-empty half-open span")
+        if self.offset_start is not None and self.offset_end - self.offset_start != len(self.text):
+            raise ValueError("Context excerpt length must match its Unicode code-point offsets")
+        return self
 
 
 class VerifiedContext(Contract):
@@ -200,3 +214,55 @@ class VerifiedContext(Contract):
     completeness: Literal["complete_in_checked_scope", "partial", "unknown"]
     checked_scope: Text
     records: tuple[ContextRecord, ...]
+
+
+class ContextItem(Contract):
+    """One authorized FHIR resource/passsage; resource boundaries never merge."""
+    item_id: LogicalId
+    source: ResourceVersion
+    patient_reference: PatientRef
+    tier: Literal["structured", "longitudinal", "relational"]
+    source_last_updated: AwareDatetime
+    verified_at: AwareDatetime
+    permission_revision: Version
+    generation_id: LogicalId
+    authorized: StrictBool
+    source_verified: StrictBool
+    reviewed: StrictBool
+    text: Text
+    offset_start: int | None = Field(default=None, ge=0)
+    offset_end: int | None = Field(default=None, ge=1)
+    offset_unit: Literal["unicode_code_points"] = "unicode_code_points"
+
+    @model_validator(mode="after")
+    def paired_offsets(self):
+        if (self.offset_start is None) != (self.offset_end is None):
+            raise ValueError("Context source offsets must both be present or both be null")
+        if self.offset_start is not None and self.offset_end <= self.offset_start:
+            raise ValueError("Context source offsets must be a non-empty half-open span")
+        if self.offset_start is not None and self.offset_end - self.offset_start != len(self.text):
+            raise ValueError("Context excerpt length must match its Unicode code-point offsets")
+        return self
+
+
+class ContextQuery(Contract):
+    """Internal query over an already backend-authorized context envelope."""
+    query: Text
+    max_items: int = Field(default=12, ge=1, le=30)
+    max_context_characters: int = Field(default=12000, ge=256, le=24000)
+    requested_resource_types: tuple[str, ...] = ()
+
+
+class AssembledContext(Contract):
+    query: Text
+    workspace_id: LogicalId
+    patient_reference: PatientRef
+    generation_id: LogicalId
+    permission_revision: Version
+    state: Literal["assembled", "empty_unknown"]
+    completeness: Literal["complete_in_checked_scope", "partial", "unknown"]
+    items: tuple[ContextItem, ...]
+    character_count: int = Field(ge=0)
+    exhaustive: Literal[False] = False
+    absence_claims_allowed: Literal[False] = False
+    notice: str = "Context is limited to current authorized sources in the backend checked scope."

@@ -58,3 +58,46 @@ async def evaluate_corpus(notes: list[dict], adapter: ExtractionAdapter) -> dict
                        "p95": sorted(latencies)[math.ceil(len(latencies)*.95)-1] if latencies else None},
         "cases": rows,
     }
+
+
+def evaluate_context_retrieval(cases: list[dict], retriever=None, *, k: int = 3) -> dict:
+    """Synthetic retrieval plumbing metrics; not clinical relevance evidence."""
+    from datetime import datetime, timezone
+
+    from .context_engineering import ReciprocalRankFusion
+    from .contracts import ContextItem
+
+    if k < 1:
+        raise ValueError("k_must_be_positive")
+    ranker = retriever or ReciprocalRankFusion()
+    hits = reciprocal_rank_sum = recall_sum = 0.0
+    rows = []
+    for case in cases:
+        items = tuple(ContextItem(
+            item_id=item["item_id"], source={"reference": item["reference"], "version": item["version"]},
+            patient_reference="Patient/synthetic-eval", tier=item["tier"],
+            source_last_updated=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            verified_at=datetime(2026, 1, 2, tzinfo=timezone.utc), permission_revision="eval-permissions-v1",
+            generation_id="synthetic-eval-generation", authorized=True, source_verified=True,
+            reviewed=item.get("reviewed", False), text=item["text"])
+            for item in case["items"])
+        by_id = {item.item_id: item for item in items}
+        ranked = [item_id for item_id in ranker.rank(case["query"], items) if item_id in by_id]
+        relevant = set(case["relevant"])
+        found = [by_id[item_id].source.reference + "@" + by_id[item_id].source.version for item_id in ranked[:k]]
+        relevant_hits = len(relevant.intersection(found))
+        recall = relevant_hits / len(relevant) if relevant else None
+        first_rank = next((i for i, ref in enumerate(found, 1) if ref in relevant), None)
+        hits += bool(first_rank)
+        recall_sum += recall or 0.0
+        reciprocal_rank_sum += 1 / first_rank if first_rank else 0.0
+        rows.append({"id": case["id"], "retrieved_at_k": found,
+                     "relevant_retrieved": relevant_hits, "relevant_count": len(relevant),
+                     "reciprocal_rank": 1 / first_rank if first_rank else 0.0})
+    n = len(cases)
+    return {"notice": "Synthetic retrieval fixture metrics; not clinical relevance or model-quality results.",
+            "simulated": True, "sample_size_queries": n, "k": k,
+            "hit_rate_at_k": hits / n if n else None,
+            "mean_recall_at_k": recall_sum / n if n else None,
+            "mean_reciprocal_rank": reciprocal_rank_sum / n if n else None,
+            "cases": rows}

@@ -13,6 +13,7 @@
   "sha256": {
     "fixtures/notes.json": "1c503fbcfbd46b94e707ce0a941008e503941b38fad2364eaeb3186d4d14be28",
     "src/namaa_ai/prompts/extract-v1.0.0.txt": "53c9ed8760c06d09906715a4241cbf634eae4d8fd37d6e35f2950d45744b3145",
-    "src/namaa_ai/prompts/extract-v1.0.1.txt": "7d3cc0119e978ede626fbc165e150e5ed7f90d9b2b866653757b8cb3d5f0b754"
+    "src/namaa_ai/prompts/extract-v1.0.1.txt": "7d3cc0119e978ede626fbc165e150e5ed7f90d9b2b866653757b8cb3d5f0b754",
+    "fixtures/context-queries.json": "f910b67a79cb6af816804c68a398dc76cfaa6a543433f9ee24ea33c52e720640"
   }
 }

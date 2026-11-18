@@ -61,6 +61,13 @@ missing/contradictory/unreviewed data, HTTP retry/repair/timeout/invalid output,
 context freshness/access rejection, handoff example/schema consistency and the
 complete simulated slice. The tests make no live endpoint calls.
 
+Context retrieval has a separate synthetic query set in
+`fixtures/context-queries.json` (development and held-out splits). Run
+`namaa-ai evaluate-context --split development` and `--split held_out` for hit
+rate, recall@k and mean reciprocal rank with query counts. These fixtures check
+ranking mechanics and source-version handling; they are not clinically
+adjudicated relevance results and do not establish vector or graph quality.
+
 Base FHIR R4 validation, Namaa profile validation, HAPI execution, real backend
 authentication, live MedGemma quality/latency and integrated browser journeys are
 not covered by these tests. Track them as pending integration checks.

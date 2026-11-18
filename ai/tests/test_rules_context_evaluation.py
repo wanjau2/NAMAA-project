@@ -8,7 +8,7 @@ from namaa_ai.adapters import MockAdapter
 from namaa_ai.context import VerifiedContextAdapter
 from namaa_ai.contracts import RuleSnapshot, VerifiedContext
 from namaa_ai.demo import run_demo, simulated_snapshot
-from namaa_ai.evaluation import evaluate_corpus
+from namaa_ai.evaluation import evaluate_context_retrieval, evaluate_corpus
 from namaa_ai.fhir import CONCEPT_TEXT
 from namaa_ai.rules import RULES, evaluate
 
@@ -131,6 +131,18 @@ def test_evaluation_detects_wrong_fields_and_duplicate_additions(corpus):
     assert report["fields"]["assertion"]["fn"] == 1
     assert report["unsupported_additions"]["count"] == 2
     assert report["outcomes"] == {"invalid_output": 1}
+
+
+def test_context_evaluation_reports_split_and_sample_denominators():
+    import json
+    from pathlib import Path
+    fixtures = json.loads((Path(__file__).parents[1] / "fixtures/context-queries.json").read_text())["queries"]
+    dev = evaluate_context_retrieval([q for q in fixtures if q["split"] == "development"])
+    held_out = evaluate_context_retrieval([q for q in fixtures if q["split"] == "held_out"])
+    assert dev["simulated"] and dev["sample_size_queries"] == 4
+    assert held_out["sample_size_queries"] == 4
+    assert "not clinical relevance" in dev["notice"]
+    assert 0 <= dev["mean_recall_at_k"] <= 1
 
 
 def test_vertical_slice():

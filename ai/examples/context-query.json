@@ -1,0 +1,6 @@
+{
+  "query": "What source-verified observation is available?",
+  "max_items": 5,
+  "max_context_characters": 12000,
+  "requested_resource_types": []
+}

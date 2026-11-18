@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from namaa_ai import contracts
+from namaa_ai.contracts import AssembledContext, ContextQuery
 from namaa_ai.fhir import local_mapping_checks
 
 EXAMPLES = Path(__file__).parents[1] / "examples"
@@ -19,6 +20,7 @@ EXAMPLES = Path(__file__).parents[1] / "examples"
     ("verified-context", contracts.VerifiedContext), ("endpoint-response", contracts.EndpointResponse),
     ("condition-extraction-proposal", contracts.ExtractionProposal),
     ("condition-review-command", contracts.ReviewCommand),
+    ("context-query", ContextQuery), ("assembled-context", AssembledContext),
 ])
 def test_handoff_examples_match_contract(filename, model):
     model.model_validate_json((EXAMPLES / f"{filename}.json").read_text())

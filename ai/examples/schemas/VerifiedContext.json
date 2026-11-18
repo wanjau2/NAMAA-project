@@ -35,6 +35,43 @@
           "pattern": "\\S",
           "title": "Text",
           "type": "string"
+        },
+        "reviewed": {
+          "default": false,
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "offset_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset Start"
+        },
+        "offset_end": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset End"
+        },
+        "offset_unit": {
+          "const": "unicode_code_points",
+          "default": "unicode_code_points",
+          "title": "Offset Unit",
+          "type": "string"
         }
       },
       "required": [

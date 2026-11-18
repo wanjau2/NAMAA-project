@@ -1,0 +1,35 @@
+{
+  "query": "What source-verified observation is available?",
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "generation_id": "generation-demo-1",
+  "permission_revision": "permissions-v1",
+  "state": "assembled",
+  "completeness": "partial",
+  "items": [
+    {
+      "item_id": "ctx-1a363bab7c20f35f74434c6e",
+      "source": {
+        "reference": "Observation/demo-observation",
+        "version": "opaque-v1"
+      },
+      "patient_reference": "Patient/demo-patient",
+      "tier": "structured",
+      "source_last_updated": "2026-11-18T08:30:00Z",
+      "verified_at": "2026-11-18T09:00:00Z",
+      "permission_revision": "permissions-v1",
+      "generation_id": "generation-demo-1",
+      "authorized": true,
+      "source_verified": true,
+      "reviewed": false,
+      "text": "Fictional source-verified record summary supplied by the backend.",
+      "offset_start": null,
+      "offset_end": null,
+      "offset_unit": "unicode_code_points"
+    }
+  ],
+  "character_count": 65,
+  "exhaustive": false,
+  "absence_claims_allowed": false,
+  "notice": "Context is limited to current authorized sources in the backend checked scope."
+}

@@ -16,6 +16,7 @@ SQLAlchemy, React or the backend's application models.
 | RuleSnapshot | `rule-input-snapshot.json` | Authorized committed FHIR gateway → evaluator |
 | RuleEvaluation | `rule-evaluation.json`, `rule-needs-review.json` | Evaluator → backend → UI |
 | VerifiedContext | `verified-context.json` | Backend verification layer → optional explanation boundary |
+| ContextItem / ContextQuery / AssembledContext | Typed contracts | Verified sources → optional explanation context assembler |
 
 All examples are under `examples/`. Authorization fields in **internal** snapshot
 and context contracts are assertions made by Ismail's trusted adapter. They are
@@ -136,8 +137,9 @@ fact verification defaults are not accepted as authoritative review receipts.
 
 ## Optional context
 
-`VerifiedContextAdapter` is disabled by default. Enabling is an explicit backend
-composition choice only after Ismail supplies a tested verification contract.
+`VerifiedContextAdapter` and `ContextAssembler` are disabled by default. Enabling
+is an explicit backend composition choice only after Ismail supplies a tested
+verification contract.
 The adapter requires matching workspace/patient/generation/permission revision,
 current authorized verified state, bounded verification times and valid per-record
 authorization and source verification. It returns source references, versions,
@@ -145,4 +147,8 @@ generation information and completeness with `exhaustive: false` and
 `absence_claims_allowed: false`, including for an empty context. Completeness means
 only the backend's checked scope. Ismail must reauthorize and verify current HAPI
 versions immediately before disclosure; the adapter cannot do those checks itself.
-It is not connected to extraction or rules. No graph implementation is included.
+The offline assembler treats each FHIR resource as its own retrieval unit, uses
+deterministic lexical ranking and accepts an optional dense-ranking adapter for
+rank fusion. It does not select a vector vendor, create embeddings, or connect to
+Relate. Retrieved context is only for optional explanation; it is not connected
+to extraction or rules. Empty retrieval remains unknown, never a no-gap result.

@@ -21,6 +21,8 @@ namaa-ai demo
 python -m pytest -q
 namaa-ai evaluate --adapter mock --split development
 namaa-ai evaluate --adapter mock --split held_out
+namaa-ai evaluate-context --split development
+namaa-ai evaluate-context --split held_out
 ```
 
 The demo explicitly constructs two **scripted** accept commands using a narrowly
@@ -57,14 +59,17 @@ not a successful empty extraction.
 | `src/namaa_ai/fhir.py` | Deterministic reviewed Observation, Condition and FamilyMemberHistory mappings, Provenance and local mapping checks |
 | `src/namaa_ai/rules.py` | Versioned fictional rules over backend resource snapshots |
 | `src/namaa_ai/context.py` | Default-disabled verified-context gate |
+| `src/namaa_ai/context_engineering.py` | FHIR-resource-bounded retrieval, BM25, optional dense adapter, rank fusion and bounded context assembly |
 | `src/namaa_ai/evaluation.py` | Field metrics, source/schema validity and latency |
 | `fixtures/notes.json` | 40 labelled notes with 20 development / 20 held-out records |
+| `fixtures/context-queries.json` | Synthetic retrieval fixtures with development / held-out splits |
 | `examples/` | Representative JSON and generated JSON Schemas for Ismail and Mark |
 | `evidence/` | Local test and simulated evaluation evidence |
 
 Read [contracts and integration](docs/CONTRACTS.md), [endpoint protocol](docs/ENDPOINT.md),
 [evaluation methodology](docs/EVALUATION.md), and the pre-implementation
-[phased plan](docs/IMPLEMENTATION_PLAN.md).
+[phased plan](docs/IMPLEMENTATION_PLAN.md). The retrieval implementation and
+Mark/Ismail handoffs are in [context engineering](docs/CONTEXT_ENGINEERING.md).
 
 Authorization boundary and synthetic security tests are documented in
 [security integration](docs/SECURITY.md). Alfred's `SecurityEnforcer` asks
@@ -72,6 +77,14 @@ Ismail's backend for a fresh decision at each boundary; it does not treat local
 roles, prompts, or Relate paths as authority. The local policy adapter is an
 explicit deterministic test fixture only. Backend guest decisions always carry
 `production_authorization=false`.
+
+The context assembler is disabled by default and accepts only current,
+backend-verified context envelopes. It ranks source-versioned resources using
+deterministic BM25; an optional dense retriever can be injected through the
+rank-fusion interface, but no vector database or embedding model is selected or
+implemented. Context evaluation uses separate synthetic development and held-out
+queries; it tests retrieval plumbing, not clinical relevance. Rules continue to
+consume reviewed committed snapshots directly and never retrieval results.
 
 ## Demonstration rule definitions
 
@@ -103,7 +116,8 @@ screening authorization. Neither rule consumes proposals or graph context.
 90-second total deadline, one transient retry and one schema-repair regeneration
 (three attempts maximum); source checks; explicit review logic; deterministic
 Observation/Condition/FamilyMemberHistory mapping and Provenance; local mapping checks;
-fictional rules; context boundary; tests and evaluation runner.
+fictional rules; security boundary; verified-context gating and offline context
+assembly/retrieval interfaces; synthetic extraction and retrieval evaluation.
 
 Condition proposals are limited to verbatim statements explicitly saying the
 patient is currently diagnosed. The lexical guard rejects inferred, historical,
@@ -122,7 +136,10 @@ real review authorization; HAPI gateway, partition/reference checks, version
 preconditions, transaction execution and crash reconciliation; trusted snapshot
 construction; Namaa profiles, terminology and official FHIR validator; deployed
 endpoint serving contract and immutable model revision; live evaluation; Relate
-verification contract. The hosted adapter is implemented, not live-verified.
+verification contract; production context endpoint with source-level offsets,
+review attestations and version freshness; selection/deployment of a retrieval
+projection, embedding model and its indexing lifecycle. The hosted adapter is
+implemented, not live-verified.
 
 **Pending with Mark:** adapt the nested proposal contract and opaque string source
 versions, convert code-point offsets for JS display, show review issues and mock/
