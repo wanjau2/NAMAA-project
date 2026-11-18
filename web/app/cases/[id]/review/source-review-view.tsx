@@ -29,10 +29,10 @@ import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import type { EpistemicState } from "@/components/status-badge";
 import { useDemoSession } from "@/lib/demo-session";
+import { useCase } from "@/lib/case-store";
 import {
   ASSERTION_LABELS,
   SUBJECT_LABELS,
-  getCaseRow,
   getSourceReview,
   quoteMatchesSource,
   type Assertion,
@@ -40,7 +40,7 @@ import {
   type ProposalSubject,
   type ReviewState,
   type SourceNote,
-} from "@/lib/mock-data";
+} from "@/lib/source-review-fixtures";
 
 type CorrectedFields = {
   value_text: string;
@@ -66,7 +66,8 @@ const REVIEW_BADGE: Record<ReviewState, { state: EpistemicState; label: string }
 export function SourceReviewView({ id }: { id: string }) {
   const { role } = useDemoSession();
   const bundle = getSourceReview(id);
-  const row = getCaseRow(id);
+  // Patient identity from the API; proposals from fixtures until Q10 lands.
+  const { case: row } = useCase(id);
 
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [selected, setSelected] = useState<string | null>(
@@ -86,7 +87,7 @@ export function SourceReviewView({ id }: { id: string }) {
     return tally;
   }, [bundle, decisions]);
 
-  if (!bundle || !row) return null;
+  if (!bundle) return null;
 
   const { note, proposals } = bundle;
   const selectedProposal = proposals.find((p) => p.id === selected) ?? null;
@@ -105,9 +106,9 @@ export function SourceReviewView({ id }: { id: string }) {
       <header className="mt-4">
         <h1 className="text-2xl text-ink">Source review</h1>
         <p className="mt-1 max-w-3xl text-sm text-ink-muted">
-          {row.patient_label} · Facts proposed from one source note. Nothing here
-          influences the demonstration rule until it is accepted or corrected by
-          a clinical reviewer.
+          {row ? `${row.patient_label} · ` : ""}Facts proposed from one source
+          note. Nothing here influences the demonstration rule until it is
+          accepted or corrected by a clinical reviewer.
         </p>
       </header>
 
@@ -144,6 +145,16 @@ export function SourceReviewView({ id }: { id: string }) {
           </span>
         </p>
       </section>
+
+      <p className="mt-3 flex items-start gap-1.5 rounded-lg border border-dashed border-status-proposed bg-status-proposed-bg p-3 text-xs text-status-proposed">
+        <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          This screen is not yet server-backed. The API has no proposal or
+          fact-review endpoints, so these proposals come from local fixtures and
+          review decisions are not persisted. Everything else in the demo is
+          served by the API.
+        </span>
+      </p>
 
       {!isReviewer ? (
         <p

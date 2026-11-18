@@ -22,31 +22,36 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDemoSession, type Role } from "@/lib/demo-session";
+import { useDemoSession } from "@/lib/demo-session";
 import { useCaseStore } from "@/lib/case-store";
 import {
-  ACTIONS,
-  type ActionRequest,
+  ACTION_CATALOG,
+  ROLE_WORDS,
   type ActionSpec,
-  type CaseState,
   type FieldSpec,
-  type StructuredError,
-} from "@/lib/case-actions";
+} from "@/lib/action-catalog";
+import type {
+  ActionRequest,
+  CaseOut,
+  Role,
+  StructuredError,
+} from "@/lib/api-types";
 
-const ROLE_WORDS: Record<Role, string> = {
-  coordinator: "Coordinator",
-  clinical_reviewer: "Clinical Reviewer",
-  population_analyst: "Population Analyst",
-};
-
-export function ActionPanel({ caseState }: { caseState: CaseState }) {
+export function ActionPanel({
+  caseState,
+  onChanged,
+}: {
+  caseState: CaseOut;
+  /** Called after a successful action so the parent can refetch. */
+  onChanged?: () => void;
+}) {
   const { role } = useDemoSession();
   const [openAction, setOpenAction] = useState<string | null>(null);
 
-  // Actions that make sense for this stage, whatever the current role. Actions
-  // for another role stay visible so the governance boundary is legible.
+  // Display hints only — the server decides what is actually valid. Actions
+  // belonging to another role stay visible so the boundary is legible.
   const applicable = useMemo(
-    () => ACTIONS.filter((spec) => spec.applies(caseState)),
+    () => ACTION_CATALOG.filter((spec) => spec.displayWhen(caseState)),
     [caseState],
   );
 
@@ -59,7 +64,8 @@ export function ActionPanel({ caseState }: { caseState: CaseState }) {
           {caseState.stage}/{caseState.disposition}
         </span>{" "}
         at <span className="font-mono-tech">rev {caseState.revision}</span>. The
-        server validates every transition and records an event.
+        server validates every transition and records the event; this list is a
+        display hint and the server may still refuse an action.
       </p>
 
       {applicable.length === 0 ? (
@@ -75,6 +81,7 @@ export function ActionPanel({ caseState }: { caseState: CaseState }) {
                 caseState={caseState}
                 role={role}
                 open={openAction === spec.id}
+                onChanged={onChanged}
                 onToggle={() =>
                   setOpenAction((current) =>
                     current === spec.id ? null : spec.id,
@@ -95,17 +102,21 @@ function ActionRow({
   role,
   open,
   onToggle,
+  onChanged,
 }: {
   spec: ActionSpec;
-  caseState: CaseState;
+  caseState: CaseOut;
   role: Role;
   open: boolean;
   onToggle: () => void;
+  onChanged?: () => void;
 }) {
+  // Role is the only gate the client applies, and only to avoid offering a
+  // control that is certain to be refused. Preconditions are the server's:
+  // it answers `precondition_failed` with the reason, which the form shows.
   const permitted = role === spec.role;
-  const blocked = spec.precondition?.(caseState) ?? null;
   const reasonId = `gate-${spec.id}`;
-  const canOpen = permitted && !blocked;
+  const canOpen = permitted;
 
   return (
     <div
@@ -152,14 +163,18 @@ function ActionRow({
         >
           <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            {blocked ??
-              `Requires the ${ROLE_WORDS[spec.role]} role. Switch role in the simulation bar to demonstrate this step.`}
+            {`Requires the ${ROLE_WORDS[spec.role]} role. Switch role in the simulation bar to demonstrate this step.`}
           </span>
         </p>
       ) : null}
 
       {open && canOpen ? (
-        <ActionForm spec={spec} caseState={caseState} onDone={onToggle} />
+        <ActionForm
+          spec={spec}
+          caseState={caseState}
+          onDone={onToggle}
+          onChanged={onChanged}
+        />
       ) : null}
     </div>
   );
@@ -178,16 +193,18 @@ function ActionForm({
   spec,
   caseState,
   onDone,
+  onChanged,
 }: {
   spec: ActionSpec;
-  caseState: CaseState;
+  caseState: CaseOut;
   onDone: () => void;
+  onChanged?: () => void;
 }) {
   const { submit, newRequestId } = useCaseStore();
   const [values, setValues] = useState(() => initialValues(spec));
   const [error, setError] = useState<StructuredError | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [duplicate, setDuplicate] = useState(false);
+  const [pending, setPending] = useState(false);
 
   // One request id per form instance. A retry after a failure reuses it, which
   // is exactly the idempotency semantic the server expects.
@@ -201,25 +218,25 @@ function ActionForm({
     setValues((prev) => ({ ...prev, [name]: value }));
   }
 
-  function onSubmit(event: React.FormEvent) {
+  async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
+    setPending(true);
     const request: ActionRequest = {
       action: spec.id,
       expected_revision: openedAtRevision,
       request_id: requestId,
       data: values,
     };
-    const result = submit(caseState.id, request);
+    const result = await submit(caseState.id, request);
+    setPending(false);
     if (result.ok) {
       setError(null);
-      setDuplicate(result.duplicate);
       setSuccess(
-        result.duplicate
-          ? "Already recorded. The repeated request produced no second event."
-          : `Recorded. ${result.event.prior_state} → ${result.event.new_state}.`,
+        `Recorded by the server. ${result.event.prior_state} → ${result.event.new_state}.`,
       );
+      onChanged?.();
     } else {
-      // Entered values are deliberately NOT cleared.
+      // Entered values are deliberately NOT cleared (D002 §4).
       setSuccess(null);
       setError(result.error);
     }
@@ -286,9 +303,7 @@ function ActionForm({
         <p
           className={cn(
             "mt-3 flex items-start gap-1.5 rounded-md border p-2 text-xs",
-            duplicate
-              ? "border-status-review bg-status-review-bg text-status-review"
-              : "border-status-verified bg-status-verified-bg text-status-verified",
+            "border-status-verified bg-status-verified-bg text-status-verified",
           )}
         >
           <CheckCircle2 aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
@@ -299,6 +314,7 @@ function ActionForm({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="submit"
+          aria-disabled={pending}
           className={cn(
             "rounded-md px-3 py-1.5 text-xs font-semibold",
             spec.tone === "destructive"
@@ -308,7 +324,7 @@ function ActionForm({
                 : "border border-border bg-surface text-ink hover:bg-subtle",
           )}
         >
-          {success ? "Submit again" : spec.label}
+          {pending ? "Submitting…" : success ? "Submit again" : spec.label}
         </button>
         <button
           type="button"
@@ -337,8 +353,8 @@ function ActionForm({
 )}
         </pre>
         <p className="mt-1 text-xs text-ink-muted">
-          Not sent anywhere. Applied by the local simulation layer until the API
-          lands.
+          Sent to <span className="font-mono-tech">POST /api/v1/cases/{caseState.id}/actions</span>{" "}
+          with the simulated role in <span className="font-mono-tech">X-Namaa-Role</span>.
         </p>
       </details>
     </form>

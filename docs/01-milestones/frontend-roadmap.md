@@ -17,7 +17,10 @@ case detail (partial).
 
 ## Phase A — Finish the screen set
 
-**Progress: A1, A2 complete.** Next: A3.
+**Progress: A1, A2, A4 complete** (plus a minimal nav from A6). Next: A3 or A5.
+
+**Phase C landed 2026-11-18** — see [M03](M03-api-integration.md). The local transition layer is
+deleted; the server is authoritative. B1, B4, B5, B6 and C1/C2/C4 came with it.
 
 No backend required. Builds on contract-matching mocks, per the work plan's dependency-slip rule.
 
@@ -26,7 +29,7 @@ No backend required. Builds on contract-matching mocks, per the work plan's depe
 | ~~A1~~ | ~~**Source review panel**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A1-source-review/checks.md) | 12/12 checks pass on the production build | 1.5h |
 | ~~A2~~ | ~~**Action forms**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A2-action-forms/checks.md) | 26/26 transition checks pass (`npm run verify:actions`); offered actions verified per state | 1.5h |
 | A3 | **Patient overview** — clinical history, caregiver information, contact preferences | Caregiver authority shown separately from relationship | 0.75h |
-| A4 | **`/metrics` population dashboard** — separate child and adult cohort cards, explicit numerator/denominator, separate funnel counts for invited / booked / attended / follow-up, synthetic banner, suppressed cells | Denominators always visible; declined and unreachable people remain in the denominator; no figure implies a real-world outcome | 1.25h |
+| ~~A4~~ | ~~**`/metrics` population dashboard**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A4-population-dashboard/checks.md) | 53/53 definition + suppression checks pass (`npm run verify:metrics`). Q8 now **demonstrated**: hidden counts are readable in the JS bundle | 1.25h |
 | A5 | **FHIR / audit inspector drawer** — resource JSON, references, versions, validation results | Scope depends on Q1. Currently a stub | 0.75h |
 | A6 | **Navigation shell** — persistent nav across worklist / metrics / inspector, with selected state | Keyboard reachable; current page announced | 0.5h |
 
@@ -38,23 +41,24 @@ Built against a stub client so Phase C becomes a swap, not a rewrite.
 
 | # | Step | Acceptance | Est. |
 | --- | --- | --- | --- |
-| B1 | **Typed API client** — action envelope (action name, expected revision, request ID); structured error parsing (`code`, `message`, `field_errors`, `request_id`) | Every mutation carries all three; repeated request IDs are not generated twice | 1h |
+| ~~B1~~ | ~~**Typed API client**~~ — **DONE 2026-11-18** · `lib/api.ts`, `lib/api-types.ts` | Envelope + structured errors verified live | 1h |
 | B2 | **Loading / skeleton states** + inference polling — 2s poll, elapsed text against the 90s timeout, terminal-state stop | A stalled job is visible as stalled; a timeout never renders as "no gap found" | 0.75h |
-| B3 | **Error states per status code** — 401 / 403 / 404 / 409 / 422 / 429 / 503 | 409 shows the inline banner with **Reload Latest State** and **preserves all entered inputs** | 0.75h |
-| B4 | **Empty states** on every list | Phrased as an empty result, never as an absence of care gaps | 0.25h |
-| B5 | **No optimistic state** — the UI waits for the server echo | A failed call leaves the last confirmed state intact | 0.25h |
-| B6 | **Reset wired** to the demo reset endpoint | Reset clears only its own synthetic session | 0.25h |
+| B3 | **Error states per status code** — *partial*: 401/404/409/422 and unreachable handled with retry and input preservation; 403/429/503 untested | 409 banner + **Reload latest state** built | 0.75h |
+| ~~B4~~ | ~~**Empty states**~~ — **DONE 2026-11-18** (worklist); fixed a first-paint bug that read as an absence of care gaps | Skeleton covers connecting state | 0.25h |
+| ~~B5~~ | ~~**No optimistic state**~~ — **DONE 2026-11-18** | Server echo is the only state source | 0.25h |
+| ~~B6~~ | ~~**Reset wired**~~ — **DONE 2026-11-18** · `POST /api/v1/demo/reset` | Session-scoped; seed restored | 0.25h |
 
 ## Phase C — Connect to the backend (F4) — BLOCKED
 
-Needs Q1 and Q5 answered. This is the phase that turns cosmetic gating into real enforcement.
+Q1 and Q5 were answered by [D003](../02-decisions/D003-backend-stack-and-api.md). The gating is
+no longer cosmetic: the server validates every transition. C3 is the remaining item.
 
 | # | Step | Depends on |
 | --- | --- | --- |
-| C1 | Swap mocks for the real API; reconcile contract mismatches | Ismail's OpenAPI spec + action names |
-| C2 | Verify revision conflicts and duplicate request IDs against the real server | Ismail (B5 reliability) |
-| C3 | Render suppression from server flags | Q8 — Ismail + Alfred |
-| C4 | Replace `generateStaticParams` on `/cases/[id]` with a dynamic route | C1 |
+| ~~C1~~ | ~~Swap mocks for the real API~~ — **DONE 2026-11-18**; `case-actions.ts` deleted | — |
+| ~~C2~~ | ~~Verify revision conflicts and duplicate request IDs~~ — **DONE**; 34/34 contract checks | — |
+| C3 | Render suppression from server flags — **API side done**, but 16/16 cells suppressed at the current seed. Blocked on a cohort decision | Ismail + Alfred |
+| ~~C4~~ | ~~Replace `generateStaticParams` on `/cases/[id]`~~ — **DONE 2026-11-18** | — |
 
 Estimated 3h once unblocked.
 

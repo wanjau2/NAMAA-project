@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verify:actions": "node --experimental-strip-types --no-warnings scripts/verify-actions.ts"
+    "verify:metrics": "node --experimental-strip-types --no-warnings scripts/verify-metrics.ts",
+    "verify": "npm run verify:metrics",
+    "verify:api": "node --experimental-strip-types --no-warnings scripts/verify-api-contract.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

@@ -8,6 +8,7 @@ import {
 import "./globals.css";
 import { DemoSessionProvider } from "@/lib/demo-session";
 import { CaseStoreProvider } from "@/lib/case-store";
+import { MainNav } from "@/components/main-nav";
 import { SimulationBar } from "@/components/simulation-bar";
 
 /**
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <DemoSessionProvider>
           <CaseStoreProvider>
             <SimulationBar />
+            <MainNav />
             <main className="flex-1">{children}</main>
           </CaseStoreProvider>
         </DemoSessionProvider>

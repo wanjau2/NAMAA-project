@@ -16,7 +16,9 @@ decision. Recommendations below are suggestions, not settled calls.
 | Q5 | Which API path convention is authoritative? | **Resolved** — [D003](D003-backend-stack-and-api.md): `/api/v1/...` |
 | Q6 | Do we have model hosting and GPU budget? | **Open — prerequisite** |
 | Q7 | Where does the demo get hosted, if anywhere? | **Open** |
-| Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side |
+| Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side. Verified live; see note below |
+| Q9 | Should the API return `available_actions` per case? | **Open — Mark → Ismail** |
+| Q10 | Are there proposal / fact-review endpoints this sprint? | **Open — blocks persisting A1** |
 
 ---
 
@@ -119,3 +121,56 @@ cohort and complementary-cell logic that lives with the metric definitions, not 
 `{ "suppressed": true, "reason": "small_cell", "threshold": 10 }` — and the UI renders only what
 it is given. Owners: Ismail (endpoint) and Alfred (cohort and complementary logic).
 Mark cannot close the suppression acceptance check until this is decided.
+
+### Why this mattered — demonstrated client-side leak (2026-11-17)
+
+`/metrics` was built with suppression applied in the data layer, and the rendered markup is
+correct: 10 suppressed cells, lock icons, no values. The hidden counts are nevertheless readable
+in the JavaScript bundle, because the computation runs in the browser:
+
+```
+grep -F '"15-17 years",count:3' bundle.js   -> PRESENT
+grep -F '"Zone D",count:8'      bundle.js   -> PRESENT
+```
+
+See [A4 evidence](../03-evidence/A4-population-dashboard/checks.md). This was the argument for
+deciding Q8 the way [D003](D003-backend-stack-and-api.md) did, and `GET /api/v1/analytics/overview`
+now suppresses server-side: verified on 2026-11-18, with suppressed cells returning
+`numerator: null, denominator: null, suppressed: true, reason: "small_cell", threshold: 10`.
+
+**Residual issue — not a suppression bug.** With the seeded cohort at 3 cases per pathway and a
+threshold of 10, **all 16 analytics cells return suppressed**, so the population view renders
+nothing but locked cells. The logic is right and the cohort is too small. The team needs to
+choose: a larger synthetic reporting cohort in the API seed, or a stated demonstration
+threshold. Until then `/metrics` stays on its local cohort fixture and is labelled as such.
+
+## Q9 — Should the API return `available_actions` per case?
+
+Raised by Mark, 2026-11-18. `lib/action-catalog.ts` keeps `displayWhen` stage predicates so the
+action panel does not offer obviously irrelevant controls. They are documented as display hints
+and the server still decides — a wrong hint surfaces as `invalid_transition`, which the UI shows.
+
+But it is duplicated knowledge, and the kind that drifts silently. If `GET /api/v1/cases/{id}`
+returned `available_actions: [{ id, permitted_role, blocked_reason }]`, the hints could be
+deleted and the panel would render exactly what the server permits.
+
+**Recommendation:** add it when there is slack. Low risk, removes a duplication. Until then
+`npm run verify:api` fails if the catalog and `/meta/actions` disagree on ids or roles.
+
+## Q10 — Are there proposal / fact-review endpoints this sprint?
+
+Raised by Mark, 2026-11-18. The API models no proposals: `grep -ri proposal api/app` returns
+nothing. The design specification §7 has `POST /api/v1/documents/{id}/extractions`,
+`GET /api/v1/extractions/{id}` and `POST /api/v1/facts/{id}/review`, none of which are built —
+consistent with Q3 deferring MedGemma.
+
+Consequence: the source review screen (A1) runs on `lib/source-review-fixtures.ts` and review
+decisions are **not persisted** — no `Provenance`, no reviewer identity, nothing carried into
+rule evaluation. The screen states this on-screen.
+
+**Options:** (a) accept it and label the screen a simulation in the submission; (b) Ismail adds
+proposal read + review write endpoints backed by the existing seed, with no model in the loop.
+(b) is a few hours and would make the review step genuinely server-authoritative like the rest.
+
+**Recommendation:** (b) if time allows, since human review of proposed facts is the concept's
+central safety claim. Otherwise (a), stated plainly.
