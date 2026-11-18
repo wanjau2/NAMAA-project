@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { SOURCE_REVIEW, getSourceReview } from "@/lib/mock-data";
+import { SOURCE_REVIEW, getSourceReview } from "@/lib/source-review-fixtures";
 import { SourceReviewView } from "./source-review-view";
 
 /**

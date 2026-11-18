@@ -1,26 +1,20 @@
-import { notFound } from "next/navigation";
-import { MOCK_CASES, getCaseRow } from "@/lib/mock-data";
 import { CaseDetailView } from "./case-detail-view";
 
 /**
  * Server shell for case detail.
  *
- * Next 16 runs with Cache Components enabled, so reading `params` outside a
- * Suspense boundary would block prerendering. The case set is static mock data
- * today, so the honest answer is to enumerate it with generateStaticParams.
- *
- * When Ismail's API lands (F4), this becomes a dynamic route: drop
- * generateStaticParams and either wrap the view in <Suspense> or set
- * `export const instant = false`.
+ * Now a dynamic route (roadmap C4): the case set comes from the API per guest
+ * session, so enumerating it with generateStaticParams is no longer honest.
+ * `instant = false` makes this a blocking route, which Cache Components
+ * requires for a param read outside Suspense.
  */
-export function generateStaticParams() {
-  return MOCK_CASES.map((row) => ({ id: row.id }));
-}
+export const instant = false;
 
 export default async function CaseDetailPage({
   params,
 }: PageProps<"/cases/[id]">) {
   const { id } = await params;
-  if (!getCaseRow(id)) notFound();
+  // Existence is decided by the API, not by a local fixture: an unknown id
+  // returns a structured 404 that the view renders.
   return <CaseDetailView id={id} />;
 }

@@ -1,143 +1,269 @@
 "use client";
 
 /**
- * Local case store — the frontend's stand-in for Ismail's persistence layer.
- * Deleted at F4 together with lib/case-actions.ts.
+ * Case store — API-backed.
  *
- * It exists so both synthetic journeys can be demonstrated end to end before
- * the API lands, and it models three server behaviours the UI must handle
- * correctly rather than discover late:
+ * The local transition layer is gone. This store only transports: it fetches
+ * from the API, submits mutations, and renders whatever comes back. It never
+ * advances a stage, never validates a transition and never fabricates an event.
  *
- *  1. REVISION CHECKS — a stale `expected_revision` is rejected, not applied.
- *  2. IDEMPOTENCY — a repeated `request_id` returns the first result and does
- *     NOT append a second event.
- *  3. SERVER-ECHO STATE — the UI never advances a stage itself. It submits and
- *     renders whatever comes back.
- *
- * Nothing is persisted across a reload, and a demo reset restores the seed.
+ * Session lifecycle: a guest session is created on first load and held in
+ * memory, so a reload starts a fresh synthetic workspace. Reset calls
+ * `POST /api/v1/demo/reset`, which restores the seed for that session only.
  */
 
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import {
-  applyAction,
-  type ActionRequest,
-  type AppliedEvent,
-  type CaseState,
-  type StructuredError,
-} from "@/lib/case-actions";
-import { MOCK_CASES, getCaseDetail } from "@/lib/mock-data";
+  ApiError,
+  ApiUnreachableError,
+  api,
+  newRequestId,
+  API_BASE,
+} from "@/lib/api";
+import type {
+  ActionRequest,
+  CaseOut,
+  CaseRow,
+  EventOut,
+  StructuredError,
+} from "@/lib/api-types";
 import { useDemoSession } from "@/lib/demo-session";
 
+export type ConnectionStatus = "connecting" | "ready" | "unreachable";
+
 export type SubmitResult =
-  | { ok: true; event: AppliedEvent; duplicate: boolean }
-  | { ok: false; error: StructuredError };
+  | { ok: true; event: EventOut; case: CaseOut }
+  | { ok: false; error: StructuredError; status: number };
 
 type CaseStoreValue = {
-  cases: Record<string, CaseState>;
-  getCase: (id: string) => CaseState | undefined;
-  eventsFor: (id: string) => AppliedEvent[];
-  submit: (caseId: string, request: ActionRequest) => SubmitResult;
-  /** Fresh request id for a form instance; reused on retry so retries are safe. */
+  status: ConnectionStatus;
+  /** Set when the API cannot be reached; the UI explains how to start it. */
+  connectionMessage: string | null;
+  apiBase: string;
+  sessionId: string | null;
+
+  /** Worklist rows. Empty while loading. */
+  rows: CaseRow[];
+  rowsLoading: boolean;
+  rowsError: StructuredError | null;
+  reloadRows: () => void;
+
+  /** Full case including detail, once fetched. */
+  getCase: (id: string) => CaseOut | undefined;
+  loadCase: (id: string) => void;
+  caseLoading: (id: string) => boolean;
+  caseError: (id: string) => StructuredError | null;
+
+  submit: (caseId: string, request: ActionRequest) => Promise<SubmitResult>;
   newRequestId: () => string;
+  resetDemo: () => Promise<void>;
 };
 
 const CaseStoreContext = createContext<CaseStoreValue | null>(null);
 
-function seedCases(): Record<string, CaseState> {
-  return Object.fromEntries(MOCK_CASES.map((row) => [row.id, { ...row }]));
-}
-
-function makeId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+function toStructured(error: unknown): { error: StructuredError; status: number } {
+  if (error instanceof ApiError) {
+    return { error: error.error, status: error.status };
   }
-  return `req-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+  if (error instanceof ApiUnreachableError) {
+    return {
+      error: {
+        code: "api_unreachable",
+        message: error.message,
+        field_errors: {},
+        request_id: null,
+      },
+      status: 0,
+    };
+  }
+  return {
+    error: {
+      code: "unexpected_error",
+      message:
+        error instanceof Error ? error.message : "An unexpected error occurred.",
+      field_errors: {},
+      request_id: null,
+    },
+    status: 0,
+  };
 }
 
-/**
- * A demo reset retires this synthetic session. Remounting on `sessionEpoch`
- * rebuilds every piece of state from the seed in one step — no reset effect,
- * and no window in which half the store is stale.
- */
 export function CaseStoreProvider({ children }: { children: ReactNode }) {
-  const { sessionEpoch } = useDemoSession();
-  return <CaseStoreInner key={sessionEpoch}>{children}</CaseStoreInner>;
-}
-
-function CaseStoreInner({ children }: { children: ReactNode }) {
   const { role } = useDemoSession();
-  const [cases, setCases] = useState<Record<string, CaseState>>(seedCases);
-  const [events, setEvents] = useState<AppliedEvent[]>([]);
 
-  // request_id -> the result it already produced.
-  const handled = useRef<Map<string, SubmitResult>>(new Map());
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [status, setStatus] = useState<ConnectionStatus>("connecting");
+  const [connectionMessage, setConnectionMessage] = useState<string | null>(null);
+
+  const [rows, setRows] = useState<CaseRow[]>([]);
+  const [rowsLoading, setRowsLoading] = useState(false);
+  const [rowsError, setRowsError] = useState<StructuredError | null>(null);
+
+  const [cases, setCases] = useState<Record<string, CaseOut>>({});
+  const [caseLoadingIds, setCaseLoadingIds] = useState<Record<string, boolean>>({});
+  const [caseErrors, setCaseErrors] = useState<Record<string, StructuredError>>({});
+
+  // Guards against duplicate in-flight fetches for the same case.
+  const inFlight = useRef<Set<string>>(new Set());
+
+  const fetchRows = useCallback(async (session: string) => {
+    setRowsLoading(true);
+    setRowsError(null);
+    try {
+      const data = await api.listCases(session);
+      setRows(data);
+    } catch (caught) {
+      const { error } = toStructured(caught);
+      setRowsError(error);
+      if (error.code === "api_unreachable") {
+        setStatus("unreachable");
+        setConnectionMessage(error.message);
+      }
+    } finally {
+      setRowsLoading(false);
+    }
+  }, []);
+
+  // Create the guest session once, then load the worklist.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const session = await api.createSession();
+        if (cancelled) return;
+        setSessionId(session.session_id);
+        setStatus("ready");
+        setConnectionMessage(null);
+        await fetchRows(session.session_id);
+      } catch (caught) {
+        if (cancelled) return;
+        const { error } = toStructured(caught);
+        setStatus("unreachable");
+        setConnectionMessage(error.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchRows]);
+
+  const loadCase = useCallback(
+    (id: string) => {
+      if (!sessionId || inFlight.current.has(id)) return;
+      inFlight.current.add(id);
+      setCaseLoadingIds((prev) => ({ ...prev, [id]: true }));
+      (async () => {
+        try {
+          const data = await api.getCase(sessionId, id);
+          setCases((prev) => ({ ...prev, [id]: data }));
+          setCaseErrors((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        } catch (caught) {
+          const { error } = toStructured(caught);
+          setCaseErrors((prev) => ({ ...prev, [id]: error }));
+        } finally {
+          inFlight.current.delete(id);
+          setCaseLoadingIds((prev) => ({ ...prev, [id]: false }));
+        }
+      })();
+    },
+    [sessionId],
+  );
 
   const submit = useCallback(
-    (caseId: string, request: ActionRequest): SubmitResult => {
-      const prior = handled.current.get(request.request_id);
-      if (prior) {
-        // Idempotent replay: same answer, no second event.
-        return prior.ok ? { ...prior, duplicate: true } : prior;
-      }
-
-      const current = cases[caseId];
-      if (!current) {
-        const result: SubmitResult = {
+    async (caseId: string, request: ActionRequest): Promise<SubmitResult> => {
+      if (!sessionId) {
+        return {
           ok: false,
+          status: 0,
           error: {
-            code: "not_found",
-            message: "This case no longer exists in the current session.",
+            code: "no_session",
+            message: "No guest session yet. Reload the page to start one.",
             field_errors: {},
             request_id: request.request_id,
           },
         };
-        return result;
       }
-
-      const outcome = applyAction(
-        current,
-        request,
-        role,
-        new Date().toISOString(),
-      );
-
-      if (!outcome.ok) {
-        // Failures are not memoised: the reviewer may fix the form and retry
-        // with the same request id, which must then be allowed through.
-        return { ok: false, error: outcome.error };
+      try {
+        const result = await api.postAction(sessionId, role, caseId, request);
+        // Server echo is the only source of new state.
+        setCases((prev) => ({ ...prev, [caseId]: result.case }));
+        setRows((prev) =>
+          prev.map((row) =>
+            row.id === caseId ? { ...row, ...stripDetail(result.case) } : row,
+          ),
+        );
+        return { ok: true, event: result.event, case: result.case };
+      } catch (caught) {
+        const { error, status } = toStructured(caught);
+        return { ok: false, error, status };
       }
-
-      setCases((prev) => ({ ...prev, [caseId]: outcome.next }));
-      setEvents((prev) => [...prev, outcome.event]);
-
-      const result: SubmitResult = {
-        ok: true,
-        event: outcome.event,
-        duplicate: false,
-      };
-      handled.current.set(request.request_id, result);
-      return result;
     },
-    [cases, role],
+    [sessionId, role],
   );
+
+  const reloadRows = useCallback(() => {
+    if (sessionId) void fetchRows(sessionId);
+  }, [sessionId, fetchRows]);
+
+  const resetDemo = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await api.resetSession(sessionId);
+      setCases({});
+      setCaseErrors({});
+      await fetchRows(sessionId);
+    } catch (caught) {
+      const { error } = toStructured(caught);
+      setRowsError(error);
+    }
+  }, [sessionId, fetchRows]);
 
   const value = useMemo<CaseStoreValue>(
     () => ({
-      cases,
+      status,
+      connectionMessage,
+      apiBase: API_BASE,
+      sessionId,
+      rows,
+      rowsLoading,
+      rowsError,
+      reloadRows,
       getCase: (id) => cases[id],
-      eventsFor: (id) => events.filter((event) => event.case_id === id),
+      loadCase,
+      caseLoading: (id) => Boolean(caseLoadingIds[id]),
+      caseError: (id) => caseErrors[id] ?? null,
       submit,
-      newRequestId: makeId,
+      newRequestId,
+      resetDemo,
     }),
-    [cases, events, submit],
+    [
+      status,
+      connectionMessage,
+      sessionId,
+      rows,
+      rowsLoading,
+      rowsError,
+      reloadRows,
+      cases,
+      loadCase,
+      caseLoadingIds,
+      caseErrors,
+      submit,
+      resetDemo,
+    ],
   );
 
   return (
@@ -145,6 +271,12 @@ function CaseStoreInner({ children }: { children: ReactNode }) {
       {children}
     </CaseStoreContext.Provider>
   );
+}
+
+/** Worklist rows carry no `detail`; drop it when folding an action response in. */
+function stripDetail({ detail, ...row }: CaseOut): CaseRow {
+  void detail;
+  return row;
 }
 
 export function useCaseStore(): CaseStoreValue {
@@ -155,10 +287,19 @@ export function useCaseStore(): CaseStoreValue {
   return ctx;
 }
 
-/** Seeded timeline from the fixtures, plus anything done in this session. */
-export function useCaseTimeline(id: string) {
-  const { eventsFor } = useCaseStore();
-  const seeded = getCaseDetail(id).events;
-  const live = eventsFor(id);
-  return { seeded, live };
+/** Fetches one case on mount and keeps it fresh after actions. */
+export function useCase(id: string) {
+  const { getCase, loadCase, caseLoading, caseError, status } = useCaseStore();
+  const data = getCase(id);
+
+  useEffect(() => {
+    if (status === "ready" && !data) loadCase(id);
+  }, [status, data, id, loadCase]);
+
+  return {
+    case: data,
+    loading: caseLoading(id) || (status === "connecting" && !data),
+    error: caseError(id),
+    reload: () => loadCase(id),
+  };
 }

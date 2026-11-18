@@ -1,45 +1,87 @@
 "use client";
 
 /**
- * Case detail and source review (theme §5).
+ * Case detail — API-backed.
  *
- * The load-bearing pattern here is the EQUAL-WEIGHT UNCERTAINTY LAYOUT
- * (theme §4.3, D002): "Missing & Unverified Information" sits side by side with
- * "Suggested Pathway" at the same visual weight. Missing history must never
- * read as low risk — the design specification is explicit that an absent record
- * means incomplete information unless completeness has been verified.
+ * The load-bearing pattern is the EQUAL-WEIGHT UNCERTAINTY LAYOUT (theme §4.3):
+ * "Missing & unverified information" sits beside "Suggested pathway" at the same
+ * visual weight, because an absent record means incomplete information, never
+ * low risk.
  *
- * The action panel offers only valid transitions for the current simulated
- * role, and the server stays authoritative. Role switching grants nothing.
+ * Everything shown here comes from `GET /api/v1/cases/{id}`. The action panel
+ * submits to the server and renders the server's answer; it never advances a
+ * stage locally.
  */
 
+import { useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { AlertOctagon, ArrowLeft, RotateCcw } from "lucide-react";
 import { StatusBadge, StatusCard } from "@/components/status-badge";
 import { ActionPanel } from "@/components/action-panel";
-import { useCaseStore } from "@/lib/case-store";
+import { useCase, useCaseStore } from "@/lib/case-store";
 import {
   DISPOSITION_LABELS,
   PATHWAY_LABELS,
   STAGE_LABELS,
-  getCaseDetail,
-  getSourceReview,
-} from "@/lib/mock-data";
+} from "@/lib/api-types";
+import { getSourceReview } from "@/lib/source-review-fixtures";
 
 export function CaseDetailView({ id }: { id: string }) {
-  // Hooks first, unconditionally — the early return below must not sit
-  // between them (react-hooks/rules-of-hooks).
-  const { getCase, eventsFor } = useCaseStore();
+  const { case: row, loading, error, reload } = useCase(id);
+  const { status, connectionMessage } = useCaseStore();
 
-  // Live state: actions taken in this session are reflected here, because the
-  // store returned them, not because this component advanced anything itself.
-  const row = getCase(id);
-  const detail = getCaseDetail(id);
+  // Source review still runs on fixtures: the API has no proposal endpoints yet.
   const review = getSourceReview(id);
-  const liveEvents = eventsFor(id);
 
-  // The server shell already guaranteed this exists.
-  if (!row) return null;
+  useEffect(() => {
+    if (row) document.title = `${row.patient_label} — Namaa`;
+  }, [row]);
+
+  if (status === "unreachable") {
+    return (
+      <Shell>
+        <Problem
+          title="The Namaa API is not reachable"
+          body={connectionMessage ?? "No connection to the API."}
+          hint="Nothing is shown rather than stale or invented data."
+          onRetry={reload}
+        />
+      </Shell>
+    );
+  }
+
+  if (loading && !row) {
+    return (
+      <Shell>
+        <div aria-busy="true" aria-live="polite">
+          <p className="text-sm text-ink-muted">Loading case…</p>
+          <div className="mt-4 h-28 animate-pulse rounded-lg bg-subtle" />
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="h-40 animate-pulse rounded-lg bg-subtle" />
+            <div className="h-40 animate-pulse rounded-lg bg-subtle" />
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (error || !row) {
+    return (
+      <Shell>
+        <Problem
+          title={error?.code === "not_found" ? "Case not found" : "Could not load this case"}
+          body={
+            error?.message ??
+            "This case is not present in the current guest session."
+          }
+          code={error?.code}
+          onRetry={reload}
+        />
+      </Shell>
+    );
+  }
+
+  const detail = row.detail;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -51,8 +93,7 @@ export function CaseDetailView({ id }: { id: string }) {
         Back to worklist
       </Link>
 
-      {/* Patient header. Caregiver authority is kept distinct from relationship,
-          per the FHIR mapping rule for RelatedPerson. */}
+      {/* Patient header. Caregiver authority is kept distinct from relationship. */}
       <header className="mt-4 rounded-lg border border-border bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -78,35 +119,46 @@ export function CaseDetailView({ id }: { id: string }) {
         </div>
 
         <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-          <div>
-            <dt className="text-xs font-medium text-ink-muted">Stage</dt>
-            <dd className="mt-1 text-ink">{STAGE_LABELS[row.stage]}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-muted">Disposition</dt>
-            <dd className="mt-1 text-ink">
-              {DISPOSITION_LABELS[row.disposition]}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-muted">Preferred contact</dt>
-            <dd className="mt-1 text-ink">
-              {row.contact_preference
-                ? `${row.contact_preference.channel.toUpperCase()} · ${row.contact_preference.language.toUpperCase()} · ${row.contact_preference.preferred_time}`
-                : "Not recorded"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-ink-muted">
-              Caregiver authority
-            </dt>
-            <dd className="mt-1 text-ink">Verified (synthetic)</dd>
-          </div>
+          <Meta label="Stage" value={STAGE_LABELS[row.stage]} />
+          <Meta
+            label="Disposition"
+            value={DISPOSITION_LABELS[row.disposition]}
+          />
+          <Meta
+            label="Preferred contact"
+            value={
+              detail.contact_preference
+                ? `${detail.contact_preference.channel.toUpperCase()} · ${detail.contact_preference.language.toUpperCase()} · ${detail.contact_preference.preferred_time}`
+                : "Not recorded"
+            }
+          />
+          <Meta label="Caregiver authority" value="Verified (synthetic)" />
         </dl>
+
+        {detail.completion_evidence ? (
+          <p className="mt-3 text-xs text-ink-muted">
+            Closure evidence:{" "}
+            <span className="font-mono-tech">
+              {detail.completion_evidence.evidence_type}/
+              {detail.completion_evidence.evidence_reference}
+            </span>
+          </p>
+        ) : null}
+        {detail.recall_date ? (
+          <p className="mt-1 text-xs text-ink-muted">
+            Recall date:{" "}
+            <span className="font-mono-tech">{detail.recall_date}</span>
+          </p>
+        ) : null}
+        {detail.referral_outcome ? (
+          <p className="mt-1 text-xs text-ink-muted">
+            Referral outcome:{" "}
+            <span className="font-mono-tech">{detail.referral_outcome}</span>
+          </p>
+        ) : null}
       </header>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[2fr_1fr]">
-        {/* Start column */}
         <div className="space-y-5">
           {/* Equal-weight pair: recommendation and uncertainty, same size. */}
           <div className="grid gap-4 md:grid-cols-2">
@@ -122,18 +174,21 @@ export function CaseDetailView({ id }: { id: string }) {
             </StatusCard>
 
             <StatusCard state="review" title="Missing & unverified information">
-              <ul className="space-y-2">
-                {detail.missing.map((item) => (
-                  <li key={item.label}>
-                    <p className="font-medium">{item.label}</p>
-                    <p className="text-ink-muted">{item.consequence}</p>
-                  </li>
-                ))}
-              </ul>
+              {detail.missing.length === 0 ? (
+                <p>No outstanding gaps recorded for this case.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {detail.missing.map((item) => (
+                    <li key={item.label}>
+                      <p className="font-medium">{item.label}</p>
+                      <p className="text-ink-muted">{item.consequence}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </StatusCard>
           </div>
 
-          {/* Contributing source facts, with proposed vs verified distinguished. */}
           <section className="rounded-lg border border-border bg-surface p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -159,11 +214,13 @@ export function CaseDetailView({ id }: { id: string }) {
             <ul className="mt-4 space-y-3">
               {detail.factors.map((fact) => (
                 <li
-                  key={fact.label}
+                  key={`${fact.label}-${fact.source}`}
                   className="rounded-md border border-border bg-canvas p-3"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="text-sm font-semibold text-ink">{fact.label}</p>
+                    <p className="text-sm font-semibold text-ink">
+                      {fact.label}
+                    </p>
                     {fact.verified ? (
                       <StatusBadge state="verified" label="Verified" />
                     ) : (
@@ -183,35 +240,29 @@ export function CaseDetailView({ id }: { id: string }) {
             </ul>
           </section>
 
-          {/* Chronological audit timeline. */}
+          {/* Audit timeline — the server's event log, not a local one. */}
           <section className="rounded-lg border border-border bg-surface p-5">
             <h2 className="text-lg text-ink">Event timeline</h2>
+            <p className="mt-1 text-xs text-ink-muted">
+              Recorded server-side. Every transition is auditable.
+            </p>
             <ol className="mt-4 space-y-3 border-s border-border ps-4">
               {detail.events.map((event) => (
-                <li key={`${event.timestamp}-${event.action}`}>
-                  <p className="font-mono-tech text-xs text-ink-muted">
-                    {event.timestamp}
-                  </p>
-                  <p className="text-sm text-ink">{event.action}</p>
-                  <p className="text-xs text-ink-muted">
-                    Actor: <span className="font-mono-tech">{event.actor_role}</span>
-                    {event.reason ? ` · ${event.reason}` : ""}
-                  </p>
-                </li>
-              ))}
-              {liveEvents.map((event) => (
                 <li key={event.id}>
                   <p className="font-mono-tech text-xs text-ink-muted">
                     {event.timestamp}
                   </p>
                   <p className="text-sm text-ink">
-                    {event.action}{" "}
-                    <span className="font-mono-tech text-xs text-ink-muted">
-                      {event.prior_state} → {event.new_state}
-                    </span>
+                    {event.action}
+                    {event.prior_state && event.new_state ? (
+                      <span className="font-mono-tech ms-1 text-xs text-ink-muted">
+                        {event.prior_state} → {event.new_state}
+                      </span>
+                    ) : null}
                   </p>
                   <p className="text-xs text-ink-muted">
-                    Actor: <span className="font-mono-tech">{event.actor_role}</span>
+                    Actor:{" "}
+                    <span className="font-mono-tech">{event.actor_role}</span>
                     {event.reason ? ` · ${event.reason}` : ""}
                     {event.evidence_reference
                       ? ` · evidence ${event.evidence_reference}`
@@ -219,33 +270,98 @@ export function CaseDetailView({ id }: { id: string }) {
                   </p>
                 </li>
               ))}
-              {liveEvents.length === 0 ? (
+              {detail.events.length === 0 ? (
                 <li className="text-xs text-ink-muted">
-                  No actions taken in this session yet.
+                  No events recorded yet.
                 </li>
               ) : null}
             </ol>
           </section>
         </div>
 
-        {/* End column: action panel */}
         <aside className="space-y-4">
-          <ActionPanel caseState={row} />
+          <ActionPanel caseState={row} onChanged={reload} />
 
           <section className="rounded-lg border border-border bg-subtle p-4">
             <h2 className="text-sm font-semibold text-ink">
               FHIR / audit inspector
             </h2>
             <p className="mt-1 text-xs text-ink-muted">
-              Resource JSON, references and versions. Wired once Ismail&apos;s
-              gateway lands (F4).
+              Resource references and versions. HAPI is not deployed for this
+              sprint (D003) — identifiers are FHIR-shaped synthetic ids held in
+              the application store.
             </p>
             <p className="mt-2 font-mono-tech text-xs text-ink-muted">
               CarePlan/{row.care_gap_id} · rev {row.revision}
+              {row.patient_id ? (
+                <>
+                  <br />
+                  Patient/{row.patient_id}
+                </>
+              ) : null}
             </p>
           </section>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <Link
+        href="/cases"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
+      >
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        Back to worklist
+      </Link>
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function Problem({
+  title,
+  body,
+  hint,
+  code,
+  onRetry,
+}: {
+  title: string;
+  body: string;
+  hint?: string;
+  code?: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-status-overdue bg-status-overdue-bg p-4">
+      <p className="flex items-start gap-2 text-sm font-semibold text-status-overdue">
+        <AlertOctagon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <span>{title}</span>
+      </p>
+      <p className="mt-2 text-sm text-ink">
+        {body} {code ? <span className="font-mono-tech">[{code}]</span> : null}
+      </p>
+      {hint ? <p className="mt-2 text-xs text-ink-muted">{hint}</p> : null}
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-3 inline-flex items-center gap-1.5 rounded border border-status-overdue px-2 py-1 text-xs font-semibold text-status-overdue"
+      >
+        <RotateCcw aria-hidden="true" className="size-3" />
+        Retry
+      </button>
+    </div>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-ink-muted">{label}</dt>
+      <dd className="mt-1 text-ink">{value}</dd>
     </div>
   );
 }

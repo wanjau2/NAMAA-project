@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { AlertTriangle, RotateCcw, Settings2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCaseStore } from "@/lib/case-store";
 import {
   ROLES,
   ROLE_LABELS,
@@ -20,6 +21,7 @@ import {
 
 export function SimulationBar() {
   const { role, setRole, locale, setLocale, resetSession } = useDemoSession();
+  const { status, resetDemo, sessionId } = useCaseStore();
   const [confirmingReset, setConfirmingReset] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -41,6 +43,7 @@ export function SimulationBar() {
 
         {/* End: session controls. Collapsed behind a toggle under 640px (D002 §9). */}
         <div className="hidden items-center gap-3 sm:flex">
+          <ApiStatus status={status} sessionId={sessionId} />
           <SessionControls
             role={role}
             setRole={setRole}
@@ -49,6 +52,7 @@ export function SimulationBar() {
             confirmingReset={confirmingReset}
             setConfirmingReset={setConfirmingReset}
             resetSession={resetSession}
+            onServerReset={resetDemo}
           />
         </div>
 
@@ -81,6 +85,7 @@ export function SimulationBar() {
             confirmingReset={confirmingReset}
             setConfirmingReset={setConfirmingReset}
             resetSession={resetSession}
+            onServerReset={resetDemo}
             stacked
           />
         </div>
@@ -97,6 +102,7 @@ function SessionControls({
   confirmingReset,
   setConfirmingReset,
   resetSession,
+  onServerReset,
   stacked = false,
 }: {
   role: Role;
@@ -106,6 +112,7 @@ function SessionControls({
   confirmingReset: boolean;
   setConfirmingReset: (value: boolean) => void;
   resetSession: () => void;
+  onServerReset: () => Promise<void>;
   stacked?: boolean;
 }) {
   const group = stacked
@@ -173,8 +180,9 @@ function SessionControls({
             <button
               type="button"
               onClick={() => {
-                // TODO: POST /api/v1/demo/reset once the contract lands (Q5).
-                // Until then this resets client state only, and the UI says so.
+                // Server restores the seed for THIS guest session only; the
+                // local call just returns role and language to defaults.
+                void onServerReset();
                 resetSession();
                 setConfirmingReset(false);
               }}
@@ -231,5 +239,47 @@ function LangButton({
     >
       {label}
     </button>
+  );
+}
+
+/** Connection indicator. A demo that silently shows nothing is worse than one that says why. */
+function ApiStatus({
+  status,
+  sessionId,
+}: {
+  status: "connecting" | "ready" | "unreachable";
+  sessionId: string | null;
+}) {
+  const text =
+    status === "ready"
+      ? "API connected"
+      : status === "connecting"
+        ? "Connecting…"
+        : "API unreachable";
+  return (
+    <span
+      className={cn(
+        "flex items-center gap-1.5 rounded border px-2 py-1 text-xs font-medium",
+        status === "ready"
+          ? "border-slate-600 text-slate-300"
+          : status === "connecting"
+            ? "border-slate-600 text-slate-400"
+            : "border-status-overdue text-status-overdue",
+      )}
+      title={sessionId ? `Session ${sessionId}` : undefined}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-1.5 rounded-full",
+          status === "ready"
+            ? "bg-status-verified"
+            : status === "connecting"
+              ? "bg-slate-400"
+              : "bg-status-overdue",
+        )}
+      />
+      {text}
+    </span>
   );
 }
