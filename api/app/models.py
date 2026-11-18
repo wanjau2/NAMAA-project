@@ -114,6 +114,8 @@ class Event(Base):
 
 
 class Command(Base):
+    """Idempotent action journal + optional FHIR saga linkage (D004)."""
+
     __tablename__ = "commands"
     __table_args__ = (
         UniqueConstraint("workspace_id", "request_id", name="uq_command_request"),
@@ -127,8 +129,132 @@ class Command(Base):
     payload_hash: Mapped[str] = mapped_column(String(128))
     response_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[str] = mapped_column(String(64))
+    # Saga state for dual-store boundary (application DB ↔ FHIR)
+    saga_state: Mapped[str] = mapped_column(String(32), default="app_committed")
+    outbox_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     workspace: Mapped[Workspace] = relationship(back_populates="commands")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", "version", name="uq_document_ws_ver"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(64), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    patient_id: Mapped[str] = mapped_column(String(64), index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    document_date: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(Text)
+    case_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
+
+class ExtractionJob(Base):
+    __tablename__ = "extraction_jobs"
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(64), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    document_id: Mapped[str] = mapped_column(String(64), index=True)
+    document_version: Mapped[int] = mapped_column(Integer)
+    patient_id: Mapped[str] = mapped_column(String(64), index=True)
+    case_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # queued | running | succeeded | failed | cancelled | timed_out
+    state: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    lease_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lease_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model_revision: Mapped[str] = mapped_column(String(128), default="offline-fixture-v1")
+    prompt_version: Mapped[str] = mapped_column(String(64), default="extract-v0.3")
+    progress_percent: Mapped[int] = mapped_column(Integer, default=0)
+    progress_message: Mapped[str] = mapped_column(String(256), default="Queued")
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String(64))
+    started_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    finished_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    timeout_ms: Mapped[int] = mapped_column(Integer, default=90_000)
+
+
+class Proposal(Base):
+    """Proposed facts — outside the clinical store until human review (design §5)."""
+
+    __tablename__ = "proposals"
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(64), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    job_id: Mapped[str] = mapped_column(String(64), index=True)
+    document_id: Mapped[str] = mapped_column(String(64), index=True)
+    document_version: Mapped[int] = mapped_column(Integer)
+    concept: Mapped[str] = mapped_column(String(128))
+    value_text: Mapped[str] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(String(32))
+    assertion: Mapped[str] = mapped_column(String(32))
+    effective_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    proposed_resource_type: Mapped[str] = mapped_column(String(64))
+    excerpt: Mapped[str] = mapped_column(Text)
+    offset_start: Mapped[int] = mapped_column(Integer)
+    offset_end: Mapped[int] = mapped_column(Integer)
+    # proposed | accepted | corrected | rejected
+    review_state: Mapped[str] = mapped_column(String(32), default="proposed")
+    review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OutboxEntry(Base):
+    """Transactional outbox for application DB → FHIR gateway (D004)."""
+
+    __tablename__ = "outbox_entries"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "request_id", name="uq_outbox_request"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(64), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    case_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    action: Mapped[str] = mapped_column(String(64))
+    # pending | processing | committed | compensating | compensated | dead_lettered
+    state: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    intended_bundle_json: Mapped[str] = mapped_column(Text)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    lease_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    next_attempt_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[str] = mapped_column(String(64))
+    updated_at: Mapped[str] = mapped_column(String(64))
+    dead_lettered_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    compensation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class FhirResource(Base):
+    """In-process FHIR gateway stub store (replace with HAPI later)."""
+
+    __tablename__ = "fhir_resources"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "resource_type",
+            "logical_id",
+            name="uq_fhir_logical",
+        ),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    resource_type: Mapped[str] = mapped_column(String(64))
+    logical_id: Mapped[str] = mapped_column(String(64))
+    version_id: Mapped[int] = mapped_column(Integer, default=1)
+    body_json: Mapped[str] = mapped_column(Text)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    updated_at: Mapped[str] = mapped_column(String(64))
 
 
 class RuleEvaluation(Base):

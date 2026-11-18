@@ -7,25 +7,33 @@ from app import __version__
 from app.config import get_settings
 from app.db import init_db
 from app.errors import AppError, app_error_handler
-from app.routers import analytics, cases, demo, health, meta, patients
+from app.routers import analytics, cases, demo, extractions, health, meta, ops, patients
+from app.workers import runtime
 
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    init_db()
-    yield
-
-
-def create_app() -> FastAPI:
+def create_app(*, start_workers: bool = True) -> FastAPI:
     settings = get_settings()
+
+    @asynccontextmanager
+    async def _lifespan(_app: FastAPI):
+        init_db()
+        if start_workers:
+            await runtime.start()
+        try:
+            yield
+        finally:
+            if start_workers:
+                await runtime.stop()
+
     app = FastAPI(
         title="Namaa Demo API",
         description=(
             "Synthetic precision-prevention workflow API. "
-            "NOT FOR CLINICAL USE. No real patient data."
+            "NOT FOR CLINICAL USE. No real patient data. "
+            "Extraction progress via SSE; FHIR dual-store via transactional outbox (D004)."
         ),
         version=__version__,
-        lifespan=lifespan,
+        lifespan=_lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -42,6 +50,8 @@ def create_app() -> FastAPI:
     app.include_router(patients.router)
     app.include_router(analytics.router)
     app.include_router(meta.router)
+    app.include_router(extractions.router)
+    app.include_router(ops.router)
     return app
 
 

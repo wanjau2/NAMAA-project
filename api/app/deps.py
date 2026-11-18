@@ -1,4 +1,4 @@
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -9,14 +9,22 @@ from app.services.demo import ensure_workspace
 
 def get_workspace_id(
     x_namaa_session: str | None = Header(default=None, alias="X-Namaa-Session"),
+    session: str | None = Query(
+        default=None,
+        description="Guest session id for EventSource (cannot set custom headers).",
+    ),
 ) -> str:
-    if not x_namaa_session:
+    workspace_id = x_namaa_session or session
+    if not workspace_id:
         raise AppError(
             code="unauthorized",
-            message="Missing X-Namaa-Session header. Create a guest session first.",
+            message=(
+                "Missing X-Namaa-Session header (or session query param for SSE). "
+                "Create a guest session first."
+            ),
             status_code=401,
         )
-    return x_namaa_session
+    return workspace_id
 
 
 def get_role(

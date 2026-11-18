@@ -53,6 +53,13 @@ uvicorn app.main:app --reload --port 8000
 | GET | `/api/v1/analytics/overview` |
 | POST | `/api/v1/demo/sessions` |
 | POST | `/api/v1/demo/reset` |
+| POST | `/api/v1/documents/{id}/extractions` | Queue extraction (202 + job id) |
+| GET | `/api/v1/extractions/{id}` | Snapshot (fallback only) |
+| GET | `/api/v1/extractions/{id}/events` | **SSE progress** (preferred) |
+| GET | `/api/v1/ops/outbox` | Outbox / DLQ inspection |
+| POST | `/api/v1/ops/outbox/{id}/retry` | Re-queue dead-lettered FHIR command |
+
+Extraction UI helper: `web/lib/extraction-sse.ts`. See [D004](../docs/02-decisions/D004-sse-and-outbox.md).
 
 Action names match `web/lib/case-actions.ts`. Mutation body:
 
@@ -89,7 +96,8 @@ pytest
 
 ## Known limitations (submission-truthful)
 
-- HAPI FHIR server is **not** deployed; IDs are FHIR-shaped strings in SQLite
-- MedGemma extraction is **not** on the critical path
+- HAPI FHIR server is **not** deployed; dual-store outbox targets an in-process FHIR **gateway stub**
+- MedGemma extraction is **not** live; SSE streams **offline-fixture** progress labelled as such
 - Rules module is a local deterministic stub until Alfred replaces `app/rules/`
 - Simulated roles via header are **not** production authentication
+- SSE hub is in-process (single API replica); scale-out needs Redis/NATS

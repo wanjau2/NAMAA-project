@@ -42,7 +42,7 @@ Built against a stub client so Phase C becomes a swap, not a rewrite.
 | # | Step | Acceptance | Est. |
 | --- | --- | --- | --- |
 | ~~B1~~ | ~~**Typed API client**~~ — **DONE 2026-11-18** · `lib/api.ts`, `lib/api-types.ts` | Envelope + structured errors verified live | 1h |
-| B2 | **Loading / skeleton states** + inference polling — 2s poll, elapsed text against the 90s timeout, terminal-state stop | A stalled job is visible as stalled; a timeout never renders as "no gap found" | 0.75h |
+| B2 | **Loading / skeleton states** + **SSE extraction progress** (D004) — use `web/lib/extraction-sse.ts` / `GET /api/v1/extractions/{id}/events`; elapsed text against the 90s timeout; stop on terminal. HTTP status GET is fallback only — do **not** 2s-poll | A stalled job is visible as stalled; a timeout never renders as "no gap found" | 0.75h |
 | B3 | **Error states per status code** — *partial*: 401/404/409/422 and unreachable handled with retry and input preservation; 403/429/503 untested | 409 banner + **Reload latest state** built | 0.75h |
 | ~~B4~~ | ~~**Empty states**~~ — **DONE 2026-11-18** (worklist); fixed a first-paint bug that read as an absence of care gaps | Skeleton covers connecting state | 0.25h |
 | ~~B5~~ | ~~**No optimistic state**~~ — **DONE 2026-11-18** | Server echo is the only state source | 0.25h |

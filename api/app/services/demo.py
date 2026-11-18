@@ -9,13 +9,19 @@ from app.models import (
     CareGap,
     Case,
     Command,
+    Document,
     Event,
+    ExtractionJob,
+    FhirResource,
     Observation,
+    OutboxEntry,
     Patient,
+    Proposal,
     RuleEvaluation,
     Workspace,
 )
 from app.seed import SEED_CASES, SEED_EVENTS, SEED_GAPS, SEED_OBSERVATIONS, SEED_PATIENTS
+from app.services.extraction_fixtures import SEED_DOCUMENTS
 
 
 def ensure_workspace(db: Session, workspace_id: str | None = None) -> Workspace:
@@ -38,7 +44,20 @@ def ensure_workspace(db: Session, workspace_id: str | None = None) -> Workspace:
 
 
 def wipe_workspace_data(db: Session, workspace_id: str) -> None:
-    for model in (Command, Event, RuleEvaluation, Case, CareGap, Observation, Patient):
+    for model in (
+        Proposal,
+        ExtractionJob,
+        OutboxEntry,
+        FhirResource,
+        Document,
+        Command,
+        Event,
+        RuleEvaluation,
+        Case,
+        CareGap,
+        Observation,
+        Patient,
+    ):
         db.query(model).filter(model.workspace_id == workspace_id).delete()
     db.flush()
 
@@ -132,6 +151,19 @@ def load_seed(db: Session, workspace_id: str) -> int:
                 reason=event.get("reason"),
                 evidence_reference=event.get("evidence_reference"),
                 request_id=event.get("request_id"),
+            )
+        )
+
+    for doc in SEED_DOCUMENTS:
+        db.add(
+            Document(
+                id=doc["id"],
+                workspace_id=workspace_id,
+                patient_id=doc["patient_id"],
+                case_id=doc.get("case_id"),
+                version=doc["version"],
+                document_date=doc["document_date"],
+                text=doc["text"],
             )
         )
 

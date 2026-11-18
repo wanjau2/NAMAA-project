@@ -11,8 +11,12 @@ from app.config import get_settings
 from app.errors import AppError
 from app.models import Case, Command, Event
 from app.schemas import ActionRequest, ActionResponse
+from app.services.outbox import build_evidence_bundle, enqueue_outbox
 from app.services.serializers import case_to_out, event_to_out
 from app.workflow.actions import ACTIONS
+
+# Actions that cross the application DB ↔ FHIR boundary (D004 outbox).
+FHIR_OUTBOX_ACTIONS = {"close_as_completed", "approve_pathway"}
 
 
 def _state_label(case: Case) -> str:
@@ -239,6 +243,60 @@ def apply_action(
     db.flush()
 
     response = ActionResponse(case=case_to_out(db, case), event=event_to_out(event))
+
+    outbox_id = None
+    saga_state = "app_committed"
+    if request.action in FHIR_OUTBOX_ACTIONS:
+        if request.action == "close_as_completed":
+            bundle = build_evidence_bundle(
+                case_id=case.id,
+                patient_id=case.patient_id,
+                evidence_type=str(request.data.get("evidence_type") or case.evidence_type),
+                evidence_reference=str(
+                    request.data.get("evidence_reference") or case.evidence_reference
+                ),
+                disposition="completed",
+            )
+        else:
+            bundle = {
+                "resourceType": "Bundle",
+                "type": "transaction",
+                "entry": [
+                    {
+                        "request": {
+                            "method": "PUT",
+                            "url": f"CarePlan/cp-{case.id}",
+                        },
+                        "resource": {
+                            "resourceType": "CarePlan",
+                            "id": f"cp-{case.id}",
+                            "status": "active",
+                            "intent": "plan",
+                            "subject": {"reference": f"Patient/{case.patient_id}"},
+                            "meta": {
+                                "tag": [
+                                    {
+                                        "system": "https://namaa.example/fhir",
+                                        "code": "synthetic",
+                                    }
+                                ]
+                            },
+                        },
+                    }
+                ],
+            }
+        outbox = enqueue_outbox(
+            db,
+            workspace_id=workspace_id,
+            request_id=request.request_id,
+            action=request.action,
+            bundle=bundle,
+            case_id=case.id,
+            now=now,
+        )
+        outbox_id = outbox.id
+        saga_state = "fhir_pending"
+
     db.add(
         Command(
             workspace_id=workspace_id,
@@ -248,6 +306,8 @@ def apply_action(
             payload_hash=payload_hash,
             response_json=response.model_dump_json(),
             created_at=now,
+            saga_state=saga_state,
+            outbox_id=outbox_id,
         )
     )
     db.commit()

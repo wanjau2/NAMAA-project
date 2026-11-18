@@ -34,6 +34,11 @@ Authoritative endpoints:
 | POST | `/api/v1/patients/{id}/evaluations` |
 | POST | `/api/v1/cases/{id}/actions` |
 | GET | `/api/v1/analytics/overview` |
+| POST | `/api/v1/documents/{id}/extractions` |
+| GET | `/api/v1/extractions/{id}` |
+| GET | `/api/v1/extractions/{id}/events` (SSE — see D004) |
+| GET | `/api/v1/ops/outbox` |
+| POST | `/api/v1/ops/outbox/{id}/retry` |
 
 Mutations carry `action`, `expected_revision`, `request_id`, and `data`. Errors return
 `code`, `message`, `field_errors`, and `request_id`.

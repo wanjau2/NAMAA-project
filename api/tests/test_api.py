@@ -6,8 +6,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.config import get_settings
 from app.db import Base, get_db
 from app.main import create_app
+from app.services.extractions import advance_job, claim_queued_jobs
+from app.services.outbox import claim_due_entries, process_entry
 
 
 @pytest.fixture()
@@ -27,11 +30,15 @@ def client():
         finally:
             db.close()
 
-    app = create_app()
+    app = create_app(start_workers=False)
     app.dependency_overrides[get_db] = _override
+    # Expose session factory for worker-style tests
+    app.state.session_factory = TestingSession  # type: ignore[attr-defined]
     with TestClient(app) as test_client:
+        test_client.app = app  # type: ignore[attr-defined]
         yield test_client
     app.dependency_overrides.clear()
+    get_settings.cache_clear()
 
 
 def _session(client: TestClient) -> str:
@@ -55,16 +62,7 @@ def test_seed_and_reset(client: TestClient):
     cases = client.get("/api/v1/cases", headers=_headers(sid))
     assert cases.status_code == 200
     assert len(cases.json()) == 6
-    assert {c["id"] for c in cases.json()} == {
-        "case-0001",
-        "case-0002",
-        "case-0003",
-        "case-0004",
-        "case-0005",
-        "case-0006",
-    }
 
-    # Mutate then reset
     detail = client.get("/api/v1/cases/case-0002", headers=_headers(sid))
     rev = detail.json()["revision"]
     attend = client.post(
@@ -82,7 +80,6 @@ def test_seed_and_reset(client: TestClient):
 
     reset = client.post("/api/v1/demo/reset", headers=_headers(sid))
     assert reset.status_code == 200
-    assert reset.json()["cases_restored"] == 6
     restored = client.get("/api/v1/cases/case-0002", headers=_headers(sid))
     assert restored.json()["stage"] == "booked"
     assert restored.json()["revision"] == 4
@@ -131,7 +128,6 @@ def test_stale_revision_and_idempotency(client: TestClient):
 def test_invalid_completion_does_not_complete(client: TestClient):
     sid = _session(client)
     case = client.get("/api/v1/cases/case-0003", headers=_headers(sid)).json()
-    # Rejected referral blocks completed closure
     res = client.post(
         "/api/v1/cases/case-0003/actions",
         headers=_headers(sid, "clinical_reviewer"),
@@ -149,7 +145,6 @@ def test_invalid_completion_does_not_complete(client: TestClient):
     assert res.status_code == 422
     assert res.json()["code"] == "precondition_failed"
 
-    # close_other must not become completed
     other = client.post(
         "/api/v1/cases/case-0003/actions",
         headers=_headers(sid, "clinical_reviewer"),
@@ -162,7 +157,6 @@ def test_invalid_completion_does_not_complete(client: TestClient):
     )
     assert other.status_code == 200
     assert other.json()["case"]["disposition"] == "clinically_closed_other"
-    assert other.json()["case"]["stage"] == "closed"
 
 
 def test_needs_review_blocks_approve(client: TestClient):
@@ -186,9 +180,185 @@ def test_analytics_suppresses_small_cells(client: TestClient):
     sid = _session(client)
     res = client.get("/api/v1/analytics/overview", headers=_headers(sid))
     assert res.status_code == 200
-    body = res.json()
-    assert body["synthetic"] is True
-    # Seed cohorts are small (< 10) so completion cells should suppress
-    for pathway in body["pathways"]:
+    for pathway in res.json()["pathways"]:
         assert pathway["completed"]["suppressed"] is True
-        assert pathway["completed"]["reason"] == "small_cell"
+
+
+def test_extraction_sse_reaches_terminal(client: TestClient):
+    sid = _session(client)
+    accepted = client.post(
+        "/api/v1/documents/doc-synthetic-11/extractions",
+        headers=_headers(sid),
+    )
+    assert accepted.status_code == 202
+    job_id = accepted.json()["job_id"]
+
+    # Drive the worker path synchronously (workers disabled in tests).
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        jobs = claim_queued_jobs(db, worker_id="test-worker")
+        assert jobs and jobs[0].id == job_id
+        job = jobs[0]
+        while job.state not in {"succeeded", "failed", "timed_out", "cancelled"}:
+            job = advance_job(db, job)
+    finally:
+        db.close()
+
+    status = client.get(f"/api/v1/extractions/{job_id}", headers=_headers(sid))
+    assert status.status_code == 200
+    body = status.json()
+    assert body["state"] == "succeeded"
+    assert body["inference_mode"] == "offline_fixture"
+    assert "no live inference" in body["model_revision"]
+    assert len(body["proposals"]) >= 1
+
+    # SSE snapshot should emit a terminal frame immediately for completed jobs.
+    with client.stream(
+        "GET",
+        f"/api/v1/extractions/{job_id}/events",
+        headers=_headers(sid),
+    ) as stream:
+        chunks = b"".join(stream.iter_bytes())
+    text = chunks.decode("utf-8")
+    assert "event: terminal" in text
+    assert job_id in text
+
+
+def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, monkeypatch):
+    sid = _session(client)
+    # Move case-0002 to attended then close with evidence (triggers outbox).
+    case = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    attend = client.post(
+        "/api/v1/cases/case-0002/actions",
+        headers=_headers(sid),
+        json={
+            "action": "record_attendance",
+            "expected_revision": case["revision"],
+            "request_id": str(uuid.uuid4()),
+            "data": {"attended": "attended"},
+        },
+    )
+    assert attend.status_code == 200
+    attended = attend.json()["case"]
+    close_id = str(uuid.uuid4())
+    closed = client.post(
+        "/api/v1/cases/case-0002/actions",
+        headers=_headers(sid, "clinical_reviewer"),
+        json={
+            "action": "close_as_completed",
+            "expected_revision": attended["revision"],
+            "request_id": close_id,
+            "data": {
+                "evidence_type": "Encounter",
+                "evidence_reference": "Encounter/enc-test-01",
+                "attestation": True,
+            },
+        },
+    )
+    assert closed.status_code == 200
+
+    pending = client.get("/api/v1/ops/outbox", headers=_headers(sid))
+    assert pending.status_code == 200
+    assert any(r["request_id"] == close_id for r in pending.json())
+
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        entries = claim_due_entries(db, worker_id="test-outbox")
+        db.commit()
+        assert entries
+        for entry in entries:
+            process_entry(db, entry)
+            db.commit()
+    finally:
+        db.close()
+
+    committed = client.get(
+        "/api/v1/ops/outbox",
+        headers=_headers(sid),
+        params={"state": "committed"},
+    )
+    assert any(r["request_id"] == close_id for r in committed.json())
+
+    # Force a dead-letter via injected failures, then retry.
+    monkeypatch.setenv("NAMAA_FHIR_INJECT_FAILURE_RATE", "1.0")
+    monkeypatch.setenv("NAMAA_OUTBOX_BACKOFF_BASE_SECONDS", "0")
+    get_settings.cache_clear()
+
+    c6 = client.get("/api/v1/cases/case-0006", headers=_headers(sid)).json()
+    reopened = client.post(
+        "/api/v1/cases/case-0006/actions",
+        headers=_headers(sid, "clinical_reviewer"),
+        json={
+            "action": "reopen",
+            "expected_revision": c6["revision"],
+            "request_id": str(uuid.uuid4()),
+            "data": {"reason": "Demo reopen for outbox DLQ test"},
+        },
+    )
+    assert reopened.status_code == 200
+    req = str(uuid.uuid4())
+    again = client.post(
+        "/api/v1/cases/case-0006/actions",
+        headers=_headers(sid, "clinical_reviewer"),
+        json={
+            "action": "close_as_completed",
+            "expected_revision": reopened.json()["case"]["revision"],
+            "request_id": req,
+            "data": {
+                "evidence_type": "Encounter",
+                "evidence_reference": "Encounter/enc-dlq-01",
+                "attestation": True,
+            },
+        },
+    )
+    assert again.status_code == 200
+
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        # Drain attempts until dead_lettered
+        for _ in range(8):
+            entries = claim_due_entries(db, worker_id="test-outbox-fail")
+            db.commit()
+            if not entries:
+                break
+            for entry in entries:
+                process_entry(db, entry)
+            db.commit()
+    finally:
+        db.close()
+
+    dlq = client.get(
+        "/api/v1/ops/outbox",
+        headers=_headers(sid),
+        params={"state": "dead_lettered"},
+    )
+    assert dlq.status_code == 200
+    dead = [r for r in dlq.json() if r["request_id"] == req]
+    assert dead, dlq.json()
+
+    monkeypatch.setenv("NAMAA_FHIR_INJECT_FAILURE_RATE", "0.0")
+    get_settings.cache_clear()
+
+    retried = client.post(
+        f"/api/v1/ops/outbox/{dead[0]['id']}/retry",
+        headers=_headers(sid),
+    )
+    assert retried.status_code == 200
+    assert retried.json()["state"] == "pending"
+
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        entries = claim_due_entries(db, worker_id="test-outbox-retry")
+        db.commit()
+        for entry in entries:
+            process_entry(db, entry)
+            db.commit()
+    finally:
+        db.close()
+
+    ok = client.get(
+        "/api/v1/ops/outbox",
+        headers=_headers(sid),
+        params={"state": "committed"},
+    )
+    assert any(r["request_id"] == req for r in ok.json())

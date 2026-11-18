@@ -4,6 +4,7 @@ Newest first. One line per milestone; detail lives in the linked record.
 
 | # | Date | Milestone | Owner | Status | Record |
 | --- | --- | --- | --- | --- | --- |
+| M03 | 2026-11-18 | Extraction SSE + FHIR outbox/DLQ compensation | Ismail | Partial | [M03-sse-and-outbox.md](M03-sse-and-outbox.md) |
 | M02 | 2026-11-18 | Backend foundation: FastAPI workflow API + seed + actions | Ismail | Partial | [M02-backend-foundation.md](M02-backend-foundation.md) |
 | M03 | 2026-11-18 | Frontend pointed at the API; local transition layer deleted | Mark | Partial | [M03-api-integration.md](M03-api-integration.md) |
 | M01 | 2026-11-17 | Frontend foundation, token layer and safety primitives | Mark | Partial | [M01-frontend-foundation.md](M01-frontend-foundation.md) |
