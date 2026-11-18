@@ -9,14 +9,14 @@ decision. Recommendations below are suggestions, not settled calls.
 
 | ID | Question | Status |
 | --- | --- | --- |
-| Q1 | Which stack do we actually build? | **Open — blocks all coding** |
+| Q1 | Which stack do we actually build? | **Resolved for sprint** — [D003](D003-backend-stack-and-api.md): FastAPI + SQLite; HAPI deferred |
 | Q2 | English only, or bilingual EN/AR with RTL? | **Open** — implementation half settled by [D002](D002-ui-theme-addendum.md) |
-| Q3 | Is MedGemma extraction in the demo or deferred? | **Open — blocks Alfred's scope** |
+| Q3 | Is MedGemma extraction in the demo or deferred? | **Deferred for sprint** — deterministic rules only (D003); revisit if Q6 clears |
 | Q4 | What is the real submission deadline and required file list? | **Open — Alfred to verify portal** |
-| Q5 | Which API path convention is authoritative? | **Open — blocks Mark's client** |
+| Q5 | Which API path convention is authoritative? | **Resolved** — [D003](D003-backend-stack-and-api.md): `/api/v1/...` |
 | Q6 | Do we have model hosting and GPU budget? | **Open — prerequisite** |
 | Q7 | Where does the demo get hosted, if anywhere? | **Open** |
-| Q8 | Does the metrics API suppress small cells server-side? | **Open — raised by [D002](D002-ui-theme-addendum.md)** |
+| Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side |
 
 ---
 

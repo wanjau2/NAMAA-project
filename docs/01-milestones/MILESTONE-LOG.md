@@ -4,6 +4,7 @@ Newest first. One line per milestone; detail lives in the linked record.
 
 | # | Date | Milestone | Owner | Status | Record |
 | --- | --- | --- | --- | --- | --- |
+| M02 | 2026-11-18 | Backend foundation: FastAPI workflow API + seed + actions | Ismail | Partial | [M02-backend-foundation.md](M02-backend-foundation.md) |
 | M01 | 2026-11-17 | Frontend foundation, token layer and safety primitives | Mark | Partial | [M01-frontend-foundation.md](M01-frontend-foundation.md) |
 | M00 | 2026-11-17 | Documentation baseline established | Mark | Done | [M00-documentation-baseline.md](M00-documentation-baseline.md) |
 

@@ -8,8 +8,9 @@ Unresolved choices live in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) until someone 
 
 | # | Date | Decision | Status |
 | --- | --- | --- | --- |
-| D001 | — | *reserved: stack selection (Q1)* | Not yet decided |
+| D001 | — | *reserved: full design-spec stack (HAPI/Postgres) — see D003 for sprint path* | Superseded for sprint by D003 |
 | D002 | 2026-11-17 | [UI theme addendum: corrected tokens and missing layers](D002-ui-theme-addendum.md) | Proposed |
+| D003 | 2026-11-18 | [Backend stack, API paths, and metrics suppression](D003-backend-stack-and-api.md) | Accepted |
 
 To add one: copy [TEMPLATE.md](TEMPLATE.md) to `DNNN-short-slug.md`, fill it in, add a row above,
 and strike the matching row out of the open-questions register.

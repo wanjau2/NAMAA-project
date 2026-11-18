@@ -61,5 +61,6 @@ can *truthfully claim*, document it.
 ## Current status
 
 **Frontend foundation built** (Next.js 16 + Tailwind 4 + shadcn/ui in [web/](../web/)), running on
-labelled mock data — see [M01](01-milestones/M01-frontend-foundation.md). No backend yet.
-Stack choice is still formally open — see [OPEN-QUESTIONS.md](02-decisions/OPEN-QUESTIONS.md).
+labelled mock data — see [M01](01-milestones/M01-frontend-foundation.md).
+**Backend demo API scaffolded** (FastAPI + SQLite in [api/](../api/)) — see [M02](01-milestones/M02-backend-foundation.md)
+and stack lock [D003](02-decisions/D003-backend-stack-and-api.md). Mark still on mocks until F4/Phase C.
