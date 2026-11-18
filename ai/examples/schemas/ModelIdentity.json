@@ -1,0 +1,34 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "model_id": {
+      "const": "google/medgemma-1.5-4b-it",
+      "default": "google/medgemma-1.5-4b-it",
+      "title": "Model Id",
+      "type": "string"
+    },
+    "model_revision": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Model Revision",
+      "type": "string"
+    },
+    "prompt_version": {
+      "const": "extract-v1.0.0",
+      "default": "extract-v1.0.0",
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "simulated": {
+      "title": "Simulated",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "model_revision",
+    "simulated"
+  ],
+  "title": "ModelIdentity",
+  "type": "object"
+}

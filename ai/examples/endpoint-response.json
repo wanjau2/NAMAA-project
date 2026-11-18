@@ -1,0 +1,30 @@
+{
+  "protocol": "namaa-extraction-v1",
+  "model_id": "google/medgemma-1.5-4b-it",
+  "model_revision": "0000000000000000000000000000000000000000",
+  "prompt_version": "extract-v1.0.0",
+  "output": {
+    "facts": [
+      {
+        "concept": "last_wcv",
+        "value_text": "The patient attended a well-child visit on 2026-09-01.",
+        "subject": "patient",
+        "assertion": "present",
+        "effective_date": "2026-09-01",
+        "excerpt": "The patient attended a well-child visit on 2026-09-01.",
+        "proposed_resource_type": "Observation",
+        "relationship": null
+      },
+      {
+        "concept": "family_condition",
+        "value_text": "Mother has asthma.",
+        "subject": "family_member",
+        "assertion": "present",
+        "effective_date": null,
+        "excerpt": "Mother has asthma.",
+        "proposed_resource_type": "FamilyMemberHistory",
+        "relationship": "mother"
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "ResourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference",
+        "version"
+      ],
+      "title": "ResourceVersion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "source": {
+      "$ref": "#/$defs/ResourceVersion"
+    },
+    "patient_reference": {
+      "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+      "title": "Patient Reference",
+      "type": "string"
+    },
+    "source_last_updated": {
+      "format": "date-time",
+      "title": "Source Last Updated",
+      "type": "string"
+    },
+    "verified_at": {
+      "format": "date-time",
+      "title": "Verified At",
+      "type": "string"
+    },
+    "authorized": {
+      "title": "Authorized",
+      "type": "boolean"
+    },
+    "source_verified": {
+      "title": "Source Verified",
+      "type": "boolean"
+    },
+    "text": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Text",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "patient_reference",
+    "source_last_updated",
+    "verified_at",
+    "authorized",
+    "source_verified",
+    "text"
+  ],
+  "title": "ContextRecord",
+  "type": "object"
+}

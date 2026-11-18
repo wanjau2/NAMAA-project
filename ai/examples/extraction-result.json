@@ -1,0 +1,81 @@
+{
+  "status": "success",
+  "model": {
+    "model_id": "google/medgemma-1.5-4b-it",
+    "model_revision": "simulated-fixture-v1",
+    "prompt_version": "extract-v1.0.0",
+    "simulated": true
+  },
+  "proposals": [
+    {
+      "id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+      "version": 1,
+      "state": "proposed",
+      "workspace_id": "offline-demo",
+      "patient_reference": "Patient/demo-patient",
+      "source_document_id": "demo-note",
+      "source_document_version": "v1",
+      "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+      "fact": {
+        "concept": "last_wcv",
+        "value_text": "The patient attended a well-child visit on 2026-09-01.",
+        "subject": "patient",
+        "assertion": "present",
+        "effective_date": "2026-09-01",
+        "excerpt": "The patient attended a well-child visit on 2026-09-01.",
+        "proposed_resource_type": "Observation",
+        "relationship": null
+      },
+      "offset_start": 0,
+      "offset_end": 54,
+      "offset_unit": "unicode_code_points",
+      "issues": [],
+      "model": {
+        "model_id": "google/medgemma-1.5-4b-it",
+        "model_revision": "simulated-fixture-v1",
+        "prompt_version": "extract-v1.0.0",
+        "simulated": true
+      }
+    },
+    {
+      "id": "2f1f5c12-b5da-5699-88c4-b9789aa786f3",
+      "version": 1,
+      "state": "proposed",
+      "workspace_id": "offline-demo",
+      "patient_reference": "Patient/demo-patient",
+      "source_document_id": "demo-note",
+      "source_document_version": "v1",
+      "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+      "fact": {
+        "concept": "family_condition",
+        "value_text": "Mother has asthma.",
+        "subject": "family_member",
+        "assertion": "present",
+        "effective_date": null,
+        "excerpt": "Mother has asthma.",
+        "proposed_resource_type": "FamilyMemberHistory",
+        "relationship": "mother"
+      },
+      "offset_start": 55,
+      "offset_end": 73,
+      "offset_unit": "unicode_code_points",
+      "issues": [
+        {
+          "code": "missing_date",
+          "severity": "review",
+          "message": "No supported full event date; source date is not a substitute"
+        }
+      ],
+      "model": {
+        "model_id": "google/medgemma-1.5-4b-it",
+        "model_revision": "simulated-fixture-v1",
+        "prompt_version": "extract-v1.0.0",
+        "simulated": true
+      }
+    }
+  ],
+  "error_code": null,
+  "latency_ms": 0,
+  "attempts": 1,
+  "schema_valid": true
+}

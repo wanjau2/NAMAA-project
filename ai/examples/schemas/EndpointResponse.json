@@ -1,0 +1,159 @@
+{
+  "$defs": {
+    "ModelOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/ProposedFact"
+          },
+          "maxItems": 30,
+          "title": "Facts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "facts"
+      ],
+      "title": "ModelOutput",
+      "type": "object"
+    },
+    "ProposedFact": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "enum": [
+            "last_wcv",
+            "last_adult_screening",
+            "caregiver_concern",
+            "tobacco_use",
+            "family_condition"
+          ],
+          "title": "Concept",
+          "type": "string"
+        },
+        "value_text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Value Text",
+          "type": "string"
+        },
+        "subject": {
+          "enum": [
+            "patient",
+            "family_member"
+          ],
+          "title": "Subject",
+          "type": "string"
+        },
+        "assertion": {
+          "enum": [
+            "present",
+            "absent",
+            "uncertain",
+            "historical"
+          ],
+          "title": "Assertion",
+          "type": "string"
+        },
+        "effective_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Effective Date"
+        },
+        "excerpt": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Excerpt",
+          "type": "string"
+        },
+        "proposed_resource_type": {
+          "enum": [
+            "Observation",
+            "FamilyMemberHistory"
+          ],
+          "title": "Proposed Resource Type",
+          "type": "string"
+        },
+        "relationship": {
+          "anyOf": [
+            {
+              "enum": [
+                "mother",
+                "father",
+                "sister",
+                "brother",
+                "sibling",
+                "grandmother",
+                "grandfather"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Relationship"
+        }
+      },
+      "required": [
+        "concept",
+        "value_text",
+        "subject",
+        "assertion",
+        "effective_date",
+        "excerpt",
+        "proposed_resource_type",
+        "relationship"
+      ],
+      "title": "ProposedFact",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "protocol": {
+      "const": "namaa-extraction-v1",
+      "title": "Protocol",
+      "type": "string"
+    },
+    "model_id": {
+      "const": "google/medgemma-1.5-4b-it",
+      "title": "Model Id",
+      "type": "string"
+    },
+    "model_revision": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Model Revision",
+      "type": "string"
+    },
+    "prompt_version": {
+      "const": "extract-v1.0.0",
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "output": {
+      "$ref": "#/$defs/ModelOutput"
+    }
+  },
+  "required": [
+    "protocol",
+    "model_id",
+    "model_revision",
+    "prompt_version",
+    "output"
+  ],
+  "title": "EndpointResponse",
+  "type": "object"
+}

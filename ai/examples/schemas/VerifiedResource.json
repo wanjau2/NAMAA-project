@@ -1,0 +1,29 @@
+{
+  "additionalProperties": false,
+  "description": "Internal backend assertion, NEVER a client- or model-controlled request.",
+  "properties": {
+    "resource": {
+      "additionalProperties": true,
+      "title": "Resource",
+      "type": "object"
+    },
+    "review_reference": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Review Reference",
+      "type": "string"
+    },
+    "reviewed": {
+      "title": "Reviewed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "resource",
+    "review_reference",
+    "reviewed"
+  ],
+  "title": "VerifiedResource",
+  "type": "object"
+}

@@ -1,0 +1,21 @@
+{
+  "request_id": "demo-correction",
+  "proposal_id": "dc71e001-0a45-547a-bd33-1b5bebe750e2",
+  "expected_proposal_version": 1,
+  "action": "correct",
+  "reviewer_reference": "Practitioner/demo-reviewer",
+  "reason": "The source attributes asthma to the mother, not the patient. Correct subject and mapping; date remains unknown.",
+  "correction": {
+    "concept": "family_condition",
+    "value_text": "Mother has asthma.",
+    "subject": "family_member",
+    "assertion": "present",
+    "effective_date": null,
+    "excerpt": "Mother has asthma.",
+    "proposed_resource_type": "FamilyMemberHistory",
+    "relationship": "mother"
+  },
+  "acknowledged_issues": [
+    "missing_date"
+  ]
+}

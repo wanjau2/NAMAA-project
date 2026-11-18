@@ -1,0 +1,10 @@
+{
+  "request_id": "demo-extraction",
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "source_id": "demo-note",
+  "source_version": "v1",
+  "source_date": "2026-11-18",
+  "language": "en",
+  "note_text": "The patient attended a well-child visit on 2026-09-01. Mother has asthma."
+}

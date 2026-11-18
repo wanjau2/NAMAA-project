@@ -1,0 +1,46 @@
+{
+  "id": "dc71e001-0a45-547a-bd33-1b5bebe750e2",
+  "version": 1,
+  "state": "proposed",
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "source_document_id": "demo-note",
+  "source_document_version": "v1",
+  "source_sha256": "8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2",
+  "fact": {
+    "concept": "family_condition",
+    "value_text": "Mother has asthma.",
+    "subject": "patient",
+    "assertion": "present",
+    "effective_date": null,
+    "excerpt": "Mother has asthma.",
+    "proposed_resource_type": "Observation",
+    "relationship": null
+  },
+  "offset_start": 55,
+  "offset_end": 73,
+  "offset_unit": "unicode_code_points",
+  "issues": [
+    {
+      "code": "subject_mapping",
+      "severity": "block",
+      "message": "Patient findings must use the patient Observation mapping"
+    },
+    {
+      "code": "family_attribution",
+      "severity": "block",
+      "message": "The excerpt attributes the condition to a relative"
+    },
+    {
+      "code": "missing_date",
+      "severity": "review",
+      "message": "No supported full event date; source date is not a substitute"
+    }
+  ],
+  "model": {
+    "model_id": "google/medgemma-1.5-4b-it",
+    "model_revision": "simulated-fixture-v1",
+    "prompt_version": "extract-v1.0.0",
+    "simulated": true
+  }
+}

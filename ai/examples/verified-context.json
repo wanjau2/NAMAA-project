@@ -1,0 +1,29 @@
+{
+  "workspace_id": "offline-demo",
+  "patient_reference": "Patient/demo-patient",
+  "generation_id": "generation-demo-1",
+  "mapping_version": "mapping-v1",
+  "permission_revision": "permissions-v1",
+  "built_at": "2026-11-18T08:00:00Z",
+  "verified_at": "2026-11-18T09:00:00Z",
+  "expires_at": "2026-11-18T09:01:00Z",
+  "state": "current",
+  "authorized": true,
+  "source_verified": true,
+  "completeness": "partial",
+  "checked_scope": "Fictional patient journey; no exhaustive absence checks",
+  "records": [
+    {
+      "source": {
+        "reference": "Observation/demo-observation",
+        "version": "opaque-v1"
+      },
+      "patient_reference": "Patient/demo-patient",
+      "source_last_updated": "2026-11-18T08:30:00Z",
+      "verified_at": "2026-11-18T09:00:00Z",
+      "authorized": true,
+      "source_verified": true,
+      "text": "Fictional source-verified record summary supplied by the backend."
+    }
+  ]
+}

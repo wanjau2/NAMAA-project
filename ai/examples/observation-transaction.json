@@ -1,0 +1,129 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "fullUrl": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0",
+      "resource": {
+        "resourceType": "Observation",
+        "status": "final",
+        "code": {
+          "text": "Reported last well-child visit"
+        },
+        "subject": {
+          "reference": "Patient/demo-patient"
+        },
+        "valueString": "The patient attended a well-child visit on 2026-09-01.",
+        "component": [
+          {
+            "code": {
+              "text": "Source assertion"
+            },
+            "valueCodeableConcept": {
+              "text": "present"
+            }
+          }
+        ],
+        "effectiveDateTime": "2026-09-01",
+        "id": "edfa4634-bcb5-5617-9031-303e675f7bc0",
+        "identifier": [
+          {
+            "system": "https://namaa.example/fhir/review-command",
+            "value": "offline-demo:demo-human-review-0"
+          }
+        ],
+        "note": [
+          {
+            "text": "Reviewed source DocumentReference/demo-note/_history/v1; quote [0,54) Unicode code points: The patient attended a well-child visit on 2026-09-01."
+          }
+        ],
+        "meta": {
+          "tag": [
+            {
+              "system": "https://namaa.example/fhir/data-mode",
+              "code": "simulated"
+            }
+          ]
+        }
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Observation/edfa4634-bcb5-5617-9031-303e675f7bc0"
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+      "resource": {
+        "resourceType": "Provenance",
+        "id": "5115366a-2fa1-57a8-87f9-9d1bbba27da0",
+        "target": [
+          {
+            "reference": "urn:uuid:edfa4634-bcb5-5617-9031-303e675f7bc0"
+          }
+        ],
+        "recorded": "2026-11-18T09:00:00+00:00",
+        "activity": {
+          "text": "Human review: accept; reason: Scripted fictional reviewer explicitly accepts the quoted statement for this local demonstration.; proposal fd5d7bbb-02be-5098-bc12-4932e2d31231 version 1"
+        },
+        "agent": [
+          {
+            "type": {
+              "text": "Human reviewer"
+            },
+            "who": {
+              "reference": "Practitioner/demo-reviewer"
+            }
+          },
+          {
+            "type": {
+              "text": "Simulated extraction"
+            },
+            "who": {
+              "reference": "#model"
+            }
+          }
+        ],
+        "contained": [
+          {
+            "resourceType": "Device",
+            "id": "model",
+            "status": "active",
+            "deviceName": [
+              {
+                "name": "google/medgemma-1.5-4b-it",
+                "type": "model-name"
+              }
+            ],
+            "version": [
+              {
+                "type": {
+                  "text": "Model revision"
+                },
+                "value": "simulated-fixture-v1"
+              },
+              {
+                "type": {
+                  "text": "Prompt version"
+                },
+                "value": "extract-v1.0.0"
+              }
+            ]
+          }
+        ],
+        "entity": [
+          {
+            "role": "source",
+            "what": {
+              "reference": "DocumentReference/demo-note/_history/v1",
+              "display": "SHA-256 8d82b6080687b7d387989c4fc404c7d038d06ce0ec274617138b7e1c67e8d8f2"
+            }
+          }
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "url": "Provenance/5115366a-2fa1-57a8-87f9-9d1bbba27da0"
+      }
+    }
+  ]
+}

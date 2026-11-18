@@ -1,0 +1,26 @@
+{
+  "patient_reference": "Patient/demo-patient",
+  "as_of": "2026-11-18",
+  "rule_id": "DEMO_WCV_01",
+  "rule_version": "synthetic-1.0.0",
+  "outcome": "needs_review",
+  "input_versions": [
+    {
+      "reference": "Patient/demo-patient",
+      "version": "demo-v1"
+    },
+    {
+      "reference": "Observation/demo-eligibility",
+      "version": "demo-v1"
+    }
+  ],
+  "contributing_factors": [
+    "Fictional eligibility card: True"
+  ],
+  "missing_information": [
+    "Reviewed explicit last-event date; absence of records is not a gap"
+  ],
+  "due_date": null,
+  "simulated": true,
+  "synthetic_rule": true
+}

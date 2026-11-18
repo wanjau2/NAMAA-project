@@ -1,0 +1,23 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "reference": {
+      "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+      "title": "Reference",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reference",
+    "version"
+  ],
+  "title": "ResourceVersion",
+  "type": "object"
+}

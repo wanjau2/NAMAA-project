@@ -1,0 +1,10 @@
+{
+  "request_id": "demo-rejection",
+  "proposal_id": "fd5d7bbb-02be-5098-bc12-4932e2d31231",
+  "expected_proposal_version": 1,
+  "action": "reject",
+  "reviewer_reference": "Practitioner/demo-reviewer",
+  "reason": "Reviewer rejects this statement for the demonstration.",
+  "correction": null,
+  "acknowledged_issues": []
+}

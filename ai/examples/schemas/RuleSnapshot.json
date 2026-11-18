@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "VerifiedResource": {
+      "additionalProperties": false,
+      "description": "Internal backend assertion, NEVER a client- or model-controlled request.",
+      "properties": {
+        "resource": {
+          "additionalProperties": true,
+          "title": "Resource",
+          "type": "object"
+        },
+        "review_reference": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Review Reference",
+          "type": "string"
+        },
+        "reviewed": {
+          "title": "Reviewed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource",
+        "review_reference",
+        "reviewed"
+      ],
+      "title": "VerifiedResource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "workspace_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Workspace Id",
+      "type": "string"
+    },
+    "patient_reference": {
+      "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+      "title": "Patient Reference",
+      "type": "string"
+    },
+    "as_of": {
+      "format": "date",
+      "title": "As Of",
+      "type": "string"
+    },
+    "authority": {
+      "enum": [
+        "hapi_fhir",
+        "simulated_fhir"
+      ],
+      "title": "Authority",
+      "type": "string"
+    },
+    "authorized": {
+      "title": "Authorized",
+      "type": "boolean"
+    },
+    "complete_for_rule": {
+      "title": "Complete For Rule",
+      "type": "boolean"
+    },
+    "resources": {
+      "items": {
+        "$ref": "#/$defs/VerifiedResource"
+      },
+      "title": "Resources",
+      "type": "array"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "patient_reference",
+    "as_of",
+    "authority",
+    "authorized",
+    "complete_for_rule",
+    "resources"
+  ],
+  "title": "RuleSnapshot",
+  "type": "object"
+}

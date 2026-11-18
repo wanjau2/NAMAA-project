@@ -1,0 +1,28 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "title": "Code",
+      "type": "string"
+    },
+    "severity": {
+      "enum": [
+        "block",
+        "review"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "message": {
+      "title": "Message",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "severity",
+    "message"
+  ],
+  "title": "ValidationIssue",
+  "type": "object"
+}
