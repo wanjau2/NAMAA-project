@@ -10,6 +10,7 @@
  * and held in memory only, so a reload starts a fresh synthetic session.
  */
 
+import type { ReviewCommand, ReviewDecision } from "@/lib/contracts";
 import type {
   ActionRequest,
   ActionResponse,
@@ -176,6 +177,22 @@ export const api = {
     request<ExtractionJobOut>(
       `/api/v1/extractions/${encodeURIComponent(jobId)}`,
       { session, role, signal },
+    ),
+
+  /**
+   * POST /api/v1/facts/{id}/review — not yet implemented by the API.
+   * A 404/405 here means the endpoint is absent, which the caller
+   * distinguishes from a refusal so review can fall back to local state.
+   */
+  reviewFact: (
+    session: string,
+    role: Role,
+    proposalId: string,
+    command: ReviewCommand,
+  ) =>
+    request<ReviewDecision>(
+      `/api/v1/facts/${encodeURIComponent(proposalId)}/review`,
+      { method: "POST", session, role, body: command },
     ),
 
   analyticsOverview: (session: string, signal?: AbortSignal) =>

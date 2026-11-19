@@ -221,14 +221,22 @@ export function CaseDetailView({ id }: { id: string }) {
                   influence the rule.
                 </p>
               </div>
-              {hasSource ? (
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {hasSource ? (
+                  <Link
+                    href={`/cases/${id}/review`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+                  >
+                    Review source facts
+                  </Link>
+                ) : null}
                 <Link
-                  href={`/cases/${id}/review`}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+                  href={`/cases/${id}/context`}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
                 >
-                  Review source facts
+                  Retrieved context
                 </Link>
-              ) : null}
+              </div>
             </div>
             <ul className="mt-4 space-y-3">
               {detail.factors.map((fact) => (

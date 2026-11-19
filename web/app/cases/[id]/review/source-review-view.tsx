@@ -37,6 +37,16 @@ import { useCase, useCaseStore } from "@/lib/case-store";
 import { useSourceReview } from "@/lib/use-source-review";
 import { traceability, type Traceability } from "@/lib/text-offsets";
 import {
+  buildReviewCommand,
+  hasBlockingIssue,
+  normalizeProposal,
+  type ProposedFact,
+  type ReviewAction,
+  type ValidationIssue,
+} from "@/lib/contracts";
+import { ApiError, ApiUnreachableError, api, newRequestId } from "@/lib/api";
+import { describeSecurityOutcome, type SecurityOutcome } from "@/lib/security-states";
+import {
   ASSERTION_LABELS,
   SUBJECT_LABELS,
   type ApiProposal,
@@ -66,6 +76,13 @@ const REVIEW_BADGE: Record<ReviewState, { state: EpistemicState; label: string }
     rejected: { state: "review", label: "Rejected — excluded from rules" },
   };
 
+/** What happened when a review decision was sent to the server. */
+type Persistence =
+  | { kind: "persisted"; version: number }
+  | { kind: "endpoint_absent" }
+  | { kind: "cannot_build"; reason: string }
+  | { kind: "refused"; outcome: SecurityOutcome; code: string };
+
 export function SourceReviewView({ id }: { id: string }) {
   const { role } = useDemoSession();
   const { sessionId } = useCaseStore();
@@ -73,7 +90,66 @@ export function SourceReviewView({ id }: { id: string }) {
   const review = useSourceReview(row, sessionId, role);
 
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [persistence, setPersistence] = useState<Record<string, Persistence>>({});
   const [selected, setSelected] = useState<string | null>(null);
+
+  /**
+   * Send a review decision to POST /api/v1/facts/{id}/review.
+   *
+   * The endpoint does not exist yet. Rather than pretend, this attempts the
+   * real call and reports exactly why it did not persist — so the day it ships,
+   * review starts working with no further change here.
+   */
+  async function submitReview(
+    proposalId: string,
+    action: ReviewAction,
+    reason: string,
+    correction: ProposedFact | null,
+  ): Promise<Persistence> {
+    const raw = review.proposals.find((p) => p.id === proposalId);
+    if (!raw || !sessionId) return { kind: "endpoint_absent" };
+
+    const normalized = normalizeProposal(raw);
+    const built = buildReviewCommand({
+      requestId: newRequestId(),
+      proposal: normalized.proposal,
+      action,
+      reviewerReference: "Practitioner/demo-reviewer",
+      reason,
+      correction,
+      acknowledgedIssues: normalized.proposal.issues.map((i) => i.code),
+    });
+    if (!built.ok) return { kind: "cannot_build", reason: built.reason };
+
+    try {
+      const decision = await api.reviewFact(
+        sessionId,
+        "clinical_reviewer",
+        proposalId,
+        built.command,
+      );
+      return { kind: "persisted", version: decision.resulting_proposal_version };
+    } catch (caught) {
+      if (caught instanceof ApiError) {
+        if (caught.status === 404 || caught.status === 405) {
+          return { kind: "endpoint_absent" };
+        }
+        return {
+          kind: "refused",
+          outcome: describeSecurityOutcome(caught.status, "fact_review"),
+          code: caught.code,
+        };
+      }
+      if (caught instanceof ApiUnreachableError) {
+        return {
+          kind: "refused",
+          outcome: describeSecurityOutcome(0, "fact_review"),
+          code: "api_unreachable",
+        };
+      }
+      return { kind: "endpoint_absent" };
+    }
+  }
 
   const isReviewer = role === "clinical_reviewer";
   const gateId = useId();
@@ -278,17 +354,40 @@ export function SourceReviewView({ id }: { id: string }) {
                     <ProposalCard
                       noteText={noteText}
                       proposal={proposal}
+                      model={{
+                        revision: review.modelRevision,
+                        inferenceMode: review.inferenceMode,
+                      }}
                       decision={decisions[proposal.id] ?? { state: "proposed" }}
                       selected={selectedProposal?.id === proposal.id}
                       onSelect={() => setSelected(proposal.id)}
                       isReviewer={isReviewer}
                       gateId={isReviewer ? undefined : gateId}
-                      onDecide={(decision) =>
+                      persistence={persistence[proposal.id]}
+                      onDecide={async (decision) => {
                         setDecisions((prev) => ({
                           ...prev,
                           [proposal.id]: decision,
-                        }))
-                      }
+                        }));
+                        const action: ReviewAction =
+                          decision.state === "accepted"
+                            ? "accept"
+                            : decision.state === "corrected"
+                              ? "correct"
+                              : "reject";
+                        const reason =
+                          "reason" in decision ? decision.reason : "Accepted as proposed.";
+                        const result = await submitReview(
+                          proposal.id,
+                          action,
+                          reason,
+                          null,
+                        );
+                        setPersistence((prev) => ({
+                          ...prev,
+                          [proposal.id]: result,
+                        }));
+                      }}
                     />
                   </li>
                 ))}
@@ -401,7 +500,9 @@ function NoteText({
 function ProposalCard({
   noteText,
   proposal,
+  model,
   decision,
+  persistence,
   selected,
   onSelect,
   isReviewer,
@@ -410,7 +511,9 @@ function ProposalCard({
 }: {
   noteText: string;
   proposal: ApiProposal;
+  model: { revision: string | null; inferenceMode: string | null };
   decision: Decision;
+  persistence?: Persistence;
   selected: boolean;
   onSelect: () => void;
   isReviewer: boolean;
@@ -428,7 +531,18 @@ function ProposalCard({
   });
 
   const trace = traceability(noteText, proposal);
-  const traceable = trace.state === "verified";
+  // Alfred's contract shape, plus an honest list of what this API cannot send.
+  const adapted = normalizeProposal(proposal);
+  if (adapted.proposal.model === null && model.revision) {
+    adapted.proposal.model = {
+      model_id: "google/medgemma-1.5-4b-it",
+      model_revision: model.revision,
+      prompt_version: "unknown",
+      simulated: model.inferenceMode !== "live",
+    };
+  }
+  const blocked = hasBlockingIssue(adapted.proposal.issues);
+  const traceable = trace.state === "verified" && !blocked;
   const badge = REVIEW_BADGE[decision.state];
   const reasonId = useId();
 
@@ -501,6 +615,11 @@ function ProposalCard({
       {displayed.subject === "family_member" ? (
         <p className="mt-2 text-xs text-ink-muted">
           Recorded as family history, never as a diagnosis for this patient.
+          {adapted.proposal.fact.relationship ? (
+            <> Relationship: {adapted.proposal.fact.relationship}.</>
+          ) : (
+            <> Relationship not supplied by this API.</>
+          )}
         </p>
       ) : null}
 
@@ -526,7 +645,17 @@ function ProposalCard({
         </figcaption>
       </figure>
 
-      {!traceable ? <TraceabilityProblem trace={trace} /> : null}
+      {!traceable && trace.state !== "verified" ? (
+        <TraceabilityProblem trace={trace} />
+      ) : null}
+
+      <ContractProvenance
+        issues={adapted.proposal.issues}
+        missing={adapted.missing}
+        model={adapted.proposal.model}
+        sourceVersion={adapted.proposal.source_document_version}
+        sourceSha={adapted.proposal.source_sha256}
+      />
 
       {decision.state === "corrected" ? (
         <div className="mt-3 rounded-md border border-border bg-canvas p-3 text-xs">
@@ -558,6 +687,8 @@ function ProposalCard({
       {decision.state === "rejected" ? (
         <p className="mt-3 text-xs text-ink-muted">Reason: {decision.reason}</p>
       ) : null}
+
+      {persistence ? <PersistenceNote persistence={persistence} /> : null}
 
       {mode === "idle" ? (
         <div className="mt-4 flex flex-wrap gap-2">
@@ -733,6 +864,126 @@ function ProposalCard({
         </form>
       ) : null}
     </article>
+  );
+}
+
+/** What the server did with this decision — stated, never assumed. */
+function PersistenceNote({ persistence }: { persistence: Persistence }) {
+  if (persistence.kind === "persisted") {
+    return (
+      <p className="mt-2 rounded-md border border-status-verified bg-status-verified-bg p-2 text-xs text-status-verified">
+        Recorded by the server. Proposal now at version{" "}
+        <span className="font-mono-tech">{persistence.version}</span>.
+      </p>
+    );
+  }
+
+  if (persistence.kind === "endpoint_absent") {
+    return (
+      <p className="mt-2 rounded-md border border-dashed border-status-proposed bg-status-proposed-bg p-2 text-xs text-status-proposed">
+        Held in this browser only. The API has no fact-review endpoint yet, so
+        this decision has no reviewer identity and no provenance, and is not an
+        authorization receipt.
+      </p>
+    );
+  }
+
+  if (persistence.kind === "cannot_build") {
+    return (
+      <p className="mt-2 rounded-md border border-status-review bg-status-review-bg p-2 text-xs text-status-review">
+        Not sent: {persistence.reason}
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-status-overdue bg-status-overdue-bg p-2 text-xs text-status-overdue">
+      <p className="font-semibold">{persistence.outcome.title}</p>
+      <p className="mt-1">{persistence.outcome.body}</p>
+      {persistence.outcome.action ? (
+        <p className="mt-1">{persistence.outcome.action}</p>
+      ) : null}
+      <p className="mt-1 font-mono-tech">[{persistence.code}]</p>
+    </div>
+  );
+}
+
+/**
+ * Validation issues, model identity and source binding — Alfred's contract
+ * fields. An empty issue list from an API that does not report issues is NOT a
+ * clean bill of health, and this says so rather than showing a reassuring
+ * blank.
+ */
+function ContractProvenance({
+  issues,
+  missing,
+  model,
+  sourceVersion,
+  sourceSha,
+}: {
+  issues: ValidationIssue[];
+  missing: string[];
+  model: { model_revision: string; prompt_version: string; simulated: boolean } | null;
+  sourceVersion: string;
+  sourceSha: string | null;
+}) {
+  const issuesUnavailable = missing.includes("issues");
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      {issues.length > 0 ? (
+        <ul className="space-y-1">
+          {issues.map((issue) => (
+            <li
+              key={issue.code}
+              className={cn(
+                "flex items-start gap-1.5 rounded-md border p-2 text-xs",
+                issue.severity === "block"
+                  ? "border-status-overdue bg-status-overdue-bg text-status-overdue"
+                  : "border-status-review bg-status-review-bg text-status-review",
+              )}
+            >
+              <AlertOctagon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                <b>{issue.severity === "block" ? "Blocking" : "Review"}:</b>{" "}
+                {issue.message}{" "}
+                <span className="font-mono-tech">[{issue.code}]</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : issuesUnavailable ? (
+        <p className="text-xs text-ink-muted">
+          Validation issues are not reported by this API. An empty list here
+          means <b>not reported</b>, not &ldquo;none found&rdquo;.
+        </p>
+      ) : null}
+
+      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+        <span>
+          source version{" "}
+          <span className="font-mono-tech">{sourceVersion}</span>
+        </span>
+        <span>
+          source hash{" "}
+          {sourceSha ? (
+            <span className="font-mono-tech">{sourceSha.slice(0, 12)}…</span>
+          ) : (
+            <span>not supplied</span>
+          )}
+        </span>
+        {model ? (
+          <span>
+            model <span className="font-mono-tech">{model.model_revision}</span>
+            {model.simulated ? (
+              <span className="ms-1 rounded border border-dashed border-status-proposed px-1.5 py-0.5 text-status-proposed">
+                simulated
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </p>
+    </div>
   );
 }
 
