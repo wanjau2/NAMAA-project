@@ -1,14 +1,18 @@
 {
   "notice": "Synthetic retrieval fixture metrics; not clinical relevance or model-quality results.",
   "simulated": true,
-  "sample_size_queries": 4,
+  "sample_size_queries": 20,
   "k": 3,
+  "splits": {
+    "held_out": 20
+  },
+  "sample_size_scenarios": 4,
   "hit_rate_at_k": 1.0,
-  "mean_recall_at_k": 1.0,
-  "mean_reciprocal_rank": 1.0,
+  "mean_recall_at_k": 0.975,
+  "mean_reciprocal_rank": 0.9666666666666668,
   "cases": [
     {
-      "id": "heldout-tobacco",
+      "id": "heldout-tobacco-01",
       "retrieved_at_k": [
         "DocumentReference/note-tobacco@v2",
         "Observation/obs-tobacco@v3"
@@ -18,7 +22,47 @@
       "reciprocal_rank": 1.0
     },
     {
-      "id": "heldout-caregiver-concern",
+      "id": "heldout-tobacco-02",
+      "retrieved_at_k": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-tobacco-03",
+      "retrieved_at_k": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-tobacco-04",
+      "retrieved_at_k": [
+        "Observation/obs-tobacco@v3",
+        "DocumentReference/note-tobacco@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-tobacco-05",
+      "retrieved_at_k": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-caregiver-concern-01",
       "retrieved_at_k": [
         "DocumentReference/note-caregiver@v1",
         "Observation/obs-visit@v1"
@@ -28,7 +72,47 @@
       "reciprocal_rank": 1.0
     },
     {
-      "id": "heldout-booking-evidence",
+      "id": "heldout-caregiver-concern-02",
+      "retrieved_at_k": [
+        "DocumentReference/note-caregiver@v1",
+        "Observation/obs-visit@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-caregiver-concern-03",
+      "retrieved_at_k": [
+        "DocumentReference/note-caregiver@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-caregiver-concern-04",
+      "retrieved_at_k": [
+        "DocumentReference/note-caregiver@v1",
+        "Observation/obs-visit@v1",
+        "Task/task-outreach@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-caregiver-concern-05",
+      "retrieved_at_k": [
+        "DocumentReference/note-caregiver@v1",
+        "Observation/obs-visit@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-booking-evidence-01",
       "retrieved_at_k": [
         "Procedure/procedure-preventive@v1",
         "DiagnosticReport/report-attendance@v2",
@@ -39,7 +123,91 @@
       "reciprocal_rank": 1.0
     },
     {
-      "id": "heldout-empty-scope",
+      "id": "heldout-booking-evidence-02",
+      "retrieved_at_k": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2",
+        "Task/task-booking@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-booking-evidence-03",
+      "retrieved_at_k": [
+        "DiagnosticReport/report-attendance@v2",
+        "Procedure/procedure-preventive@v1",
+        "Task/task-booking@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-booking-evidence-04",
+      "retrieved_at_k": [
+        "Task/task-booking@v1",
+        "DocumentReference/note-screening@v1",
+        "DiagnosticReport/report-attendance@v2"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 2,
+      "reciprocal_rank": 0.3333333333333333
+    },
+    {
+      "id": "heldout-booking-evidence-05",
+      "retrieved_at_k": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2",
+        "Task/task-booking@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-empty-scope-01",
+      "retrieved_at_k": [
+        "ServiceRequest/sr-adult-screen@v3",
+        "ServiceRequest/sr-old@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-empty-scope-02",
+      "retrieved_at_k": [
+        "ServiceRequest/sr-adult-screen@v3",
+        "ServiceRequest/sr-old@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-empty-scope-03",
+      "retrieved_at_k": [
+        "ServiceRequest/sr-adult-screen@v3",
+        "ServiceRequest/sr-old@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-empty-scope-04",
+      "retrieved_at_k": [
+        "ServiceRequest/sr-adult-screen@v3",
+        "ServiceRequest/sr-old@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "heldout-empty-scope-05",
       "retrieved_at_k": [
         "ServiceRequest/sr-adult-screen@v3",
         "ServiceRequest/sr-old@v1"

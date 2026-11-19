@@ -1,0 +1,17 @@
+{
+  "metric_id": "overdue-task-rate",
+  "version": "demo-1.0.0",
+  "name": "Overdue active follow-up task rate",
+  "unit_of_analysis": "task",
+  "aggregation": "rate",
+  "numerator": "Active tasks past their due time at the reporting instant",
+  "denominator": "Active tasks with a valid due time at the reporting instant",
+  "exclusions": [
+    "closed tasks",
+    "tasks without a due time"
+  ],
+  "reporting_period": "point_in_time",
+  "suppression_threshold": 10,
+  "complementary_suppression_required": true,
+  "synthetic_only": true
+}

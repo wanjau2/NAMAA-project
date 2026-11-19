@@ -1,0 +1,9 @@
+{
+  "template_id": "demo-prevention-sms-v1",
+  "channel": "sms",
+  "language": "en",
+  "purpose": "prevention_reminder",
+  "text": "Your care team has a preventive health update for you. Contact them when convenient to discuss your options. No action is required based on this message. Reply STOP to decline demo reminders.",
+  "review_status": "human_review_required_before_demo",
+  "simulated_only": true
+}

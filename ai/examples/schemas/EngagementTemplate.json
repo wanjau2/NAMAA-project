@@ -1,0 +1,62 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "template_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Template Id",
+      "type": "string"
+    },
+    "channel": {
+      "enum": [
+        "sms",
+        "whatsapp",
+        "portal"
+      ],
+      "title": "Channel",
+      "type": "string"
+    },
+    "language": {
+      "const": "en",
+      "title": "Language",
+      "type": "string"
+    },
+    "purpose": {
+      "enum": [
+        "prevention_reminder",
+        "follow_up_choice"
+      ],
+      "title": "Purpose",
+      "type": "string"
+    },
+    "text": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Text",
+      "type": "string"
+    },
+    "review_status": {
+      "const": "human_review_required_before_demo",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "simulated_only": {
+      "const": true,
+      "default": true,
+      "title": "Simulated Only",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "template_id",
+    "channel",
+    "language",
+    "purpose",
+    "text",
+    "review_status"
+  ],
+  "title": "EngagementTemplate",
+  "type": "object"
+}

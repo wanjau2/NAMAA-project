@@ -1,0 +1,18 @@
+{
+  "metric_id": "median-time-to-attendance",
+  "version": "demo-1.0.0",
+  "name": "Median days from gap identification to verified attendance",
+  "unit_of_analysis": "patient_pathway",
+  "aggregation": "median",
+  "numerator": "Elapsed calendar days from first gap identification to verified attendance evidence",
+  "denominator": "Patient-pathways with both valid timestamps and verified attendance evidence",
+  "exclusions": [
+    "open pathways",
+    "missing timestamps",
+    "unverified booking or attendance"
+  ],
+  "reporting_period": "cohort_followup",
+  "suppression_threshold": 10,
+  "complementary_suppression_required": true,
+  "synthetic_only": true
+}

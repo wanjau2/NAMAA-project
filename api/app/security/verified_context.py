@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -15,7 +16,9 @@ from app.security.enforce import authorize
 
 
 def _iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Preserve precision: truncating verification time to seconds makes a
+    # freshly stored resource appear newer than its own verification.
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def build_verified_context(
@@ -52,28 +55,28 @@ def build_verified_context(
     now = datetime.now(timezone.utc)
     records: list[dict[str, Any]] = []
 
-    # Candidate refs from Relate are suggestions only.
-    hinted_refs = {
-        (h.get("resource_type"), h.get("logical_id"))
-        for h in (relate_hints or [])
-        if h.get("resource_type") and h.get("logical_id")
-    }
-
     fhir_rows = (
         db.query(FhirResource)
         .filter(FhirResource.workspace_id == ctx.workspace_id)
         .all()
     )
     for row in fhir_rows:
-        # Suppress anything not for this patient when body carries subject.
-        body = row.body_json
-        if f"Patient/{patient_id}" not in body and hinted_refs and (
-            row.resource_type,
-            row.logical_id,
-        ) not in hinted_refs:
+        # Only the resource's actual patient link establishes scope. A graph
+        # hint or patient name embedded in narrative must never widen it.
+        try:
+            body = json.loads(row.body_json)
+        except (TypeError, ValueError):
             continue
-        if f"Patient/{patient_id}" not in body and not hinted_refs:
-            # Include only explicitly patient-linked or seed observations path below.
+        if not isinstance(body, dict):
+            continue
+        link_field = {
+            "Observation": "subject", "Condition": "subject",
+            "DocumentReference": "subject", "CarePlan": "subject",
+            "FamilyMemberHistory": "patient",
+        }.get(row.resource_type)
+        patient_link = body.get(link_field) if link_field else None
+        if (not isinstance(patient_link, dict) or
+                patient_link.get("reference") != f"Patient/{patient_id}"):
             continue
         records.append(
             {

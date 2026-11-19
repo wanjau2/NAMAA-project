@@ -9,9 +9,9 @@ complete offline slice, explicit scripted review commands, two transaction
 proposals, pending validation reports and before/after simulated evaluations.
 `environment.json` identifies versions, corpus/prompt hashes and unrun checks.
 `context-development.json` and `context-held-out.json` report deterministic
-BM25 retrieval plumbing over four authored synthetic queries per split. Both
-currently score 1.0 on hit rate@3, recall@3 and MRR because the fixture is small
-and authored around its labels; these are not clinical relevance measurements.
+BM25 retrieval plumbing over 20 synthetic queries per split. The queries are
+paraphrases of eight authored scenarios, not independent clinical examples.
+Scores are therefore plumbing checks and not clinical relevance measurements.
 
 | Scripted replay | Development | Held-out |
 | --- | --- | --- |

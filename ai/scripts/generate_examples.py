@@ -9,6 +9,7 @@ from namaa_ai.contracts import (ContextQuery, ExtractionRequest, LayoutBlock, Mo
     ParsedDocument, ProposedFact, RelateCandidateBatch, ReviewCommand, VerifiedContext)
 from namaa_ai.demo import DemoAuthorizer, run_demo, simulated_snapshot
 from namaa_ai.context_engineering import ContextAssembler
+from namaa_ai.engagement import METRICS, TEMPLATES
 from namaa_ai.fhir import propose_transaction
 from namaa_ai.rules import evaluate
 from namaa_ai.handoff import prepare_rule_handoff
@@ -61,6 +62,10 @@ save("relate-candidates", RelateCandidateBatch(workspace_id="offline-demo",
     permission_revision="permissions-v1", state="current", candidates=[{
         "patient_reference": "Patient/demo-patient", "candidate_kind": "family_history",
         "supporting_references": ["FamilyMemberHistory/demo-history"]}]).model_dump(mode="json"))
+for template in TEMPLATES:
+    save(f"engagement-{template.template_id}", template.model_dump(mode="json"))
+for metric in METRICS:
+    save(f"metric-{metric.metric_id}", metric.model_dump(mode="json"))
 context_query = ContextQuery(query="What source-verified observation is available?", max_items=5)
 assembled = ContextAssembler(enabled=True).assemble(ctx, context_query, workspace_id="offline-demo",
     patient_reference="Patient/demo-patient", permission_revision="permissions-v1",

@@ -114,8 +114,10 @@ was permitted.
 
 ## Offline evaluation
 
-`fixtures/context-queries.json` has authored synthetic query/relevant-source
-labels separated into development and held-out splits. Run from `ai/`:
+`fixtures/context-queries.json` has 40 synthetic queries (20 development, 20
+held-out), built as five paraphrases of each of eight authored source scenarios.
+The paraphrases reuse scenario candidates; they are not 40 independent records
+or clinical relevance labels. Run from `ai/`:
 
 ```bash
 namaa-ai evaluate-context --split development
@@ -123,9 +125,9 @@ namaa-ai evaluate-context --split held_out
 ```
 
 The command reports hit rate at K, recall at K, mean reciprocal rank, and sample
-counts for the deterministic local retriever. This fixture set is deliberately
-small and authored around its queries. Its scores test the plumbing only; they
-are not clinical relevance, model quality, or population generalization results.
+counts for the deterministic local retriever. The repeated scenario sources
+make these scores plumbing checks only; they are not clinical relevance, model
+quality, or population generalization results.
 
 ## Deliberately not implemented
 

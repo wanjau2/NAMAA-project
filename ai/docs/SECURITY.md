@@ -61,7 +61,9 @@ grant permission. Empty or partial context does not establish absence of care.
 `BackendHttpClient` requires the API base URL and caller-supplied authenticated
 headers. Obtain those headers from Ismail's server-side session or service-token
 integration; do not pass credentials through the browser, model adapter or
-audit event. Production must inject a real backend client. Missing configuration
+audit event. `X-Namaa-Session` is required even for service calls; optional
+service-token/role headers select the backend identity. Production must inject
+a real backend client. Missing configuration
 or a failed policy/audit service is a denial. `LocalSyntheticPolicy` is suitable
 only for deterministic tests and must never be selected as production fallback.
 
@@ -80,7 +82,13 @@ payload-free audit evidence. These are security boundary tests, not model
 quality measurements. Broader integration coverage for caregiver authority,
 stale graph suppression, worker reauthorization, and central identity
 revocation belongs in Ismail's API integration suite, because those facts are
-minted and enforced there.
+minted and enforced there. The AI package now also exercises the real API
+context, AuthZEN and audit routes, source retrieval, and verified-context scope
+through `tests/integration/test_api_security.py`. It includes regression tests
+for cross-patient Relate hints and subsecond verification timestamps. See the
+[backend bridge guide](BACKEND_BRIDGES.md) for dependencies and opt-in HTTP
+AuthZEN checks. Review, canonical rule and Relate discovery client tests use
+announced contracts; deployed verification awaits the newer backend routes.
 
 ## Pilot requirements still outstanding
 

@@ -1,0 +1,104 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "metric_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Metric Id",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Name",
+      "type": "string"
+    },
+    "unit_of_analysis": {
+      "enum": [
+        "patient_pathway",
+        "case",
+        "task",
+        "event"
+      ],
+      "title": "Unit Of Analysis",
+      "type": "string"
+    },
+    "aggregation": {
+      "enum": [
+        "rate",
+        "median",
+        "count"
+      ],
+      "title": "Aggregation",
+      "type": "string"
+    },
+    "numerator": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Numerator",
+      "type": "string"
+    },
+    "denominator": {
+      "maxLength": 6000,
+      "minLength": 1,
+      "pattern": "\\S",
+      "title": "Denominator",
+      "type": "string"
+    },
+    "exclusions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exclusions",
+      "type": "array"
+    },
+    "reporting_period": {
+      "enum": [
+        "point_in_time",
+        "calendar_month",
+        "cohort_followup"
+      ],
+      "title": "Reporting Period",
+      "type": "string"
+    },
+    "suppression_threshold": {
+      "default": 10,
+      "minimum": 10,
+      "title": "Suppression Threshold",
+      "type": "integer"
+    },
+    "complementary_suppression_required": {
+      "default": true,
+      "title": "Complementary Suppression Required",
+      "type": "boolean"
+    },
+    "synthetic_only": {
+      "default": true,
+      "title": "Synthetic Only",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "metric_id",
+    "version",
+    "name",
+    "unit_of_analysis",
+    "aggregation",
+    "numerator",
+    "denominator",
+    "exclusions",
+    "reporting_period"
+  ],
+  "title": "MetricDefinition",
+  "type": "object"
+}

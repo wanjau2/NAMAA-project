@@ -1,0 +1,9 @@
+{
+  "template_id": "demo-followup-portal-v1",
+  "channel": "portal",
+  "language": "en",
+  "purpose": "follow_up_choice",
+  "text": "Your care team would like to discuss preventive care options with you. You can choose a convenient time, ask for another contact method, or decline further reminders.",
+  "review_status": "human_review_required_before_demo",
+  "simulated_only": true
+}

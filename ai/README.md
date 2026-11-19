@@ -56,12 +56,14 @@ not a successful empty extraction.
 | `src/namaa_ai/adapters.py` | Backend-only hosted adapter and labelled fixture replay |
 | `src/namaa_ai/validation.py` | Exact excerpts, offsets, qualifiers, source conflicts |
 | `src/namaa_ai/review.py` | Accept/correct/reject, authorization callback and version checks |
+| `src/namaa_ai/backend.py` | Session-bound API bridges for nested proposals, review, canonical rules and verified Relate discovery |
 | `src/namaa_ai/fhir.py` | Deterministic reviewed Observation, Condition and FamilyMemberHistory mappings, Provenance and local mapping checks |
 | `src/namaa_ai/rules.py` | Versioned fictional rules over backend resource snapshots |
 | `src/namaa_ai/context.py` | Default-disabled verified-context gate |
 | `src/namaa_ai/context_engineering.py` | FHIR-resource-bounded retrieval, BM25, optional dense adapter, rank fusion and bounded context assembly |
 | `src/namaa_ai/ingestion.py` | Layout/OCR parser protocol and explicitly simulated fixture parser |
 | `src/namaa_ai/relate.py` | Default-disabled Relate candidate verification against current backend context |
+| `src/namaa_ai/engagement.py` | English-only, non-sending demo templates and versioned metric definitions |
 | `src/namaa_ai/evaluation.py` | Field metrics, source/schema validity and latency |
 | `fixtures/notes.json` | 40 labelled notes with 20 development / 20 held-out records |
 | `fixtures/context-queries.json` | Synthetic retrieval fixtures with development / held-out splits |
@@ -72,6 +74,9 @@ Read [contracts and integration](docs/CONTRACTS.md), [endpoint protocol](docs/EN
 [evaluation methodology](docs/EVALUATION.md), and the pre-implementation
 [phased plan](docs/IMPLEMENTATION_PLAN.md). The retrieval implementation and
 Mark/Ismail handoffs are in [context engineering](docs/CONTEXT_ENGINEERING.md).
+The demo copy and metric definitions are documented in
+[engagement and metrics](docs/ENGAGEMENT_AND_METRICS.md); product claims and the
+Alfred demo narrative are in [claims and demo](docs/CLAIMS_AND_DEMO.md).
 
 Authorization boundary and synthetic security tests are documented in
 [security integration](docs/SECURITY.md). Alfred's `SecurityEnforcer` asks
@@ -79,6 +84,16 @@ Ismail's backend for a fresh decision at each boundary; it does not treat local
 roles, prompts, or Relate paths as authority. The local policy adapter is an
 explicit deterministic test fixture only. Backend guest decisions always carry
 `production_authorization=false`.
+
+The [backend bridge guide](docs/BACKEND_BRIDGES.md) covers API integration tests,
+live AuthZEN checks, and the review/rule/Relate clients. The announced newer
+backend routes are absent from this checkout, so their deployed compatibility
+remains pending. HAPI commit is still stubbed.
+
+From the repository root, run the isolated HTTP acceptance checks with
+`ai/.venv/bin/python ai/scripts/check_backend.py --local`. For an existing
+synthetic stack, use `--api-url` instead. The command returns a failing exit code
+for contract failures; see the guide for compact JSON evidence and rule fixtures.
 
 The context assembler is disabled by default and accepts only current,
 backend-verified context envelopes. It ranks source-versioned resources using

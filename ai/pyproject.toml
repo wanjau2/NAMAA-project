@@ -24,3 +24,9 @@ namaa_ai = ["prompts/*.txt"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+  "api_integration: exercises the real FastAPI application with an isolated database",
+  "live_security: checks AuthZEN and audit over HTTP against NAMAA_AI_TEST_API_URL",
+  "live_bridges: checks announced bridges against NAMAA_AI_TEST_API_URL",
+  "live_rule_outcomes: checks all four outcomes using NAMAA_AI_TEST_RULE_CASES backend seed mappings",
+]

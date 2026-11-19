@@ -1,0 +1,9 @@
+{
+  "template_id": "demo-prevention-whatsapp-v1",
+  "channel": "whatsapp",
+  "language": "en",
+  "purpose": "prevention_reminder",
+  "text": "Your care team has a preventive health update for you. Contact them when convenient to discuss your options. You may decline further demo reminders at any time.",
+  "review_status": "human_review_required_before_demo",
+  "simulated_only": true
+}

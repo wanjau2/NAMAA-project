@@ -1,0 +1,2 @@
+# Install alongside the AI package: pip install -e '.[test]' -r requirements-integration.txt
+-r ../api/requirements.txt

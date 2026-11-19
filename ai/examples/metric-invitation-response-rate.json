@@ -1,0 +1,17 @@
+{
+  "metric_id": "invitation-response-rate",
+  "version": "demo-1.0.0",
+  "name": "Recorded response rate to simulated invitations",
+  "unit_of_analysis": "patient_pathway",
+  "aggregation": "rate",
+  "numerator": "Distinct invited patient-pathways with a recorded accept or decline response",
+  "denominator": "Distinct patient-pathways with a simulated invitation in the reporting period",
+  "exclusions": [
+    "undelivered or unsent invitations",
+    "no recorded response"
+  ],
+  "reporting_period": "calendar_month",
+  "suppression_threshold": 10,
+  "complementary_suppression_required": true,
+  "synthetic_only": true
+}

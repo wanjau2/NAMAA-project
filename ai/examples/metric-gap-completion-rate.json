@@ -1,0 +1,18 @@
+{
+  "metric_id": "gap-completion-rate",
+  "version": "demo-1.0.0",
+  "name": "Evidence-backed care-gap completion rate",
+  "unit_of_analysis": "patient_pathway",
+  "aggregation": "rate",
+  "numerator": "Distinct eligible patient-pathways with verified attendance evidence during the reporting period",
+  "denominator": "Distinct eligible patient-pathways with an identified gap at the start of the reporting period",
+  "exclusions": [
+    "needs_review",
+    "not_eligible",
+    "declined without attendance evidence"
+  ],
+  "reporting_period": "cohort_followup",
+  "suppression_threshold": 10,
+  "complementary_suppression_required": true,
+  "synthetic_only": true
+}

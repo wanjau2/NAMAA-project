@@ -2,99 +2,1548 @@
   "notice": "Fictional retrieval benchmark fixtures only; no patient or clinical relevance claims.",
   "queries": [
     {
-      "id": "dev-wcv-date",
+      "id": "dev-wcv-date-01",
       "split": "development",
       "query": "when was the last well-child visit",
-      "relevant": ["DocumentReference/note-wcv-01@v1", "Observation/obs-wcv-date@v2"],
+      "relevant": [
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-wcv-date@v2"
+      ],
       "items": [
-        {"item_id": "wcv-note", "reference": "DocumentReference/note-wcv-01", "version": "v1", "tier": "longitudinal", "text": "The patient attended a well-child visit on 2026-09-01."},
-        {"item_id": "wcv-date", "reference": "Observation/obs-wcv-date", "version": "v2", "tier": "structured", "text": "Reviewed last well-child visit date 2026-09-01."},
-        {"item_id": "adult-screen", "reference": "Observation/obs-screen", "version": "v1", "tier": "structured", "text": "Reported last adult screening on 2026-02-12."},
-        {"item_id": "family-asthma", "reference": "FamilyMemberHistory/fmh-asthma", "version": "v1", "tier": "relational", "text": "Mother has asthma."}
+        {
+          "item_id": "wcv-note",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        },
+        {
+          "item_id": "wcv-date",
+          "reference": "Observation/obs-wcv-date",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reviewed last well-child visit date 2026-09-01."
+        },
+        {
+          "item_id": "adult-screen",
+          "reference": "Observation/obs-screen",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening on 2026-02-12."
+        },
+        {
+          "item_id": "family-asthma",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
       ]
     },
     {
-      "id": "dev-family-history",
+      "id": "dev-wcv-date-02",
+      "split": "development",
+      "query": "date of the most recent well child visit",
+      "relevant": [
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-wcv-date@v2"
+      ],
+      "items": [
+        {
+          "item_id": "wcv-note",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        },
+        {
+          "item_id": "wcv-date",
+          "reference": "Observation/obs-wcv-date",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reviewed last well-child visit date 2026-09-01."
+        },
+        {
+          "item_id": "adult-screen",
+          "reference": "Observation/obs-screen",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening on 2026-02-12."
+        },
+        {
+          "item_id": "family-asthma",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-wcv-date-03",
+      "split": "development",
+      "query": "which source records the last child health check date",
+      "relevant": [
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-wcv-date@v2"
+      ],
+      "items": [
+        {
+          "item_id": "wcv-note",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        },
+        {
+          "item_id": "wcv-date",
+          "reference": "Observation/obs-wcv-date",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reviewed last well-child visit date 2026-09-01."
+        },
+        {
+          "item_id": "adult-screen",
+          "reference": "Observation/obs-screen",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening on 2026-02-12."
+        },
+        {
+          "item_id": "family-asthma",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-wcv-date-04",
+      "split": "development",
+      "query": "find the documented WCV date",
+      "relevant": [
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-wcv-date@v2"
+      ],
+      "items": [
+        {
+          "item_id": "wcv-note",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        },
+        {
+          "item_id": "wcv-date",
+          "reference": "Observation/obs-wcv-date",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reviewed last well-child visit date 2026-09-01."
+        },
+        {
+          "item_id": "adult-screen",
+          "reference": "Observation/obs-screen",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening on 2026-02-12."
+        },
+        {
+          "item_id": "family-asthma",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-wcv-date-05",
+      "split": "development",
+      "query": "retrieve the source for the patient's most recent well-child visit",
+      "relevant": [
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-wcv-date@v2"
+      ],
+      "items": [
+        {
+          "item_id": "wcv-note",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        },
+        {
+          "item_id": "wcv-date",
+          "reference": "Observation/obs-wcv-date",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reviewed last well-child visit date 2026-09-01."
+        },
+        {
+          "item_id": "adult-screen",
+          "reference": "Observation/obs-screen",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening on 2026-02-12."
+        },
+        {
+          "item_id": "family-asthma",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-family-history-01",
       "split": "development",
       "query": "what family history of diabetes is documented",
-      "relevant": ["FamilyMemberHistory/fmh-diabetes@v1"],
+      "relevant": [
+        "FamilyMemberHistory/fmh-diabetes@v1"
+      ],
       "items": [
-        {"item_id": "fmh-diabetes", "reference": "FamilyMemberHistory/fmh-diabetes", "version": "v1", "tier": "relational", "text": "Father has diabetes, documented in family history."},
-        {"item_id": "obs-tobacco", "reference": "Observation/obs-tobacco", "version": "v1", "tier": "structured", "text": "Patient denies tobacco use."},
-        {"item_id": "care-plan", "reference": "CarePlan/cp-prevention", "version": "v3", "tier": "structured", "text": "Active preventive care plan."},
-        {"item_id": "note-wcv", "reference": "DocumentReference/note-wcv-01", "version": "v1", "tier": "longitudinal", "text": "The patient attended a well-child visit on 2026-09-01."}
+        {
+          "item_id": "fmh-diabetes",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes, documented in family history."
+        },
+        {
+          "item_id": "obs-tobacco",
+          "reference": "Observation/obs-tobacco",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Patient denies tobacco use."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan."
+        },
+        {
+          "item_id": "note-wcv",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        }
       ]
     },
     {
-      "id": "dev-care-plan",
+      "id": "dev-family-history-02",
+      "split": "development",
+      "query": "show the father's recorded diabetes history",
+      "relevant": [
+        "FamilyMemberHistory/fmh-diabetes@v1"
+      ],
+      "items": [
+        {
+          "item_id": "fmh-diabetes",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes, documented in family history."
+        },
+        {
+          "item_id": "obs-tobacco",
+          "reference": "Observation/obs-tobacco",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Patient denies tobacco use."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan."
+        },
+        {
+          "item_id": "note-wcv",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        }
+      ]
+    },
+    {
+      "id": "dev-family-history-03",
+      "split": "development",
+      "query": "find source evidence of a relative with diabetes",
+      "relevant": [
+        "FamilyMemberHistory/fmh-diabetes@v1"
+      ],
+      "items": [
+        {
+          "item_id": "fmh-diabetes",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes, documented in family history."
+        },
+        {
+          "item_id": "obs-tobacco",
+          "reference": "Observation/obs-tobacco",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Patient denies tobacco use."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan."
+        },
+        {
+          "item_id": "note-wcv",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        }
+      ]
+    },
+    {
+      "id": "dev-family-history-04",
+      "split": "development",
+      "query": "which family member history mentions diabetes",
+      "relevant": [
+        "FamilyMemberHistory/fmh-diabetes@v1"
+      ],
+      "items": [
+        {
+          "item_id": "fmh-diabetes",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes, documented in family history."
+        },
+        {
+          "item_id": "obs-tobacco",
+          "reference": "Observation/obs-tobacco",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Patient denies tobacco use."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan."
+        },
+        {
+          "item_id": "note-wcv",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        }
+      ]
+    },
+    {
+      "id": "dev-family-history-05",
+      "split": "development",
+      "query": "retrieve the documented paternal condition",
+      "relevant": [
+        "FamilyMemberHistory/fmh-diabetes@v1"
+      ],
+      "items": [
+        {
+          "item_id": "fmh-diabetes",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes, documented in family history."
+        },
+        {
+          "item_id": "obs-tobacco",
+          "reference": "Observation/obs-tobacco",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Patient denies tobacco use."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan."
+        },
+        {
+          "item_id": "note-wcv",
+          "reference": "DocumentReference/note-wcv-01",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient attended a well-child visit on 2026-09-01."
+        }
+      ]
+    },
+    {
+      "id": "dev-care-plan-01",
       "split": "development",
       "query": "current care plan and assigned preventive follow-up",
-      "relevant": ["CarePlan/cp-prevention@v3", "Task/task-followup@v2"],
+      "relevant": [
+        "CarePlan/cp-prevention@v3",
+        "Task/task-followup@v2"
+      ],
       "items": [
-        {"item_id": "cp", "reference": "CarePlan/cp-prevention", "version": "v3", "tier": "structured", "text": "Active preventive care plan for adult screening."},
-        {"item_id": "task", "reference": "Task/task-followup", "version": "v2", "tier": "structured", "text": "Assigned follow-up task for the screening pathway."},
-        {"item_id": "note", "reference": "DocumentReference/note-history", "version": "v1", "tier": "longitudinal", "text": "Historical visit note with no current plan details."},
-        {"item_id": "fmh", "reference": "FamilyMemberHistory/fmh-asthma", "version": "v1", "tier": "relational", "text": "Mother has asthma."}
+        {
+          "item_id": "cp",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan for adult screening."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-followup",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Assigned follow-up task for the screening pathway."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-history",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Historical visit note with no current plan details."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
       ]
     },
     {
-      "id": "dev-source-conflict",
+      "id": "dev-care-plan-02",
+      "split": "development",
+      "query": "show the active prevention plan and follow-up task",
+      "relevant": [
+        "CarePlan/cp-prevention@v3",
+        "Task/task-followup@v2"
+      ],
+      "items": [
+        {
+          "item_id": "cp",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan for adult screening."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-followup",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Assigned follow-up task for the screening pathway."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-history",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Historical visit note with no current plan details."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-care-plan-03",
+      "split": "development",
+      "query": "find current plan and assigned screening work",
+      "relevant": [
+        "CarePlan/cp-prevention@v3",
+        "Task/task-followup@v2"
+      ],
+      "items": [
+        {
+          "item_id": "cp",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan for adult screening."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-followup",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Assigned follow-up task for the screening pathway."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-history",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Historical visit note with no current plan details."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-care-plan-04",
+      "split": "development",
+      "query": "which task is assigned for preventive follow-up",
+      "relevant": [
+        "CarePlan/cp-prevention@v3",
+        "Task/task-followup@v2"
+      ],
+      "items": [
+        {
+          "item_id": "cp",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan for adult screening."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-followup",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Assigned follow-up task for the screening pathway."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-history",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Historical visit note with no current plan details."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-care-plan-05",
+      "split": "development",
+      "query": "retrieve current care plan status and owner task",
+      "relevant": [
+        "CarePlan/cp-prevention@v3",
+        "Task/task-followup@v2"
+      ],
+      "items": [
+        {
+          "item_id": "cp",
+          "reference": "CarePlan/cp-prevention",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Active preventive care plan for adult screening."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-followup",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Assigned follow-up task for the screening pathway."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-history",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Historical visit note with no current plan details."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-asthma",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Mother has asthma."
+        }
+      ]
+    },
+    {
+      "id": "dev-source-conflict-01",
       "split": "development",
       "query": "conflicting documented last adult screening dates",
-      "relevant": ["Observation/obs-screen-a@v1", "Observation/obs-screen-b@v2"],
+      "relevant": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
       "items": [
-        {"item_id": "screen-a", "reference": "Observation/obs-screen-a", "version": "v1", "tier": "structured", "text": "Reported last adult screening date is 2026-02-12."},
-        {"item_id": "screen-b", "reference": "Observation/obs-screen-b", "version": "v2", "tier": "structured", "text": "Reported last adult screening date is 2025-11-03."},
-        {"item_id": "note", "reference": "DocumentReference/note-smoking", "version": "v1", "tier": "longitudinal", "text": "The patient denies tobacco use."},
-        {"item_id": "fmh", "reference": "FamilyMemberHistory/fmh-diabetes", "version": "v1", "tier": "relational", "text": "Father has diabetes."}
+        {
+          "item_id": "screen-a",
+          "reference": "Observation/obs-screen-a",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2026-02-12."
+        },
+        {
+          "item_id": "screen-b",
+          "reference": "Observation/obs-screen-b",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2025-11-03."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-smoking",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient denies tobacco use."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
       ]
     },
     {
-      "id": "heldout-tobacco",
+      "id": "dev-source-conflict-02",
+      "split": "development",
+      "query": "show both source versions with different screening dates",
+      "relevant": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "items": [
+        {
+          "item_id": "screen-a",
+          "reference": "Observation/obs-screen-a",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2026-02-12."
+        },
+        {
+          "item_id": "screen-b",
+          "reference": "Observation/obs-screen-b",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2025-11-03."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-smoking",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient denies tobacco use."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "dev-source-conflict-03",
+      "split": "development",
+      "query": "find inconsistent history for the last adult screen",
+      "relevant": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "items": [
+        {
+          "item_id": "screen-a",
+          "reference": "Observation/obs-screen-a",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2026-02-12."
+        },
+        {
+          "item_id": "screen-b",
+          "reference": "Observation/obs-screen-b",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2025-11-03."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-smoking",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient denies tobacco use."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "dev-source-conflict-04",
+      "split": "development",
+      "query": "which records report conflicting screening dates",
+      "relevant": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "items": [
+        {
+          "item_id": "screen-a",
+          "reference": "Observation/obs-screen-a",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2026-02-12."
+        },
+        {
+          "item_id": "screen-b",
+          "reference": "Observation/obs-screen-b",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2025-11-03."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-smoking",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient denies tobacco use."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "dev-source-conflict-05",
+      "split": "development",
+      "query": "retrieve contradictory adult screening history sources",
+      "relevant": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "items": [
+        {
+          "item_id": "screen-a",
+          "reference": "Observation/obs-screen-a",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2026-02-12."
+        },
+        {
+          "item_id": "screen-b",
+          "reference": "Observation/obs-screen-b",
+          "version": "v2",
+          "tier": "structured",
+          "text": "Reported last adult screening date is 2025-11-03."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-smoking",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The patient denies tobacco use."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "heldout-tobacco-01",
       "split": "held_out",
       "query": "patient report about smoking tobacco or cigarettes",
-      "relevant": ["DocumentReference/note-tobacco@v2", "Observation/obs-tobacco@v3"],
+      "relevant": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
       "items": [
-        {"item_id": "tobacco-note", "reference": "DocumentReference/note-tobacco", "version": "v2", "tier": "longitudinal", "text": "The patient denies smoking cigarettes or using tobacco."},
-        {"item_id": "tobacco-obs", "reference": "Observation/obs-tobacco", "version": "v3", "tier": "structured", "text": "Reviewed tobacco use assertion: absent."},
-        {"item_id": "care-plan", "reference": "CarePlan/cp-adult", "version": "v1", "tier": "structured", "text": "Active adult screening plan."},
-        {"item_id": "fmh", "reference": "FamilyMemberHistory/fmh-heart", "version": "v1", "tier": "relational", "text": "Sibling has a documented heart condition."}
+        {
+          "item_id": "tobacco-note",
+          "reference": "DocumentReference/note-tobacco",
+          "version": "v2",
+          "tier": "longitudinal",
+          "text": "The patient denies smoking cigarettes or using tobacco."
+        },
+        {
+          "item_id": "tobacco-obs",
+          "reference": "Observation/obs-tobacco",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Reviewed tobacco use assertion: absent."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-adult",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Active adult screening plan."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
       ]
     },
     {
-      "id": "heldout-caregiver-concern",
+      "id": "heldout-tobacco-02",
+      "split": "held_out",
+      "query": "find the patient's statement about cigarette use",
+      "relevant": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "items": [
+        {
+          "item_id": "tobacco-note",
+          "reference": "DocumentReference/note-tobacco",
+          "version": "v2",
+          "tier": "longitudinal",
+          "text": "The patient denies smoking cigarettes or using tobacco."
+        },
+        {
+          "item_id": "tobacco-obs",
+          "reference": "Observation/obs-tobacco",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Reviewed tobacco use assertion: absent."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-adult",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Active adult screening plan."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-tobacco-03",
+      "split": "held_out",
+      "query": "retrieve evidence about tobacco use or smoking",
+      "relevant": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "items": [
+        {
+          "item_id": "tobacco-note",
+          "reference": "DocumentReference/note-tobacco",
+          "version": "v2",
+          "tier": "longitudinal",
+          "text": "The patient denies smoking cigarettes or using tobacco."
+        },
+        {
+          "item_id": "tobacco-obs",
+          "reference": "Observation/obs-tobacco",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Reviewed tobacco use assertion: absent."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-adult",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Active adult screening plan."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-tobacco-04",
+      "split": "held_out",
+      "query": "which note and observation describe tobacco history",
+      "relevant": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "items": [
+        {
+          "item_id": "tobacco-note",
+          "reference": "DocumentReference/note-tobacco",
+          "version": "v2",
+          "tier": "longitudinal",
+          "text": "The patient denies smoking cigarettes or using tobacco."
+        },
+        {
+          "item_id": "tobacco-obs",
+          "reference": "Observation/obs-tobacco",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Reviewed tobacco use assertion: absent."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-adult",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Active adult screening plan."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-tobacco-05",
+      "split": "held_out",
+      "query": "show the source for the patient's smoking assertion",
+      "relevant": [
+        "DocumentReference/note-tobacco@v2",
+        "Observation/obs-tobacco@v3"
+      ],
+      "items": [
+        {
+          "item_id": "tobacco-note",
+          "reference": "DocumentReference/note-tobacco",
+          "version": "v2",
+          "tier": "longitudinal",
+          "text": "The patient denies smoking cigarettes or using tobacco."
+        },
+        {
+          "item_id": "tobacco-obs",
+          "reference": "Observation/obs-tobacco",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Reviewed tobacco use assertion: absent."
+        },
+        {
+          "item_id": "care-plan",
+          "reference": "CarePlan/cp-adult",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Active adult screening plan."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-caregiver-concern-01",
       "split": "held_out",
       "query": "caregiver concern or question about a child's preventive visit",
-      "relevant": ["DocumentReference/note-caregiver@v1"],
+      "relevant": [
+        "DocumentReference/note-caregiver@v1"
+      ],
       "items": [
-        {"item_id": "concern-note", "reference": "DocumentReference/note-caregiver", "version": "v1", "tier": "longitudinal", "text": "The caregiver is worried and has a question about the child's well-child visit."},
-        {"item_id": "visit", "reference": "Observation/obs-visit", "version": "v1", "tier": "structured", "text": "Reported last well-child visit."},
-        {"item_id": "task", "reference": "Task/task-outreach", "version": "v1", "tier": "structured", "text": "Follow-up task for family outreach."},
-        {"item_id": "fmh", "reference": "FamilyMemberHistory/fmh-diabetes", "version": "v1", "tier": "relational", "text": "Father has diabetes."}
+        {
+          "item_id": "concern-note",
+          "reference": "DocumentReference/note-caregiver",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The caregiver is worried and has a question about the child's well-child visit."
+        },
+        {
+          "item_id": "visit",
+          "reference": "Observation/obs-visit",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last well-child visit."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-outreach",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Follow-up task for family outreach."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
       ]
     },
     {
-      "id": "heldout-booking-evidence",
+      "id": "heldout-caregiver-concern-02",
+      "split": "held_out",
+      "query": "find the caregiver's question about the child's checkup",
+      "relevant": [
+        "DocumentReference/note-caregiver@v1"
+      ],
+      "items": [
+        {
+          "item_id": "concern-note",
+          "reference": "DocumentReference/note-caregiver",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The caregiver is worried and has a question about the child's well-child visit."
+        },
+        {
+          "item_id": "visit",
+          "reference": "Observation/obs-visit",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last well-child visit."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-outreach",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Follow-up task for family outreach."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "heldout-caregiver-concern-03",
+      "split": "held_out",
+      "query": "retrieve the source describing caregiver worry about prevention",
+      "relevant": [
+        "DocumentReference/note-caregiver@v1"
+      ],
+      "items": [
+        {
+          "item_id": "concern-note",
+          "reference": "DocumentReference/note-caregiver",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The caregiver is worried and has a question about the child's well-child visit."
+        },
+        {
+          "item_id": "visit",
+          "reference": "Observation/obs-visit",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last well-child visit."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-outreach",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Follow-up task for family outreach."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "heldout-caregiver-concern-04",
+      "split": "held_out",
+      "query": "which note records a family concern about the well-child visit",
+      "relevant": [
+        "DocumentReference/note-caregiver@v1"
+      ],
+      "items": [
+        {
+          "item_id": "concern-note",
+          "reference": "DocumentReference/note-caregiver",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The caregiver is worried and has a question about the child's well-child visit."
+        },
+        {
+          "item_id": "visit",
+          "reference": "Observation/obs-visit",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last well-child visit."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-outreach",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Follow-up task for family outreach."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "heldout-caregiver-concern-05",
+      "split": "held_out",
+      "query": "show caregiver feedback related to the child's preventive care",
+      "relevant": [
+        "DocumentReference/note-caregiver@v1"
+      ],
+      "items": [
+        {
+          "item_id": "concern-note",
+          "reference": "DocumentReference/note-caregiver",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "The caregiver is worried and has a question about the child's well-child visit."
+        },
+        {
+          "item_id": "visit",
+          "reference": "Observation/obs-visit",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Reported last well-child visit."
+        },
+        {
+          "item_id": "task",
+          "reference": "Task/task-outreach",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Follow-up task for family outreach."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-diabetes",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Father has diabetes."
+        }
+      ]
+    },
+    {
+      "id": "heldout-booking-evidence-01",
       "split": "held_out",
       "query": "verified procedure attendance evidence for the preventive service",
-      "relevant": ["Procedure/procedure-preventive@v1", "DiagnosticReport/report-attendance@v2"],
+      "relevant": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2"
+      ],
       "items": [
-        {"item_id": "procedure", "reference": "Procedure/procedure-preventive", "version": "v1", "tier": "structured", "text": "Verified Procedure evidence for completed preventive care."},
-        {"item_id": "report", "reference": "DiagnosticReport/report-attendance", "version": "v2", "tier": "structured", "text": "DiagnosticReport records attendance evidence for the service."},
-        {"item_id": "booking", "reference": "Task/task-booking", "version": "v1", "tier": "structured", "text": "Appointment booking task; booking is not attendance evidence."},
-        {"item_id": "note", "reference": "DocumentReference/note-screening", "version": "v1", "tier": "longitudinal", "text": "Note mentions a screening appointment."}
+        {
+          "item_id": "procedure",
+          "reference": "Procedure/procedure-preventive",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Verified Procedure evidence for completed preventive care."
+        },
+        {
+          "item_id": "report",
+          "reference": "DiagnosticReport/report-attendance",
+          "version": "v2",
+          "tier": "structured",
+          "text": "DiagnosticReport records attendance evidence for the service."
+        },
+        {
+          "item_id": "booking",
+          "reference": "Task/task-booking",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Appointment booking task; booking is not attendance evidence."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-screening",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Note mentions a screening appointment."
+        }
       ]
     },
     {
-      "id": "heldout-empty-scope",
+      "id": "heldout-booking-evidence-02",
+      "split": "held_out",
+      "query": "find the completed procedure record for attendance",
+      "relevant": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2"
+      ],
+      "items": [
+        {
+          "item_id": "procedure",
+          "reference": "Procedure/procedure-preventive",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Verified Procedure evidence for completed preventive care."
+        },
+        {
+          "item_id": "report",
+          "reference": "DiagnosticReport/report-attendance",
+          "version": "v2",
+          "tier": "structured",
+          "text": "DiagnosticReport records attendance evidence for the service."
+        },
+        {
+          "item_id": "booking",
+          "reference": "Task/task-booking",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Appointment booking task; booking is not attendance evidence."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-screening",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Note mentions a screening appointment."
+        }
+      ]
+    },
+    {
+      "id": "heldout-booking-evidence-03",
+      "split": "held_out",
+      "query": "retrieve diagnostic evidence that the patient attended",
+      "relevant": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2"
+      ],
+      "items": [
+        {
+          "item_id": "procedure",
+          "reference": "Procedure/procedure-preventive",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Verified Procedure evidence for completed preventive care."
+        },
+        {
+          "item_id": "report",
+          "reference": "DiagnosticReport/report-attendance",
+          "version": "v2",
+          "tier": "structured",
+          "text": "DiagnosticReport records attendance evidence for the service."
+        },
+        {
+          "item_id": "booking",
+          "reference": "Task/task-booking",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Appointment booking task; booking is not attendance evidence."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-screening",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Note mentions a screening appointment."
+        }
+      ]
+    },
+    {
+      "id": "heldout-booking-evidence-04",
+      "split": "held_out",
+      "query": "which source proves attendance rather than appointment booking",
+      "relevant": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2"
+      ],
+      "items": [
+        {
+          "item_id": "procedure",
+          "reference": "Procedure/procedure-preventive",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Verified Procedure evidence for completed preventive care."
+        },
+        {
+          "item_id": "report",
+          "reference": "DiagnosticReport/report-attendance",
+          "version": "v2",
+          "tier": "structured",
+          "text": "DiagnosticReport records attendance evidence for the service."
+        },
+        {
+          "item_id": "booking",
+          "reference": "Task/task-booking",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Appointment booking task; booking is not attendance evidence."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-screening",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Note mentions a screening appointment."
+        }
+      ]
+    },
+    {
+      "id": "heldout-booking-evidence-05",
+      "split": "held_out",
+      "query": "show verified service completion evidence",
+      "relevant": [
+        "Procedure/procedure-preventive@v1",
+        "DiagnosticReport/report-attendance@v2"
+      ],
+      "items": [
+        {
+          "item_id": "procedure",
+          "reference": "Procedure/procedure-preventive",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Verified Procedure evidence for completed preventive care."
+        },
+        {
+          "item_id": "report",
+          "reference": "DiagnosticReport/report-attendance",
+          "version": "v2",
+          "tier": "structured",
+          "text": "DiagnosticReport records attendance evidence for the service."
+        },
+        {
+          "item_id": "booking",
+          "reference": "Task/task-booking",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Appointment booking task; booking is not attendance evidence."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-screening",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "Note mentions a screening appointment."
+        }
+      ]
+    },
+    {
+      "id": "heldout-empty-scope-01",
       "split": "held_out",
       "query": "current active adult screening service request",
-      "relevant": ["ServiceRequest/sr-adult-screen@v3"],
+      "relevant": [
+        "ServiceRequest/sr-adult-screen@v3"
+      ],
       "items": [
-        {"item_id": "sr", "reference": "ServiceRequest/sr-adult-screen", "version": "v3", "tier": "structured", "text": "Current authorized adult screening service request."},
-        {"item_id": "old-sr", "reference": "ServiceRequest/sr-old", "version": "v1", "tier": "structured", "text": "Cancelled historical service request."},
-        {"item_id": "note", "reference": "DocumentReference/note-prevention", "version": "v1", "tier": "longitudinal", "text": "General note about prevention planning."},
-        {"item_id": "fmh", "reference": "FamilyMemberHistory/fmh-heart", "version": "v1", "tier": "relational", "text": "Sibling has a documented heart condition."}
+        {
+          "item_id": "sr",
+          "reference": "ServiceRequest/sr-adult-screen",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Current authorized adult screening service request."
+        },
+        {
+          "item_id": "old-sr",
+          "reference": "ServiceRequest/sr-old",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Cancelled historical service request."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-prevention",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "General note about prevention planning."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-empty-scope-02",
+      "split": "held_out",
+      "query": "find the current service request for adult screening",
+      "relevant": [
+        "ServiceRequest/sr-adult-screen@v3"
+      ],
+      "items": [
+        {
+          "item_id": "sr",
+          "reference": "ServiceRequest/sr-adult-screen",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Current authorized adult screening service request."
+        },
+        {
+          "item_id": "old-sr",
+          "reference": "ServiceRequest/sr-old",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Cancelled historical service request."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-prevention",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "General note about prevention planning."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-empty-scope-03",
+      "split": "held_out",
+      "query": "retrieve active preventive screening order request",
+      "relevant": [
+        "ServiceRequest/sr-adult-screen@v3"
+      ],
+      "items": [
+        {
+          "item_id": "sr",
+          "reference": "ServiceRequest/sr-adult-screen",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Current authorized adult screening service request."
+        },
+        {
+          "item_id": "old-sr",
+          "reference": "ServiceRequest/sr-old",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Cancelled historical service request."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-prevention",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "General note about prevention planning."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-empty-scope-04",
+      "split": "held_out",
+      "query": "which current request supports the adult screening pathway",
+      "relevant": [
+        "ServiceRequest/sr-adult-screen@v3"
+      ],
+      "items": [
+        {
+          "item_id": "sr",
+          "reference": "ServiceRequest/sr-adult-screen",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Current authorized adult screening service request."
+        },
+        {
+          "item_id": "old-sr",
+          "reference": "ServiceRequest/sr-old",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Cancelled historical service request."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-prevention",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "General note about prevention planning."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
+      ]
+    },
+    {
+      "id": "heldout-empty-scope-05",
+      "split": "held_out",
+      "query": "show the authorized active screening service request",
+      "relevant": [
+        "ServiceRequest/sr-adult-screen@v3"
+      ],
+      "items": [
+        {
+          "item_id": "sr",
+          "reference": "ServiceRequest/sr-adult-screen",
+          "version": "v3",
+          "tier": "structured",
+          "text": "Current authorized adult screening service request."
+        },
+        {
+          "item_id": "old-sr",
+          "reference": "ServiceRequest/sr-old",
+          "version": "v1",
+          "tier": "structured",
+          "text": "Cancelled historical service request."
+        },
+        {
+          "item_id": "note",
+          "reference": "DocumentReference/note-prevention",
+          "version": "v1",
+          "tier": "longitudinal",
+          "text": "General note about prevention planning."
+        },
+        {
+          "item_id": "fmh",
+          "reference": "FamilyMemberHistory/fmh-heart",
+          "version": "v1",
+          "tier": "relational",
+          "text": "Sibling has a documented heart condition."
+        }
       ]
     }
   ]

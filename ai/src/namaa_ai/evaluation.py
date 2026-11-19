@@ -97,6 +97,8 @@ def evaluate_context_retrieval(cases: list[dict], retriever=None, *, k: int = 3)
     n = len(cases)
     return {"notice": "Synthetic retrieval fixture metrics; not clinical relevance or model-quality results.",
             "simulated": True, "sample_size_queries": n, "k": k,
+            "splits": dict(Counter(case.get("split", "unspecified") for case in cases)),
+            "sample_size_scenarios": len({case["id"].rsplit("-", 1)[0] for case in cases}),
             "hit_rate_at_k": hits / n if n else None,
             "mean_recall_at_k": recall_sum / n if n else None,
             "mean_reciprocal_rank": reciprocal_rank_sum / n if n else None,

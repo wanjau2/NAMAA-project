@@ -156,10 +156,12 @@ def test_context_evaluation_reports_split_and_sample_denominators():
     fixtures = json.loads((Path(__file__).parents[1] / "fixtures/context-queries.json").read_text())["queries"]
     dev = evaluate_context_retrieval([q for q in fixtures if q["split"] == "development"])
     held_out = evaluate_context_retrieval([q for q in fixtures if q["split"] == "held_out"])
-    assert dev["simulated"] and dev["sample_size_queries"] == 4
-    assert held_out["sample_size_queries"] == 4
+    assert dev["simulated"] and dev["sample_size_queries"] == 20
+    assert held_out["sample_size_queries"] == 20
     assert "not clinical relevance" in dev["notice"]
     assert 0 <= dev["mean_recall_at_k"] <= 1
+    assert dev["splits"] == {"development": 20}
+    assert held_out["splits"] == {"held_out": 20}
 
 
 def test_vertical_slice():

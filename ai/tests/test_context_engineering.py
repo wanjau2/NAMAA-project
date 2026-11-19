@@ -208,3 +208,16 @@ def test_layout_parser_contract_preserves_pages_and_labels_mock_ocr():
     with pytest.raises(ValueError, match="fixture_not_found"):
         parser.parse(source="DocumentReference/other", source_version="v3",
                      media_type="application/pdf", payload=b"synthetic")
+
+
+def test_context_query_fixture_has_balanced_unique_development_and_heldout():
+    import json
+    from pathlib import Path
+
+    cases = json.loads((Path(__file__).parents[1] / "fixtures/context-queries.json").read_text())["queries"]
+    assert len(cases) == 40
+    assert len({case["id"] for case in cases}) == 40
+    assert len({case["query"] for case in cases}) == 40
+    assert {split: sum(case["split"] == split for case in cases) for split in ("development", "held_out")} == {
+        "development": 20, "held_out": 20,
+    }

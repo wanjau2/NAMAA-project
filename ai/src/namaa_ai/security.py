@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -80,6 +80,41 @@ class BackendSecurityClient(Protocol):
     async def emit(self, event: "AuditEvent") -> None: ...
 
 
+def encode_authzen_request(context: TrustedContext, request: PolicyRequest) -> dict[str, Any]:
+    """Encode the backend's AuthZEN adapter without substituting the subject."""
+    if request.subject_id != context.user_id:
+        raise ValueError("subject_principal_mismatch")
+    return {"subject": {"type": "user", "id": request.subject_id},
+            "action": {"name": request.action},
+            "resource": {"type": request.resource_type, "id": request.resource_id,
+                         "workspace_id": context.workspace_id, "patient_id": request.patient_id},
+            "context": {"purpose_of_use": context.purpose_of_use,
+                        "model_destination": context.approved_model_destination,
+                        "request_id": context.request_id, "patient_id": request.patient_id}}
+
+
+def decode_authzen_response(data: Any) -> PolicyDecision:
+    """Fail closed on malformed, contradictory, or non-synthetic responses."""
+    invalid = PolicyDecision(outcome="indeterminate", reason_code="pdp_invalid_decision")
+    if type(data) is not dict or type(data.get("decision")) is not bool:
+        return invalid
+    meta = data.get("context")
+    if (type(meta) is not dict or
+            any(type(meta.get(key)) is not str or not meta[key].strip()
+                for key in ("decision_id", "policy_revision", "permission_revision", "reason_code")) or
+            meta.get("policy_adapter") != "synthetic_guest_v1" or
+            meta.get("production_authorization") is not False):
+        return invalid
+    value = meta.get("decision_value")
+    if value not in ("Permit", "Deny", "Indeterminate") or data["decision"] != (value == "Permit"):
+        return invalid
+    return PolicyDecision(
+        outcome={"Permit": "allow", "Deny": "deny", "Indeterminate": "indeterminate"}[value],
+        **{key: meta[key] for key in ("decision_id", "policy_revision", "permission_revision",
+                                     "policy_adapter", "production_authorization", "reason_code")},
+    )
+
+
 class BackendHttpClient:
     """Bridge to the API's context, PDP, and protected audit endpoints.
 
@@ -88,13 +123,17 @@ class BackendHttpClient:
     """
     def __init__(self, api_base_url: str, headers: dict[str, str], *, transport=None):
         url = urlsplit(api_base_url)
-        if url.scheme != "https" and url.hostname not in {"localhost", "127.0.0.1", "testserver"}:
+        if url.scheme not in {"http", "https"} or (url.scheme != "https" and url.hostname not in {
+                "localhost", "127.0.0.1", "testserver"}):
             raise ValueError("backend_api_url_must_use_https")
         if not url.netloc or url.username or url.password or url.query or url.fragment:
             raise ValueError("invalid_backend_api_url")
         if any(k.lower() in {"authorization", "x-namaa-service-token"} and not v for k, v in headers.items()):
             raise ValueError("invalid_backend_auth_header")
-        self.base, self.headers, self.transport = api_base_url.rstrip("/"), dict(headers), transport
+        self.headers = httpx.Headers(headers)
+        if not self.headers.get("X-Namaa-Session", "").strip():
+            raise ValueError("backend_session_required")
+        self.base, self.transport = api_base_url.rstrip("/"), transport
 
     @classmethod
     def from_env(cls, headers: dict[str, str], *, transport=None):
@@ -107,41 +146,28 @@ class BackendHttpClient:
         return httpx.AsyncClient(transport=self.transport, timeout=httpx.Timeout(5),
                                  follow_redirects=False, trust_env=False)
 
-    async def trusted_context(self) -> TrustedContext:
+    async def _request(self, method: str, path: str, *, request_id: str | None = None,
+                       **kwargs) -> httpx.Response:
+        headers = self.headers.copy()
+        if request_id is not None:
+            headers["X-Namaa-Request-Id"] = request_id
         async with await self._client() as client:
-            response = await client.get(self.base + "/api/v1/security/context", headers=self.headers)
+            response = await client.request(method, self.base + path, headers=headers, **kwargs)
         response.raise_for_status()
+        return response
+
+    async def trusted_context(self) -> TrustedContext:
+        response = await self._request("GET", "/api/v1/security/context")
         return TrustedContext.from_backend(response.json())
 
     async def decide(self, *, context: TrustedContext, request: PolicyRequest) -> PolicyDecision:
-        body = {"subject": {"type": "user", "id": context.user_id},
-                "action": {"name": request.action},
-                "resource": {"type": request.resource_type, "id": request.resource_id,
-                             "workspace_id": context.workspace_id, "patient_id": request.patient_id},
-                "context": {"purpose_of_use": context.purpose_of_use,
-                            "model_destination": context.approved_model_destination,
-                            "request_id": context.request_id, "patient_id": request.patient_id}}
         try:
-            async with await self._client() as client:
-                response = await client.post(self.base + "/api/v1/authz/evaluation", json=body,
-                                             headers=self.headers)
+            body = encode_authzen_request(context, request)
+            response = await self._request("POST", "/api/v1/authz/evaluation", json=body,
+                                           request_id=context.request_id)
             if response.status_code != 200:
                 return PolicyDecision(outcome="indeterminate", reason_code="pdp_unavailable")
-            data = response.json()
-            meta = data.get("context") if type(data) is dict else None
-            if (type(data) is not dict or type(data.get("decision")) is not bool or
-                    type(meta) is not dict or not meta.get("decision_id") or
-                    meta.get("policy_adapter") != "synthetic_guest_v1" or
-                    meta.get("production_authorization") is not False):
-                return PolicyDecision(outcome="indeterminate", reason_code="pdp_invalid_decision")
-            allowed = data["decision"] and meta.get("decision_value") == "Permit"
-            outcome = "allow" if allowed else "deny"
-            return PolicyDecision(outcome=outcome, decision_id=meta["decision_id"],
-                                  policy_revision=meta.get("policy_revision"),
-                                  permission_revision=meta.get("permission_revision"),
-                                  policy_adapter=meta.get("policy_adapter"),
-                                  production_authorization=meta.get("production_authorization"),
-                                  reason_code=meta.get("reason_code") or "pdp_denied")
+            return decode_authzen_response(response.json())
         except (httpx.HTTPError, ValueError, KeyError):
             return PolicyDecision(outcome="indeterminate", reason_code="pdp_unavailable")
 
@@ -156,10 +182,7 @@ class BackendHttpClient:
                 "detail": {"initiating_user": event.initiating_user,
                            "executing_service": event.executing_service,
                            "permission_revision": event.permission_revision}}
-        async with await self._client() as client:
-            response = await client.post(self.base + "/api/v1/audit/events", json=body,
-                                         headers=self.headers)
-        response.raise_for_status()
+        await self._request("POST", "/api/v1/audit/events", json=body, request_id=event.request_id)
 
 
 @dataclass(frozen=True)
@@ -216,7 +239,7 @@ class AuditEvent(BaseModel):
     permission_revision: str
     decision_id: str | None = None
     reason_code: str
-    source_versions: tuple[str, ...] = ()
+    source_versions: dict[str, str] = Field(default_factory=dict)
     model_revision: str | None = None
     prompt_version: str | None = None
     reviewer_reference: str | None = None
@@ -235,7 +258,7 @@ class SecurityEnforcer:
 
     async def require(self, *, context: TrustedContext, action: str, resource_type: str,
                       resource_id: str, patient_id: str, job_id: str | None = None,
-                      source_versions: tuple[str, ...] = (), model_revision: str | None = None,
+                      source_versions: dict[str, str] | None = None, model_revision: str | None = None,
                       prompt_version: str | None = None, reviewer_reference: str | None = None) -> PolicyDecision:
         decision: PolicyDecision
         valid = (context.membership_active is True and patient_id in context.patient_ids and
@@ -265,7 +288,7 @@ class SecurityEnforcer:
                            purpose_of_use=context.purpose_of_use, outcome=outcome,
                            policy_revision=context.policy_revision, permission_revision=context.permission_revision,
                            decision_id=decision.decision_id, reason_code=decision.reason_code,
-                           source_versions=source_versions, model_revision=model_revision,
+                           source_versions=source_versions or {}, model_revision=model_revision,
                            prompt_version=prompt_version, reviewer_reference=reviewer_reference)
         try:
             await self.audit.emit(event)
@@ -291,12 +314,13 @@ class AuthorizedExtractionPipeline:
             raise AuthorizationDenied()
         await self.enforcer.require(context=context, action="model.dispatch", resource_type="DocumentReference",
                                     resource_id=source_id, patient_id=patient_id, job_id=job_id,
-                                    source_versions=(request.source_version,))
+                                    source_versions={f"DocumentReference/{source_id}": request.source_version})
         # Dispatch is the irreversibility boundary: a later revocation cannot recall bytes already sent.
         result = await self.adapter.extract(request)
         await self.enforcer.require(context=context, action="proposal.disclose", resource_type="DocumentReference",
                                     resource_id=source_id, patient_id=patient_id, job_id=job_id,
-                                    source_versions=(request.source_version,), model_revision=result.model.model_revision,
+                                    source_versions={f"DocumentReference/{source_id}": request.source_version},
+                                    model_revision=result.model.model_revision,
                                     prompt_version=result.model.prompt_version)
         return result
 
@@ -306,7 +330,7 @@ class AuthorizedExtractionPipeline:
         return await self.enforcer.require(context=context,
             action="excerpt.export" if exporting else "excerpt.display",
             resource_type="DocumentReference", resource_id=source_id, patient_id=patient_id,
-            source_versions=(source_version,))
+            source_versions={f"DocumentReference/{source_id}": source_version})
 
     async def retrieve_verified_context(self, *, context: TrustedContext, patient_id: str,
                                         patient_reference: str, fetch, job_id: str | None = None):
@@ -327,7 +351,7 @@ async def apply_review_authorized(*, enforcer: SecurityEnforcer, context: Truste
     await enforcer.require(context=context, action="review.apply", resource_type="DocumentReference",
                            resource_id=proposal.source_document_id,
                            patient_id=proposal.patient_reference.removeprefix("Patient/"),
-                           source_versions=(proposal.source_document_version,),
+                           source_versions={f"DocumentReference/{proposal.source_document_id}": proposal.source_document_version},
                            reviewer_reference=command.reviewer_reference, job_id=job_id)
     from .review import apply_review
 

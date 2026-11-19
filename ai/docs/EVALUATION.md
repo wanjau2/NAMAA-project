@@ -61,12 +61,18 @@ missing/contradictory/unreviewed data, HTTP retry/repair/timeout/invalid output,
 context freshness/access rejection, handoff example/schema consistency and the
 complete simulated slice. The tests make no live endpoint calls.
 
-Context retrieval has a separate synthetic query set in
-`fixtures/context-queries.json` (development and held-out splits). Run
+Context retrieval now has 40 distinct query phrasings in
+`fixtures/context-queries.json` (20 development, 20 held-out). The queries are
+five paraphrases of each of eight hand-authored scenarios and reuse those
+scenarios' fictional candidate resources. They broaden phrasing checks but are
+not 40 independent records or a clinically adjudicated retrieval set. Run
 `namaa-ai evaluate-context --split development` and `--split held_out` for hit
 rate, recall@k and mean reciprocal rank with query counts. These fixtures check
 ranking mechanics and source-version handling; they are not clinically
 adjudicated relevance results and do not establish vector or graph quality.
+`scripts/expand_context_fixtures.py` deterministically regenerates the paraphrase
+set. The held-out split represents held-out intents/scenarios, while its query
+phrasing variants share each scenario's candidate resource set.
 
 Base FHIR R4 validation, Namaa profile validation, HAPI execution, real backend
 authentication, live MedGemma quality/latency and integrated browser journeys are

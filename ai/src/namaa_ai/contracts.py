@@ -329,3 +329,28 @@ class ParsedDocument(Contract):
     extraction_method: Literal["native_text", "ocr"]
     simulated: StrictBool
     blocks: tuple[LayoutBlock, ...] = Field(max_length=500)
+
+
+class EngagementTemplate(Contract):
+    template_id: LogicalId
+    channel: Literal["sms", "whatsapp", "portal"]
+    language: Literal["en"]
+    purpose: Literal["prevention_reminder", "follow_up_choice"]
+    text: Text
+    review_status: Literal["human_review_required_before_demo"]
+    simulated_only: Literal[True] = True
+
+
+class MetricDefinition(Contract):
+    metric_id: LogicalId
+    version: Version
+    name: Text
+    unit_of_analysis: Literal["patient_pathway", "case", "task", "event"]
+    aggregation: Literal["rate", "median", "count"]
+    numerator: Text
+    denominator: Text
+    exclusions: tuple[str, ...]
+    reporting_period: Literal["point_in_time", "calendar_month", "cohort_followup"]
+    suppression_threshold: int = Field(default=10, ge=10)
+    complementary_suppression_required: StrictBool = True
+    synthetic_only: StrictBool = True

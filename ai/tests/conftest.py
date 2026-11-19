@@ -7,6 +7,11 @@ from namaa_ai.contracts import ExtractionRequest, ModelIdentity, ProposedFact
 from namaa_ai.validation import make_proposals
 
 
+def pytest_addoption(parser):
+    parser.addoption("--require-backend", action="store_true",
+                     help="Fail selected integration checks when API dependencies, URL or fixture configuration are missing")
+
+
 @pytest.fixture
 def corpus():
     return json.loads((Path(__file__).parents[1] / "fixtures/notes.json").read_text())["notes"]

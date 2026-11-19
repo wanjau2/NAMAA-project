@@ -1,14 +1,18 @@
 {
   "notice": "Synthetic retrieval fixture metrics; not clinical relevance or model-quality results.",
   "simulated": true,
-  "sample_size_queries": 4,
+  "sample_size_queries": 20,
   "k": 3,
+  "splits": {
+    "development": 20
+  },
+  "sample_size_scenarios": 4,
   "hit_rate_at_k": 1.0,
   "mean_recall_at_k": 1.0,
-  "mean_reciprocal_rank": 1.0,
+  "mean_reciprocal_rank": 0.95,
   "cases": [
     {
-      "id": "dev-wcv-date",
+      "id": "dev-wcv-date-01",
       "retrieved_at_k": [
         "DocumentReference/note-wcv-01@v1",
         "Observation/obs-wcv-date@v2",
@@ -19,7 +23,48 @@
       "reciprocal_rank": 1.0
     },
     {
-      "id": "dev-family-history",
+      "id": "dev-wcv-date-02",
+      "retrieved_at_k": [
+        "Observation/obs-wcv-date@v2",
+        "DocumentReference/note-wcv-01@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-wcv-date-03",
+      "retrieved_at_k": [
+        "Observation/obs-wcv-date@v2",
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-screen@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-wcv-date-04",
+      "retrieved_at_k": [
+        "Observation/obs-wcv-date@v2",
+        "DocumentReference/note-wcv-01@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-wcv-date-05",
+      "retrieved_at_k": [
+        "DocumentReference/note-wcv-01@v1",
+        "Observation/obs-wcv-date@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-family-history-01",
       "retrieved_at_k": [
         "FamilyMemberHistory/fmh-diabetes@v1"
       ],
@@ -28,7 +73,46 @@
       "reciprocal_rank": 1.0
     },
     {
-      "id": "dev-care-plan",
+      "id": "dev-family-history-02",
+      "retrieved_at_k": [
+        "FamilyMemberHistory/fmh-diabetes@v1",
+        "DocumentReference/note-wcv-01@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-family-history-03",
+      "retrieved_at_k": [
+        "FamilyMemberHistory/fmh-diabetes@v1",
+        "DocumentReference/note-wcv-01@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-family-history-04",
+      "retrieved_at_k": [
+        "FamilyMemberHistory/fmh-diabetes@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-family-history-05",
+      "retrieved_at_k": [
+        "FamilyMemberHistory/fmh-diabetes@v1",
+        "DocumentReference/note-wcv-01@v1"
+      ],
+      "relevant_retrieved": 1,
+      "relevant_count": 1,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-care-plan-01",
       "retrieved_at_k": [
         "Task/task-followup@v2",
         "CarePlan/cp-prevention@v3",
@@ -39,7 +123,91 @@
       "reciprocal_rank": 1.0
     },
     {
-      "id": "dev-source-conflict",
+      "id": "dev-care-plan-02",
+      "retrieved_at_k": [
+        "Task/task-followup@v2",
+        "CarePlan/cp-prevention@v3",
+        "DocumentReference/note-history@v1"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-care-plan-03",
+      "retrieved_at_k": [
+        "DocumentReference/note-history@v1",
+        "Task/task-followup@v2",
+        "CarePlan/cp-prevention@v3"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "id": "dev-care-plan-04",
+      "retrieved_at_k": [
+        "Task/task-followup@v2",
+        "CarePlan/cp-prevention@v3"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-care-plan-05",
+      "retrieved_at_k": [
+        "CarePlan/cp-prevention@v3",
+        "DocumentReference/note-history@v1",
+        "Task/task-followup@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-source-conflict-01",
+      "retrieved_at_k": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-source-conflict-02",
+      "retrieved_at_k": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-source-conflict-03",
+      "retrieved_at_k": [
+        "DocumentReference/note-smoking@v1",
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 0.5
+    },
+    {
+      "id": "dev-source-conflict-04",
+      "retrieved_at_k": [
+        "Observation/obs-screen-a@v1",
+        "Observation/obs-screen-b@v2"
+      ],
+      "relevant_retrieved": 2,
+      "relevant_count": 2,
+      "reciprocal_rank": 1.0
+    },
+    {
+      "id": "dev-source-conflict-05",
       "retrieved_at_k": [
         "Observation/obs-screen-a@v1",
         "Observation/obs-screen-b@v2"
