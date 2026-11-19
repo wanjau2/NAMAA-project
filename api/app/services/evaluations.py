@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.errors import AppError
-from app.models import CareGap, Case, Event, Observation, Patient, RuleEvaluation
+from app.models import CareGap, Case, Event, Observation, Patient, Proposal, RuleEvaluation
 from app.rules import evaluate_patient
 from app.schemas import EvaluationResult
 from app.security.context import TrustedRequestContext
@@ -61,9 +61,46 @@ def run_evaluation(
         )
         .all()
     )
+    # I02 — reviewed proposals are already upserted as Observation rows on accept/correct.
+    reviewed = (
+        db.query(Proposal)
+        .filter(
+            Proposal.workspace_id == workspace_id,
+            Proposal.patient_id == patient_id,
+            Proposal.review_state.in_(("accepted", "corrected")),
+        )
+        .all()
+    )
 
     result = evaluate_patient(patient, observations, pathway)
     eval_id = f"eval-{uuid.uuid4().hex[:12]}"
+
+    outcome = getattr(result, "outcome", None) or {
+        "gap": "gap_identified",
+        "needs_review": "needs_review",
+        "no_gap": "no_gap_identified_in_available_data",
+        "not_eligible": "not_eligible",
+    }.get(result.flag_status, "needs_review")
+    legacy = _OUTCOME_TO_LEGACY.get(outcome, result.flag_status)
+    rule_evaluation = {
+        "patient_reference": f"Patient/{patient_id}",
+        "as_of": settings.demo_now[:10],
+        "rule_id": result.rule_id_version,
+        "rule_version": getattr(result, "rule_version", "synthetic-1.0.0"),
+        "outcome": outcome,
+        "input_versions": result.input_versions
+        or [{"reference": f"Patient/{patient_id}", "version": "app-1"}],
+        "contributing_factors": [f.get("label", "") for f in result.factors],
+        "missing_information": [m.get("label", "") for m in result.missing],
+        "due_date": getattr(result, "due_date", None),
+        "simulated": True,
+        "synthetic_rule": True,
+    }
+    api_compat = (
+        "api_outcome_extension_required"
+        if legacy == "not_eligible"
+        else "current_api_outcome_supported"
+    )
 
     db.add(
         RuleEvaluation(
@@ -76,12 +113,31 @@ def run_evaluation(
                 {
                     "patient_id": patient_id,
                     "age_band": patient.age_band,
+                    "pathway": result.pathway,
                     "observation_ids": [o.id for o in observations],
+                    "observation_versions": [
+                        {"reference": f"Observation/{o.id}", "version": "app-1"}
+                        for o in observations
+                    ],
+                    "reviewed_proposal_ids": [p.id for p in reviewed],
+                    "reviewed_proposal_versions": [
+                        {
+                            "reference": f"Proposal/{p.id}",
+                            "version": str(p.version),
+                            "review_state": p.review_state,
+                        }
+                        for p in reviewed
+                    ],
+                    "rule_version": rule_evaluation["rule_version"],
                 }
             ),
+            # I01 — persist the full canonical object, not only the lossy flag.
             result_json=json.dumps(
                 {
-                    "flag_status": result.flag_status,
+                    "rule_evaluation": rule_evaluation,
+                    "legacy_flag_status": None if legacy == "not_eligible" else legacy,
+                    "api_compatibility": api_compat,
+                    "flag_status": legacy,
                     "factors": result.factors,
                     "missing": result.missing,
                 }
@@ -177,33 +233,6 @@ def run_evaluation(
             db.flush()
             case_out = case_to_out(db, open_case)
 
-    outcome = getattr(result, "outcome", None) or {
-        "gap": "gap_identified",
-        "needs_review": "needs_review",
-        "no_gap": "no_gap_identified_in_available_data",
-        "not_eligible": "not_eligible",
-    }.get(result.flag_status, "needs_review")
-    legacy = _OUTCOME_TO_LEGACY.get(outcome, result.flag_status)
-    rule_evaluation = {
-        "patient_reference": f"Patient/{patient_id}",
-        "as_of": settings.demo_now[:10],
-        "rule_id": result.rule_id_version,
-        "rule_version": getattr(result, "rule_version", "synthetic-1.0.0"),
-        "outcome": outcome,
-        "input_versions": result.input_versions
-        or [{"reference": f"Patient/{patient_id}", "version": "app-1"}],
-        "contributing_factors": [f.get("label", "") for f in result.factors],
-        "missing_information": [m.get("label", "") for m in result.missing],
-        "due_date": getattr(result, "due_date", None),
-        "simulated": True,
-        "synthetic_rule": True,
-    }
-    api_compat = (
-        "api_outcome_extension_required"
-        if legacy == "not_eligible"
-        else "current_api_outcome_supported"
-    )
-
     db.commit()
     return EvaluationResult(
         patient_id=patient_id,
@@ -220,3 +249,54 @@ def run_evaluation(
         legacy_flag_status=None if legacy == "not_eligible" else legacy,
         api_compatibility=api_compat,
     )
+
+
+def latest_evaluation(
+    db: Session,
+    *,
+    workspace_id: str,
+    patient_id: str,
+    ctx: TrustedRequestContext | None = None,
+) -> dict:
+    """I01 — authorized readback of the last persisted canonical evaluation."""
+    if ctx is not None:
+        authorize(
+            db,
+            ctx,
+            action="evaluation.run",
+            resource_type="Patient",
+            resource_id=patient_id,
+            patient_id=patient_id,
+        )
+    row = (
+        db.query(RuleEvaluation)
+        .filter(
+            RuleEvaluation.workspace_id == workspace_id,
+            RuleEvaluation.patient_id == patient_id,
+        )
+        .order_by(RuleEvaluation.pk.desc())
+        .first()
+    )
+    if row is None:
+        raise AppError(
+            code="not_found",
+            message="No evaluation recorded for this patient in this session.",
+            status_code=404,
+        )
+    stored = json.loads(row.result_json)
+    if ctx is not None:
+        db.commit()
+    return {
+        "patient_id": patient_id,
+        "evaluation_id": row.id,
+        "pathway": row.pathway,
+        "rule_id_version": row.rule_id_version,
+        "created_at": row.created_at,
+        "input_snapshot": json.loads(row.input_snapshot_json),
+        "rule_evaluation": stored.get("rule_evaluation"),
+        "legacy_flag_status": stored.get("legacy_flag_status"),
+        "api_compatibility": stored.get("api_compatibility"),
+        "flag_status": stored.get("flag_status"),
+        "factors": stored.get("factors", []),
+        "missing": stored.get("missing", []),
+    }

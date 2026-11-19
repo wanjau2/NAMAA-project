@@ -178,18 +178,28 @@ def post_audit_event(
         prompt_version=body.prompt_version,
         reviewer_id=body.reviewer_id,
         reason_code=body.reason_code or body.decision,
-        extra={
-            **body.detail,
-            "client_decision": body.decision,
-            "client_decision_id": body.decision_id,
-        },
+        extra=body.detail,
     )
+    # Persist the caller's verified decision link on the event itself (Alfred I8/audit).
+    if body.decision_id:
+        event.decision_id = body.decision_id
+    if body.decision:
+        # Alfred sends allow/deny/error; map common spellings for readback.
+        mapped = {
+            "allow": "Permit",
+            "deny": "Deny",
+            "Permit": "Permit",
+            "Deny": "Deny",
+            "error": "Indeterminate",
+        }.get(body.decision, body.decision)
+        event.decision = mapped
     db.commit()
     return {
         "id": event.id,
         "timestamp": event.timestamp,
         "policy_adapter": event.policy_adapter,
         "production_authorization": event.production_authorization,
+        "decision_id": event.decision_id,
     }
 
 

@@ -144,7 +144,7 @@ def queue_extraction(
             if settings.extraction_mode == "offline_fixture"
             else "medgemma-pending"
         ),
-        prompt_version="extract-v0.3",
+        prompt_version="extract-v1.0.1",
         progress_percent=0,
         progress_message="Queued for extraction",
         created_at=now,
@@ -371,12 +371,16 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
     issues_uncertain = (
         '[{"code":"uncertain_date","severity":"review","message":"Effective date is uncertain; acknowledgment required."}]'
     )
+    # I07 — immutable proposal id per extraction job (never reuse bare fixture ids).
+    job_suffix = job.id.removeprefix("ext-")[:12]
     for item in fixtures:
         issues = issues_uncertain if item.get("assertion") == "uncertain" else "[]"
         relationship = "sibling" if item.get("subject") == "family_member" else None
+        fixture_stem = str(item["id"]).removeprefix("prop-")
+        proposal_id = f"prop-{job_suffix}-{fixture_stem}"[:64]
         db.add(
             Proposal(
-                id=item["id"],
+                id=proposal_id,
                 workspace_id=job.workspace_id,
                 job_id=job.id,
                 patient_id=job.patient_id,
@@ -397,7 +401,7 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
                 issues_json=issues,
                 model_id="google/medgemma-1.5-4b-it",
                 model_revision=job.model_revision,
-                prompt_version=job.prompt_version or "extract-v1.0.1",
+                prompt_version="extract-v1.0.1",
                 model_simulated=True,
                 review_state="proposed",
             )

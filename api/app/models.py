@@ -189,6 +189,9 @@ class Proposal(Base):
     """Proposed facts — outside the clinical store until human review (design §5)."""
 
     __tablename__ = "proposals"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_proposal_workspace_id"),
+    )
 
     pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     id: Mapped[str] = mapped_column(String(64), index=True)

@@ -10,12 +10,15 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
-from app.models import Document, Proposal, ReviewCommandJournal
+from app.models import Document, Observation, Proposal, ReviewCommandJournal
 from app.security.audit import emit_audit
 from app.security.context import TrustedRequestContext
 from app.security.enforce import authorize
 from app.services.outbox import enqueue_outbox
 from app.services.proposals import proposal_to_alfred, source_sha256
+
+# Synthetic guest reviewer binding (I05) — never trust an unbound client claim.
+SYNTHETIC_REVIEWER = "Practitioner/demo-reviewer"
 
 
 def _iso() -> str:
@@ -26,6 +29,27 @@ def _payload_hash(body: dict[str, Any]) -> str:
     return hashlib.sha256(
         json.dumps(body, sort_keys=True, default=str).encode("utf-8")
     ).hexdigest()
+
+
+def _bound_reviewer(ctx: TrustedRequestContext, supplied: str | None) -> str:
+    """Resolve reviewer from trusted role; require client ref to match mapping."""
+    if ctx.membership_role != "clinical_reviewer":
+        raise AppError(
+            code="forbidden",
+            message="Only the clinical_reviewer role may apply review.",
+            status_code=403,
+            request_id=ctx.request_id,
+        )
+    bound = SYNTHETIC_REVIEWER
+    if supplied and supplied != bound:
+        raise AppError(
+            code="forbidden",
+            message="reviewer_reference does not match the trusted reviewer binding.",
+            status_code=403,
+            field_errors={"reviewer_reference": "mismatch"},
+            request_id=ctx.request_id,
+        )
+    return bound
 
 
 def apply_review(
@@ -45,6 +69,7 @@ def apply_review(
             request_id=ctx.request_id,
         )
 
+    digest = _payload_hash(body)
     existing = (
         db.query(ReviewCommandJournal)
         .filter(
@@ -53,7 +78,6 @@ def apply_review(
         )
         .one_or_none()
     )
-    digest = _payload_hash(body)
     if existing is not None:
         if existing.payload_hash != digest:
             raise AppError(
@@ -62,6 +86,28 @@ def apply_review(
                 status_code=409,
                 request_id=request_id,
             )
+        # I05 — reauthorize before disclosing a replayed journal result.
+        proposal = (
+            db.query(Proposal)
+            .filter(
+                Proposal.workspace_id == ctx.workspace_id,
+                Proposal.id == existing.proposal_id,
+            )
+            .one_or_none()
+        )
+        if proposal is None:
+            raise AppError(code="not_found", message="Proposal not found.", status_code=404)
+        _bound_reviewer(ctx, body.get("reviewer_reference"))
+        authorize(
+            db,
+            ctx,
+            action="review.apply",
+            resource_type="Proposal",
+            resource_id=existing.proposal_id,
+            patient_id=proposal.patient_id,
+            extra_context={"initiating_role": ctx.membership_role},
+        )
+        db.commit()
         return json.loads(existing.response_json)
 
     proposal = (
@@ -101,6 +147,14 @@ def apply_review(
             request_id=request_id,
         )
 
+    if proposal.review_state != "proposed":
+        raise AppError(
+            code="stale_revision",
+            message="Proposal is no longer in proposed state.",
+            status_code=409,
+            request_id=request_id,
+        )
+
     action = body.get("action")
     if action not in {"accept", "correct", "reject"}:
         raise AppError(
@@ -120,16 +174,8 @@ def apply_review(
             request_id=request_id,
         )
 
-    reviewer = body.get("reviewer_reference") or f"Practitioner/{ctx.user_id}"
-    if ctx.membership_role != "clinical_reviewer":
-        raise AppError(
-            code="forbidden",
-            message="Only the clinical_reviewer role may apply review.",
-            status_code=403,
-            request_id=request_id,
-        )
+    reviewer = _bound_reviewer(ctx, body.get("reviewer_reference"))
 
-    # Source version binding
     doc = (
         db.query(Document)
         .filter(
@@ -148,9 +194,9 @@ def apply_review(
         )
 
     issues = json.loads(proposal.issues_json or "[]")
-    ack = set(body.get("acknowledged_issues") or [])
+    ack = list(body.get("acknowledged_issues") or [])
     review_codes = {i["code"] for i in issues if i.get("severity") == "review"}
-    if action != "reject" and not review_codes.issubset(ack):
+    if action != "reject" and not review_codes.issubset(set(ack)):
         raise AppError(
             code="validation_failed",
             message="Review-level issues must be acknowledged.",
@@ -159,27 +205,12 @@ def apply_review(
             request_id=request_id,
         )
 
-    now = _iso()
-    outbox_id = None
-    if action == "reject":
-        proposal.review_state = "rejected"
-        proposal.review_reason = reason
-        proposal.reviewer_reference = reviewer
-        proposal.reviewed_at = now
-        proposal.version += 1
-        state = "rejected"
-        fact = None
-    elif action == "accept":
-        proposal.review_state = "accepted"
-        proposal.review_reason = reason
-        proposal.reviewer_reference = reviewer
-        proposal.reviewed_at = now
-        proposal.version += 1
-        state = "accepted"
-        fact = proposal_to_alfred(proposal)["fact"]
-        outbox_id = _enqueue_review_transaction(db, ctx, proposal, request_id, now)
-    else:  # correct
-        correction = body.get("correction")
+    # Snapshot the addressed proposal version BEFORE mutation (I03).
+    original_fact = proposal_to_alfred(proposal, version=expected)["fact"]
+    original_proposal = proposal_to_alfred(proposal, version=expected)
+
+    correction = body.get("correction")
+    if action == "correct":
         if not isinstance(correction, dict):
             raise AppError(
                 code="validation_failed",
@@ -187,6 +218,48 @@ def apply_review(
                 status_code=422,
                 request_id=request_id,
             )
+    elif correction is not None:
+        raise AppError(
+            code="validation_failed",
+            message="correction is only allowed for action=correct.",
+            status_code=422,
+            request_id=request_id,
+        )
+
+    command = {
+        "request_id": request_id,
+        "proposal_id": proposal.id,
+        "expected_proposal_version": expected,
+        "action": action,
+        "reviewer_reference": reviewer,
+        "reason": reason,
+        "correction": correction if action == "correct" else None,
+        "acknowledged_issues": ack,
+    }
+
+    now = _iso()
+    outbox_id = None
+    selected_fact: dict[str, Any] | None = None
+
+    if action == "reject":
+        proposal.review_state = "rejected"
+        proposal.review_reason = reason
+        proposal.reviewer_reference = reviewer
+        proposal.reviewed_at = now
+        proposal.version += 1
+        state = "rejected"
+    elif action == "accept":
+        proposal.review_state = "accepted"
+        proposal.review_reason = reason
+        proposal.reviewer_reference = reviewer
+        proposal.reviewed_at = now
+        proposal.version += 1
+        state = "accepted"
+        selected_fact = original_fact
+        outbox_id = _enqueue_review_transaction(db, ctx, proposal, request_id, now)
+        _upsert_reviewed_observation(db, ctx, proposal, selected_fact, now)
+    else:
+        assert isinstance(correction, dict)
         proposal.concept = str(correction.get("concept") or proposal.concept)
         proposal.value_text = str(correction.get("value_text") or "")
         proposal.subject = str(correction.get("subject") or proposal.subject)
@@ -203,31 +276,35 @@ def apply_review(
         proposal.reviewed_at = now
         proposal.version += 1
         state = "corrected"
-        fact = proposal_to_alfred(proposal)["fact"]
+        selected_fact = {
+            "concept": proposal.concept,
+            "value_text": proposal.value_text,
+            "subject": proposal.subject,
+            "assertion": proposal.assertion,
+            "effective_date": proposal.effective_date,
+            "excerpt": proposal.excerpt,
+            "proposed_resource_type": proposal.proposed_resource_type,
+            "relationship": proposal.relationship,
+        }
         outbox_id = _enqueue_review_transaction(db, ctx, proposal, request_id, now)
+        _upsert_reviewed_observation(db, ctx, proposal, selected_fact, now)
 
-    response = {
-        "command": {
-            "request_id": request_id,
-            "proposal_id": proposal.id,
-            "expected_proposal_version": expected,
-            "action": action,
-            "reviewer_reference": reviewer,
-            "reason": reason,
-            "acknowledged_issues": list(ack),
-        },
+    response: dict[str, Any] = {
+        "command": command,
         "resulting_proposal_version": proposal.version,
         "state": state,
         "fact": (
             {
-                "proposal": proposal_to_alfred(proposal),
-                "fact": fact,
+                "proposal": original_proposal,
+                "fact": selected_fact,
+                "review": command,
                 "reviewed_at": now,
                 "source_date": doc.document_date[:10],
                 "offset_start": proposal.offset_start,
                 "offset_end": proposal.offset_end,
+                "offset_unit": "unicode_code_points",
             }
-            if fact is not None
+            if selected_fact is not None
             else None
         ),
         "fhir_gateway": "stub",
@@ -270,6 +347,43 @@ def apply_review(
     return response
 
 
+def _upsert_reviewed_observation(
+    db: Session,
+    ctx: TrustedRequestContext,
+    proposal: Proposal,
+    fact: dict[str, Any],
+    now: str,
+) -> None:
+    """I02 — make accepted/corrected facts visible to the evaluation path."""
+    obs_id = f"obs-reviewed-{proposal.id}"[:64]
+    existing = (
+        db.query(Observation)
+        .filter(Observation.workspace_id == ctx.workspace_id, Observation.id == obs_id)
+        .one_or_none()
+    )
+    concept = str(fact.get("concept") or "reviewed_fact")
+    value = str(fact.get("value_text") or "")[:500]
+    if existing is None:
+        db.add(
+            Observation(
+                id=obs_id,
+                workspace_id=ctx.workspace_id,
+                patient_id=proposal.patient_id,
+                type=concept,
+                value=value,
+                observed_time=now,
+                verified=True,
+                source=f"review:{proposal.id}",
+            )
+        )
+    else:
+        existing.type = concept
+        existing.value = value
+        existing.observed_time = now
+        existing.verified = True
+        existing.source = f"review:{proposal.id}"
+
+
 def _enqueue_review_transaction(
     db: Session,
     ctx: TrustedRequestContext,
@@ -277,8 +391,9 @@ def _enqueue_review_transaction(
     request_id: str,
     now: str,
 ) -> str:
-    logical = f"rvw-{proposal.id[:12]}"
+    logical = f"rvw-{proposal.id}"[:64]
     resource_type = proposal.proposed_resource_type
+    link_field = "patient" if resource_type == "FamilyMemberHistory" else "subject"
     bundle = {
         "resourceType": "Bundle",
         "type": "transaction",
@@ -289,7 +404,7 @@ def _enqueue_review_transaction(
                     "resourceType": resource_type,
                     "id": logical,
                     "status": "final" if resource_type == "Observation" else "partial",
-                    "subject": {"reference": f"Patient/{proposal.patient_id}"},
+                    link_field: {"reference": f"Patient/{proposal.patient_id}"},
                     "meta": {
                         "tag": [
                             {"system": "https://namaa.example/fhir", "code": "synthetic"},

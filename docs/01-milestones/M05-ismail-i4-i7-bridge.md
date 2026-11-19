@@ -25,4 +25,12 @@
 
 ```text
 cd api && pytest -q
+# From repo root — Alfred HTTP acceptance against a temp API:
+ai/.venv/Scripts/python ai/scripts/check_backend.py --local --report ai/evidence/backend-acceptance-local.json
 ```
+
+**2026-11-19 follow-up (I03/I05/I07 + I01/I02):** Alfred local acceptance **12 passed, 0 failed**
+(`ai/evidence/backend-acceptance-local.json`). Canonical proposal/review wire shape,
+bound `Practitioner/demo-reviewer`, unique proposal IDs per job, durable
+`rule_evaluation` + `GET /patients/{id}/evaluations/latest`, reviewed facts upserted
+as observations for the evaluation path.

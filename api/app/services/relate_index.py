@@ -2,11 +2,41 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import FhirResource, Observation
+from app.models import FhirResource
+
+
+def _patient_linked(row: FhirResource, patient_id: str) -> bool:
+    try:
+        body = json.loads(row.body_json)
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(body, dict):
+        return False
+    link_field = "patient" if row.resource_type == "FamilyMemberHistory" else "subject"
+    link = body.get(link_field)
+    return isinstance(link, dict) and link.get("reference") == f"Patient/{patient_id}"
+
+
+def _batch(
+    *,
+    workspace_id: str,
+    patient_id: str,
+    candidates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    # Alfred RelateCandidateBatch — no envelope extras (I03/I14).
+    return {
+        "state": "current",
+        "workspace_id": workspace_id,
+        "patient_reference": f"Patient/{patient_id}",
+        "permission_revision": "permissions-v1",
+        "generation_id": f"rel-gen-{patient_id}",
+        "candidates": candidates,
+    }
 
 
 def family_history_candidates(
@@ -16,41 +46,29 @@ def family_history_candidates(
     patient_id: str,
     limit: int = 20,
 ) -> dict[str, Any]:
+    limit = max(1, min(int(limit or 20), 100))
     refs: list[dict[str, Any]] = []
-    for row in (
+    rows = (
         db.query(FhirResource)
         .filter(
             FhirResource.workspace_id == workspace_id,
             FhirResource.resource_type == "FamilyMemberHistory",
         )
-        .limit(limit)
         .all()
-    ):
-        if f"Patient/{patient_id}" not in row.body_json:
+    )
+    for row in rows:
+        if not _patient_linked(row, patient_id):
             continue
         refs.append(
             {
-                "candidate_id": f"rel-fmh-{row.logical_id}",
                 "patient_reference": f"Patient/{patient_id}",
                 "supporting_references": [f"FamilyMemberHistory/{row.logical_id}"],
-                "label": "family_history",
+                "candidate_kind": "family_history",
             }
         )
-    # Seed observations tagged as family-related text are not FMH resources —
-    # still expose Observation refs only when type hints family (none in seed).
-    return {
-        "state": "current",
-        "workspace_id": workspace_id,
-        "patient_reference": f"Patient/{patient_id}",
-        "permission_revision": "permissions-v1",
-        "generation_id": f"rel-gen-{patient_id}",
-        "operation": "family_history_candidates",
-        "candidates": refs[:limit],
-        "notice": (
-            "Relate is a disposable discovery index. Candidates never grant access; "
-            "call POST /api/v1/security/verified-context to authorize and verify."
-        ),
-    }
+        if len(refs) >= limit:
+            break
+    return _batch(workspace_id=workspace_id, patient_id=patient_id, candidates=refs)
 
 
 def care_plan_candidates(
@@ -60,55 +78,26 @@ def care_plan_candidates(
     patient_id: str,
     limit: int = 20,
 ) -> dict[str, Any]:
+    limit = max(1, min(int(limit or 20), 100))
     refs: list[dict[str, Any]] = []
-    for row in (
+    rows = (
         db.query(FhirResource)
         .filter(
             FhirResource.workspace_id == workspace_id,
             FhirResource.resource_type == "CarePlan",
         )
-        .limit(limit)
         .all()
-    ):
-        if f"Patient/{patient_id}" not in row.body_json:
+    )
+    for row in rows:
+        if not _patient_linked(row, patient_id):
             continue
         refs.append(
             {
-                "candidate_id": f"rel-cp-{row.logical_id}",
                 "patient_reference": f"Patient/{patient_id}",
                 "supporting_references": [f"CarePlan/{row.logical_id}"],
-                "label": "care_plan",
+                "candidate_kind": "care_plan_link",
             }
         )
-    # Application observations in scope (discovery only)
-    for obs in (
-        db.query(Observation)
-        .filter(
-            Observation.workspace_id == workspace_id,
-            Observation.patient_id == patient_id,
-            Observation.verified.is_(True),
-        )
-        .limit(limit)
-        .all()
-    ):
-        refs.append(
-            {
-                "candidate_id": f"rel-obs-{obs.id}",
-                "patient_reference": f"Patient/{patient_id}",
-                "supporting_references": [f"Observation/{obs.id}"],
-                "label": "observation_seed",
-            }
-        )
-    return {
-        "state": "current",
-        "workspace_id": workspace_id,
-        "patient_reference": f"Patient/{patient_id}",
-        "permission_revision": "permissions-v1",
-        "generation_id": f"rel-gen-{patient_id}",
-        "operation": "care_plan_candidates",
-        "candidates": refs[:limit],
-        "notice": (
-            "Relate is a disposable discovery index. Candidates never grant access; "
-            "call POST /api/v1/security/verified-context to authorize and verify."
-        ),
-    }
+        if len(refs) >= limit:
+            break
+    return _batch(workspace_id=workspace_id, patient_id=patient_id, candidates=refs)

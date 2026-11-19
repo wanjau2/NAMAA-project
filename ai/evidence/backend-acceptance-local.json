@@ -1,17 +1,13 @@
 {
-  "checked_at": "2026-11-19T07:59:14.346407+00:00",
+  "checked_at": "2026-11-19T09:42:07.460746+00:00",
   "target": "temporary_local_synthetic_api",
   "openapi": {
     "status": "checked",
-    "missing_routes": [
-      "POST /api/v1/facts/{}/review",
-      "GET /api/v1/relate/family-history",
-      "GET /api/v1/relate/care-plans"
-    ]
+    "missing_routes": []
   },
   "rule_outcome_fixtures_selected": false,
   "hapi_commit_verified": false,
-  "exit_code": 1,
+  "exit_code": 0,
   "checks": [
     {
       "name": "test_authzen_codec_against_live_responses",
@@ -19,52 +15,52 @@
     },
     {
       "name": "test_audit_boundary_links_its_own_backend_decision",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_review_action_round_trip[accept]",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_review_action_round_trip[correct]",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_review_action_round_trip[reject]",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_review_replay_and_conflicting_request_id",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_review_stale_version_is_rejected",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_review_requires_reviewer_role",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_rule_response_retains_the_complete_canonical_payload[pat-synthetic-11]",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_rule_response_retains_the_complete_canonical_payload[pat-synthetic-31]",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_relate_discovery_and_verification[family_history_context]",
-      "status": "failure"
+      "status": "passed"
     },
     {
       "name": "test_relate_discovery_and_verification[care_plan_context]",
-      "status": "failure"
+      "status": "passed"
     }
   ],
   "counts": {
-    "passed": 1,
-    "failure": 11,
+    "passed": 12,
+    "failure": 0,
     "error": 0,
     "skipped": 0
   }
