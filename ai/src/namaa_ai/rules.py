@@ -13,6 +13,7 @@ RULES = {
 def evaluate(snapshot: RuleSnapshot, rule_id: str) -> RuleEvaluation:
     if not isinstance(snapshot, RuleSnapshot):
         raise TypeError("Rules require a backend-authorized committed resource snapshot")
+    snapshot = RuleSnapshot.model_validate(snapshot.model_dump())
     if rule_id not in RULES:
         raise ValueError("Unsupported demonstration rule")
     if not snapshot.authorized:
@@ -36,7 +37,7 @@ def evaluate(snapshot: RuleSnapshot, rule_id: str) -> RuleEvaluation:
                 raise PermissionError("Patient scope mismatch")
         elif r.get("subject", r.get("patient", {})).get("reference") != snapshot.patient_reference:
             raise PermissionError("Resource patient scope mismatch")
-        if not record.reviewed:
+        if not record.reviewed or not record.review_reference.strip():
             missing.append(f"Unreviewed input: {v.reference}")
         if r.get("modifierExtension"):
             missing.append("Unsupported modifier extension")
@@ -45,6 +46,17 @@ def evaluate(snapshot: RuleSnapshot, rule_id: str) -> RuleEvaluation:
         missing.append("Versioned Patient resource")
     if not snapshot.complete_for_rule:
         missing.append("Authoritative retrieval incomplete for this rule")
+
+    # Familial findings remain about the relative. They explain the review
+    # context but never infer patient diagnosis, eligibility or a shorter interval.
+    if rule_id == "DEMO_ADULT_01":
+        for record in snapshot.resources:
+            r = record.resource
+            if (record.reviewed and record.review_reference.strip() and not r.get("modifierExtension")
+                    and r.get("resourceType") == "FamilyMemberHistory"
+                    and r.get("status") in {"partial", "completed"} and r.get("condition")):
+                factors.append(f"Reviewed family history: FamilyMemberHistory/{r['id']}; "
+                               "relative's finding only; adult screening history still required")
 
     def result(outcome, due=None):
         return RuleEvaluation(patient_reference=snapshot.patient_reference, as_of=snapshot.as_of,
@@ -86,6 +98,41 @@ def evaluate(snapshot: RuleSnapshot, rule_id: str) -> RuleEvaluation:
     if missing:
         return result("needs_review")
     event_date = next(iter(dates))
-    due = event_date + timedelta(days=interval_days)
+    try:
+        due = event_date + timedelta(days=interval_days)
+    except OverflowError:
+        missing.append("Last-event date exceeds supported calculation range")
+        return result("needs_review")
     factors += [f"Reviewed last event: {event_date}", f"Fictional interval: {interval_days} days; due on {due}"]
     return result("gap_identified" if snapshot.as_of >= due else "no_gap_identified_in_available_data", due)
+
+
+def rules_for_reviewed_commit(snapshot: RuleSnapshot, changed: ResourceVersion) -> tuple[str, ...]:
+    """Backend post-commit routing, never called with an uncommitted proposal.
+
+    Ismail's outbox calls this only after reloading a reviewed HAPI version.
+    Routing requests evaluation; it does not authorize screening or any write.
+    """
+    if not isinstance(snapshot, RuleSnapshot):
+        raise TypeError("Rule routing requires an authoritative committed snapshot")
+    snapshot = RuleSnapshot.model_validate(snapshot.model_dump())
+    if not snapshot.authorized:
+        raise PermissionError("Backend snapshot authorization required")
+    records = [r for r in snapshot.resources
+               if f"{r.resource.get('resourceType')}/{r.resource.get('id')}" == changed.reference]
+    if len(records) != 1:
+        return ()
+    record = records[0]
+    r = record.resource
+    if (not record.reviewed or not record.review_reference.strip()
+            or r.get("meta", {}).get("versionId") != changed.version):
+        return ()
+    if r.get("subject", r.get("patient", {})).get("reference") != snapshot.patient_reference:
+        raise PermissionError("Resource patient scope mismatch")
+    if r.get("resourceType") == "FamilyMemberHistory":
+        return ("DEMO_ADULT_01",)
+    if r.get("resourceType") == "Observation":
+        code = r.get("code", {}).get("text")
+        return tuple(rule for rule, (eligibility, concept, _) in RULES.items()
+                     if code in {eligibility, CONCEPT_TEXT[concept]})
+    return ()

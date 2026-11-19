@@ -19,21 +19,31 @@ from .contracts import AssembledContext, ContextItem, ContextQuery, VerifiedCont
 TIER_BY_RESOURCE = {
     "Patient": "structured", "Observation": "structured", "Condition": "structured",
     "CarePlan": "structured", "Task": "structured", "ServiceRequest": "structured",
-    "Procedure": "structured", "DiagnosticReport": "structured",
+    "Procedure": "structured", "DiagnosticReport": "structured", "Encounter": "structured",
+    "PractitionerRole": "relational",
     "DocumentReference": "longitudinal",
     "FamilyMemberHistory": "relational",
 }
 TOKEN_RE = re.compile(r"[a-z0-9]+", re.I)
 
 
+class RetrievalText(Protocol):
+    """A pre-authorized candidate; guideline text is never a patient fact."""
+    @property
+    def item_id(self) -> str: ...
+
+    @property
+    def text(self) -> str: ...
+
+
 class RankedRetriever(Protocol):
     """Return item IDs in relevance order; scores are not clinical probabilities."""
-    def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]: ...
+    def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]: ...
 
 
 class DenseRetriever(Protocol):
     """Replaceable pgvector/Qdrant adapter boundary; no backend chosen here."""
-    def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]: ...
+    def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]: ...
 
 
 class InMemoryDenseRetriever:
@@ -47,7 +57,7 @@ class InMemoryDenseRetriever:
         self.vectors = {key: tuple(float(value) for value in vector) for key, vector in vectors.items()}
         self.query_encoder = query_encoder
 
-    def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]:
+    def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]:
         query_vector = tuple(float(value) for value in self.query_encoder(query))
         if not query_vector or not all(math.isfinite(value) for value in query_vector):
             return ()
@@ -75,7 +85,7 @@ def _tokens(text: str) -> list[str]:
 
 class BM25Retriever:
     """Small deterministic lexical retriever for synthetic/local use."""
-    def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]:
+    def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]:
         query_terms = set(_tokens(query))
         if not query_terms or not items:
             return ()
@@ -109,7 +119,7 @@ class ReciprocalRankFusion:
         self.dense = dense
         self.rank_constant = rank_constant
 
-    def rank(self, query: str, items: Sequence[ContextItem]) -> Sequence[str]:
+    def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]:
         allowed = {item.item_id for item in items}
         rankings = [self.lexical.rank(query, items)]
         if self.dense is not None:
@@ -135,8 +145,30 @@ class ContextAssembler:
     def assemble(self, verified: VerifiedContext, query: ContextQuery, *, workspace_id: str,
                  patient_reference: str, permission_revision: str, generation_id: str,
                  now) -> AssembledContext:
+        candidates = self.candidates(verified, query, workspace_id=workspace_id,
+            patient_reference=patient_reference, permission_revision=permission_revision,
+            generation_id=generation_id, now=now)
+        selected, total_chars, overflow = select_bounded(
+            self.retriever.rank(query.query, candidates), candidates, query)
+        incomplete = (overflow or len(selected) < len(candidates)
+                     or verified.completeness != "complete_in_checked_scope")
+        completeness = ("unknown" if not selected else
+                        "partial" if incomplete else "complete_in_checked_scope")
+        return AssembledContext(
+            query=query.query, workspace_id=verified.workspace_id,
+            patient_reference=verified.patient_reference, generation_id=verified.generation_id,
+            permission_revision=verified.permission_revision,
+            state="assembled" if selected else "empty_unknown", completeness=completeness,
+            items=tuple(selected), character_count=total_chars)
+
+    def candidates(self, verified: VerifiedContext, query: ContextQuery, *, workspace_id: str,
+                   patient_reference: str, permission_revision: str, generation_id: str,
+                   now) -> tuple[ContextItem, ...]:
+        """Return resource-bounded candidates only after the current scope gate."""
         if not self.enabled:
             raise ValueError("context_assembly_disabled")
+        verified = VerifiedContext.model_validate(verified.model_dump())
+        query = ContextQuery.model_validate(query.model_dump())
         VerifiedContextAdapter(enabled=True).accept(
             verified, workspace_id=workspace_id, patient_reference=patient_reference,
             permission_revision=permission_revision, generation_id=generation_id, now=now)
@@ -151,7 +183,8 @@ class ContextAssembler:
                 continue
             if not record.authorized or not record.source_verified:
                 continue
-            key_material = f"{reference}|{record.source.version}|{verified.generation_id}"
+            key_material = json.dumps([reference, record.source.version, verified.generation_id,
+                                       record.offset_start, record.offset_end, record.text], ensure_ascii=False)
             item_id = "ctx-" + hashlib.sha256(key_material.encode()).hexdigest()[:24]
             candidates.append(ContextItem(
                 item_id=item_id, source=record.source, patient_reference=record.patient_reference,
@@ -161,31 +194,28 @@ class ContextAssembler:
                 reviewed=record.reviewed, text=record.text, offset_start=record.offset_start,
                 offset_end=record.offset_end))
 
-        by_id = {item.item_id: item for item in candidates}
-        order = self.retriever.rank(query.query, candidates)
-        selected: list[ContextItem] = []
-        total_chars = 0
-        overflow = False
-        for item_id in order:
-            item = by_id[item_id]
-            if len(selected) >= query.max_items:
-                overflow = True
-                break
-            if total_chars + len(item.text) > query.max_context_characters:
-                overflow = True
-                continue  # Never truncate an excerpt or sever its source trace.
-            selected.append(item)
-            total_chars += len(item.text)
-        incomplete = (overflow or len(selected) < len(candidates)
-                     or verified.completeness != "complete_in_checked_scope")
-        completeness = ("unknown" if not selected else
-                        "partial" if incomplete else "complete_in_checked_scope")
-        return AssembledContext(
-            query=query.query, workspace_id=verified.workspace_id,
-            patient_reference=verified.patient_reference, generation_id=verified.generation_id,
-            permission_revision=verified.permission_revision,
-            state="assembled" if selected else "empty_unknown", completeness=completeness,
-            items=tuple(selected), character_count=total_chars)
+        return tuple({item.item_id: item for item in candidates}.values())
+
+
+def select_bounded(order, candidates, query: ContextQuery):
+    """Ignore unknown/repeated ranker IDs and omit whole passages at the budget."""
+    query = ContextQuery.model_validate(query.model_dump())
+    by_id = {item.item_id: item for item in candidates}
+    selected, seen, total_chars, overflow = [], set(), 0, False
+    for item_id in order:
+        if item_id not in by_id or item_id in seen:
+            continue
+        seen.add(item_id)
+        item = by_id[item_id]
+        if len(selected) >= query.max_items:
+            overflow = True
+            break
+        if total_chars + len(item.text) > query.max_context_characters:
+            overflow = True
+            continue
+        selected.append(item)
+        total_chars += len(item.text)
+    return selected, total_chars, overflow
 
 
 def render_explanation_context(context: AssembledContext) -> str:

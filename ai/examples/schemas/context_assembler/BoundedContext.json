@@ -1,0 +1,348 @@
+{
+  "$defs": {
+    "AssembledContext": {
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Query",
+          "type": "string"
+        },
+        "workspace_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "patient_reference": {
+          "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+          "title": "Patient Reference",
+          "type": "string"
+        },
+        "generation_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Generation Id",
+          "type": "string"
+        },
+        "permission_revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Permission Revision",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "assembled",
+            "empty_unknown"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "completeness": {
+          "enum": [
+            "complete_in_checked_scope",
+            "partial",
+            "unknown"
+          ],
+          "title": "Completeness",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ContextItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "character_count": {
+          "minimum": 0,
+          "title": "Character Count",
+          "type": "integer"
+        },
+        "exhaustive": {
+          "const": false,
+          "default": false,
+          "title": "Exhaustive",
+          "type": "boolean"
+        },
+        "absence_claims_allowed": {
+          "const": false,
+          "default": false,
+          "title": "Absence Claims Allowed",
+          "type": "boolean"
+        },
+        "notice": {
+          "default": "Context is limited to current authorized sources in the backend checked scope.",
+          "title": "Notice",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query",
+        "workspace_id",
+        "patient_reference",
+        "generation_id",
+        "permission_revision",
+        "state",
+        "completeness",
+        "items",
+        "character_count"
+      ],
+      "title": "AssembledContext",
+      "type": "object"
+    },
+    "ContextItem": {
+      "additionalProperties": false,
+      "description": "One authorized FHIR resource/passsage; resource boundaries never merge.",
+      "properties": {
+        "item_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceVersion"
+        },
+        "patient_reference": {
+          "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+          "title": "Patient Reference",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "structured",
+            "longitudinal",
+            "relational"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "source_last_updated": {
+          "format": "date-time",
+          "title": "Source Last Updated",
+          "type": "string"
+        },
+        "verified_at": {
+          "format": "date-time",
+          "title": "Verified At",
+          "type": "string"
+        },
+        "permission_revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Permission Revision",
+          "type": "string"
+        },
+        "generation_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Generation Id",
+          "type": "string"
+        },
+        "authorized": {
+          "title": "Authorized",
+          "type": "boolean"
+        },
+        "source_verified": {
+          "title": "Source Verified",
+          "type": "boolean"
+        },
+        "reviewed": {
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        },
+        "offset_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset Start"
+        },
+        "offset_end": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset End"
+        },
+        "offset_unit": {
+          "const": "unicode_code_points",
+          "default": "unicode_code_points",
+          "title": "Offset Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_id",
+        "source",
+        "patient_reference",
+        "tier",
+        "source_last_updated",
+        "verified_at",
+        "permission_revision",
+        "generation_id",
+        "authorized",
+        "source_verified",
+        "reviewed",
+        "text"
+      ],
+      "title": "ContextItem",
+      "type": "object"
+    },
+    "GuidelinePassage": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/ResourceVersion"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        },
+        "offset_start": {
+          "minimum": 0,
+          "title": "Offset Start",
+          "type": "integer"
+        },
+        "offset_end": {
+          "minimum": 1,
+          "title": "Offset End",
+          "type": "integer"
+        },
+        "approved": {
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "approved_by": {
+          "pattern": "^Practitioner(Role)?/[A-Za-z0-9.-]{1,64}$",
+          "title": "Approved By",
+          "type": "string"
+        },
+        "approved_at": {
+          "format": "date-time",
+          "title": "Approved At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "title",
+        "text",
+        "offset_start",
+        "offset_end",
+        "approved",
+        "approved_by",
+        "approved_at"
+      ],
+      "title": "GuidelinePassage",
+      "type": "object"
+    },
+    "ResourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference",
+        "version"
+      ],
+      "title": "ResourceVersion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "patient_context": {
+      "$ref": "#/$defs/AssembledContext"
+    },
+    "guidelines": {
+      "items": {
+        "$ref": "#/$defs/GuidelinePassage"
+      },
+      "title": "Guidelines",
+      "type": "array"
+    },
+    "guideline_state": {
+      "enum": [
+        "current",
+        "unknown",
+        "not_requested"
+      ],
+      "title": "Guideline State",
+      "type": "string"
+    },
+    "character_count": {
+      "minimum": 0,
+      "title": "Character Count",
+      "type": "integer"
+    },
+    "absence_claims_allowed": {
+      "const": false,
+      "default": false,
+      "title": "Absence Claims Allowed",
+      "type": "boolean"
+    },
+    "notice": {
+      "default": "Guidelines are reference material, not patient facts or authority to order care.",
+      "title": "Notice",
+      "type": "string"
+    }
+  },
+  "required": [
+    "patient_context",
+    "guidelines",
+    "guideline_state",
+    "character_count"
+  ],
+  "title": "BoundedContext",
+  "type": "object"
+}

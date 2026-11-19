@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "metric_id": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Metric Id",
+      "type": "string"
+    },
+    "segment": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Segment",
+      "type": "string"
+    },
+    "count": {
+      "minimum": 0,
+      "title": "Count",
+      "type": "integer"
+    },
+    "denominator": {
+      "minimum": 0,
+      "title": "Denominator",
+      "type": "integer"
+    },
+    "denominator_label": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Denominator Label",
+      "type": "string"
+    }
+  },
+  "required": [
+    "metric_id",
+    "segment",
+    "count",
+    "denominator",
+    "denominator_label"
+  ],
+  "title": "MetricCount",
+  "type": "object"
+}

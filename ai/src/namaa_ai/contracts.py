@@ -2,9 +2,23 @@
 from __future__ import annotations
 
 from datetime import date
+import re
 from typing import Annotated, Any, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool, model_validator
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, StrictBool, model_validator
+
+
+def _explicit_date(value):
+    # Pydantic's default date codec also accepts timestamps and midnight datetimes.
+    # Neither is an explicit event date copied from a clinical source.
+    if type(value) is date:
+        return value
+    if isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        return date.fromisoformat(value)
+    raise ValueError("An explicit YYYY-MM-DD date is required")
+
+
+ExplicitDate = Annotated[date, BeforeValidator(_explicit_date)]
 
 Text = Annotated[str, Field(min_length=1, max_length=6000, pattern=r"\S")]
 Version = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9.-]+$")]
@@ -26,7 +40,7 @@ class ExtractionRequest(Contract):
     patient_reference: PatientRef
     source_id: LogicalId
     source_version: Version
-    source_date: date
+    source_date: ExplicitDate
     language: Literal["en"] = "en"
     note_text: Text
 
@@ -36,7 +50,7 @@ class ProposedFact(Contract):
     value_text: Text  # original statement, verbatim; never a model paraphrase
     subject: Literal["patient", "family_member"]
     assertion: Assertion
-    effective_date: date | None  # explicit full ISO date only in this slice
+    effective_date: ExplicitDate | None  # explicit full ISO date only in this slice
     excerpt: Text
     proposed_resource_type: Literal["Observation", "Condition", "FamilyMemberHistory"]
     relationship: Literal["mother", "father", "sister", "brother", "sibling", "grandmother", "grandfather"] | None

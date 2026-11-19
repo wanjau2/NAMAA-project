@@ -33,6 +33,15 @@ def test_published_schemas_are_current():
         assert json.loads(path.read_text()) == getattr(contracts, path.stem).model_json_schema()
 
 
+def test_published_safety_schemas_are_current():
+    from namaa_ai import analytics, context_assembler, relate_graph
+    for module in (analytics, context_assembler, relate_graph):
+        paths = list((EXAMPLES / "schemas" / module.__name__.split(".")[-1]).glob("*.json"))
+        assert paths, f"No published schemas for {module.__name__}"
+        for path in paths:
+            assert json.loads(path.read_text()) == getattr(module, path.stem).model_json_schema()
+
+
 def test_engagement_and_metric_examples_are_current():
     for template in TEMPLATES:
         data = json.loads((EXAMPLES / f"engagement-{template.template_id}.json").read_text())

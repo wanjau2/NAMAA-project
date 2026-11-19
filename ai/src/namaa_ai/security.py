@@ -310,7 +310,11 @@ class AuthorizedExtractionPipeline:
         await self.enforcer.require(context=context, action="note.retrieve", resource_type="DocumentReference",
                                     resource_id=source_id, patient_id=patient_id, job_id=job_id)
         request = await self.source_provider.fetch(context=context, patient_id=patient_id, source_id=source_id)
-        if request.workspace_id != context.workspace_id or request.patient_reference != f"Patient/{patient_id}":
+        from .contracts import ExtractionRequest
+
+        request = ExtractionRequest.model_validate(request.model_dump())
+        if (request.workspace_id != context.workspace_id or request.patient_reference != f"Patient/{patient_id}"
+                or request.source_id != source_id):
             raise AuthorizationDenied()
         await self.enforcer.require(context=context, action="model.dispatch", resource_type="DocumentReference",
                                     resource_id=source_id, patient_id=patient_id, job_id=job_id,

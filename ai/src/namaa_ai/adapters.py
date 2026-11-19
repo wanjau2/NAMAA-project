@@ -13,8 +13,9 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import ValidationError
 
-from .contracts import EndpointResponse, ExtractionRequest, ExtractionResult, ModelIdentity, ModelOutput
+from .contracts import ExtractionRequest, ExtractionResult, ModelIdentity, ModelOutput
 from .validation import make_proposals
+from .extraction import decode_response, EndpointIdentityMismatch
 
 PROTOCOL = "namaa-extraction-v1"
 PROMPT_VERSION = "extract-v1.0.1"
@@ -140,9 +141,11 @@ class HostedAdapter:
                                 continue
                             return fail("transport_failure", "transport_retry_exhausted")
                         try:
-                            envelope = EndpointResponse.model_validate_json(bytes(body))
-                            if envelope.model_revision != self.config.model_revision:
-                                return fail("invalid_output", "model_revision_mismatch")
+                            envelope = decode_response(bytes(body), model_id=MODEL_ID,
+                                model_revision=self.config.model_revision,
+                                prompt_version=PROMPT_VERSION, protocol=PROTOCOL)
+                        except EndpointIdentityMismatch as exc:
+                            return fail("invalid_output", str(exc))
                         except (ValidationError, ValueError):
                             if not repaired and attempts < 3:
                                 repaired = True

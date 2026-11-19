@@ -8,6 +8,15 @@ write is implemented here. The existing SQLite demo remains as documented in D00
 
 **Synthetic only. Mock results are simulated. No clinical validation is claimed.**
 
+The [19 November safety implementation and backend handoff](docs/SAFETY_IMPLEMENTATION.md)
+records the current Alfred-only scope: strict extraction decoding, bounded
+patient/guideline retrieval, explicit graph refresh outcomes, family-history
+re-evaluation routing and population suppression. No live HAPI or model endpoint
+was used. The API still uses SQLite and a stub FHIR gateway.
+
+For integration, start with the [draft handover to Ismail](docs/HANDOVER_TO_ISMAIL.md):
+delivered interfaces, backend work sequence, contract decisions and acceptance gates.
+
 ## Setup and local demonstration
 
 From the repository root, with Python 3.11+ (tested here on Python 3.14.10):
@@ -54,6 +63,7 @@ not a successful empty extraction.
 | --- | --- |
 | `src/namaa_ai/contracts.py` | Pydantic 2 contracts with unknown fields forbidden |
 | `src/namaa_ai/adapters.py` | Backend-only hosted adapter and labelled fixture replay |
+| `src/namaa_ai/extraction.py` | Strict JSON decoder; duplicate-key and deployment-identity rejection |
 | `src/namaa_ai/validation.py` | Exact excerpts, offsets, qualifiers, source conflicts |
 | `src/namaa_ai/review.py` | Accept/correct/reject, authorization callback and version checks |
 | `src/namaa_ai/backend.py` | Session-bound API bridges for nested proposals, review, canonical rules and verified Relate discovery |
@@ -61,8 +71,11 @@ not a successful empty extraction.
 | `src/namaa_ai/rules.py` | Versioned fictional rules over backend resource snapshots |
 | `src/namaa_ai/context.py` | Default-disabled verified-context gate |
 | `src/namaa_ai/context_engineering.py` | FHIR-resource-bounded retrieval, BM25, optional dense adapter, rank fusion and bounded context assembly |
+| `src/namaa_ai/context_assembler.py` | Approved guidelines and patient passages with a shared retrieval budget |
 | `src/namaa_ai/ingestion.py` | Layout/OCR parser protocol and explicitly simulated fixture parser |
 | `src/namaa_ai/relate.py` | Default-disabled Relate candidate verification against current backend context |
+| `src/namaa_ai/relate_graph.py` | Per-request verification callback, unknown suppression and refresh requests |
+| `src/namaa_ai/analytics.py` | Pure small-cell/complementary suppression for one complete publication family |
 | `src/namaa_ai/engagement.py` | English-only, non-sending demo templates and versioned metric definitions |
 | `src/namaa_ai/evaluation.py` | Field metrics, source/schema validity and latency |
 | `fixtures/notes.json` | 40 labelled notes with 20 development / 20 held-out records |
@@ -86,9 +99,9 @@ explicit deterministic test fixture only. Backend guest decisions always carry
 `production_authorization=false`.
 
 The [backend bridge guide](docs/BACKEND_BRIDGES.md) covers API integration tests,
-live AuthZEN checks, and the review/rule/Relate clients. The announced newer
-backend routes are absent from this checkout, so their deployed compatibility
-remains pending. HAPI commit is still stubbed.
+live AuthZEN checks, and the review/rule/Relate clients. HAPI commit is still
+stubbed. Current acceptance evidence is recorded in the safety handoff above;
+older evidence in the bridge guide describes its original checkout.
 
 From the repository root, run the isolated HTTP acceptance checks with
 `ai/.venv/bin/python ai/scripts/check_backend.py --local`. For an existing

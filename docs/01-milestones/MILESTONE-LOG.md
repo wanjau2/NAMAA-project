@@ -4,6 +4,7 @@ Newest first. One line per milestone; detail lives in the linked record.
 
 | # | Date | Milestone | Owner | Status | Record |
 | --- | --- | --- | --- | --- | --- |
+| M05 | 2026-11-19 | Alfred extraction, bounded context, graph refresh and evaluation safeguards | Alfred | Partial | [M05-alfred-safety-boundaries.md](M05-alfred-safety-boundaries.md) |
 | M03 | 2026-11-18 | Extraction SSE + FHIR outbox/DLQ compensation | Ismail | Partial | [M03-sse-and-outbox.md](M03-sse-and-outbox.md) |
 | M02 | 2026-11-18 | Backend foundation: FastAPI workflow API + seed + actions | Ismail | Partial | [M02-backend-foundation.md](M02-backend-foundation.md) |
 | M04 | 2026-11-18 | Browser verification: journeys, accessibility, RTL, responsive | Mark | Done | [M04-browser-verification.md](M04-browser-verification.md) |

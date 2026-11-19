@@ -30,6 +30,9 @@ class DenyReview:
 def apply_review(request: ExtractionRequest, proposal: ExtractionProposal, command: ReviewCommand,
                  *, current_version: int, reviewed_at: datetime,
                  authorizer: ReviewAuthorizer | None = None) -> ReviewDecision:
+    request = ExtractionRequest.model_validate(request.model_dump())
+    proposal = ExtractionProposal.model_validate(proposal.model_dump())
+    command = ReviewCommand.model_validate(command.model_dump())
     (authorizer or DenyReview()).require_review(command, proposal)
     if command.proposal_id != proposal.id or command.expected_proposal_version != current_version or proposal.version != current_version:
         raise ReviewError("stale_proposal_version")

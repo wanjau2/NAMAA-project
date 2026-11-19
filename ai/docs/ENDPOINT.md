@@ -63,6 +63,13 @@ are terminal. One invalid-schema regeneration is allowed. Three attempts maximum
 across both allowances; the deadline may stop earlier. Response body is bounded
 to 128 KiB. Cancellation propagates; there is no local background inference job.
 
+The decoder rejects duplicate JSON keys and non-JSON numeric constants. Event
+dates must be explicit `YYYY-MM-DD` strings (or actual Python dates internally);
+numeric timestamps and midnight datetime coercions are refused. A mismatched
+model ID/revision, prompt version or protocol is terminal and does not consume
+the formatting-repair allowance. Source ID, patient and workspace are checked
+against the worker's authenticated source request before model dispatch.
+
 Valid empty facts are distinct from schema failure, source-validation failure,
 HTTP/transport failure and deadline expiry. Source errors are not repaired by
 making another model call. They remain blocked proposals for explicit correction

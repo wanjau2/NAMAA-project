@@ -1,0 +1,114 @@
+{
+  "$defs": {
+    "PublishedMetric": {
+      "additionalProperties": false,
+      "properties": {
+        "metric_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "segment": {
+          "title": "Segment",
+          "type": "string"
+        },
+        "count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Count"
+        },
+        "denominator": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Denominator"
+        },
+        "denominator_label": {
+          "title": "Denominator Label",
+          "type": "string"
+        },
+        "rate": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rate"
+        },
+        "suppressed": {
+          "title": "Suppressed",
+          "type": "boolean"
+        },
+        "suppression_reason": {
+          "anyOf": [
+            {
+              "const": "release_suppressed",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Suppression Reason"
+        }
+      },
+      "required": [
+        "metric_id",
+        "segment",
+        "count",
+        "denominator",
+        "denominator_label",
+        "rate",
+        "suppressed",
+        "suppression_reason"
+      ],
+      "title": "PublishedMetric",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "projection_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9.-]+$",
+      "title": "Projection Version",
+      "type": "string"
+    },
+    "suppression_threshold": {
+      "minimum": 10,
+      "title": "Suppression Threshold",
+      "type": "integer"
+    },
+    "cells": {
+      "items": {
+        "$ref": "#/$defs/PublishedMetric"
+      },
+      "title": "Cells",
+      "type": "array"
+    }
+  },
+  "required": [
+    "projection_version",
+    "suppression_threshold",
+    "cells"
+  ],
+  "title": "AnalyticsRelease",
+  "type": "object"
+}

@@ -28,11 +28,15 @@ def main():
     if args.command == "demo":
         result = asyncio.run(run_demo())
     elif args.command == "schemas":
-        from . import contracts
+        from . import contracts, analytics, context_assembler, relate_graph
         args.output.mkdir(parents=True, exist_ok=True)
-        for name, obj in vars(contracts).items():
-            if isinstance(obj, type) and issubclass(obj, contracts.Contract) and obj is not contracts.Contract:
-                (args.output / f"{name}.json").write_text(json.dumps(obj.model_json_schema(), indent=2) + "\n")
+        for module in (contracts, analytics, context_assembler, relate_graph):
+            destination = args.output if module is contracts else args.output / module.__name__.split(".")[-1]
+            destination.mkdir(parents=True, exist_ok=True)
+            for name, obj in vars(module).items():
+                if (isinstance(obj, type) and issubclass(obj, contracts.Contract)
+                        and obj is not contracts.Contract and obj.__module__ == module.__name__):
+                    (destination / f"{name}.json").write_text(json.dumps(obj.model_json_schema(), indent=2) + "\n")
         result = {"schemas_written": str(args.output)}
     elif args.command == "evaluate-context":
         cases = json.loads(args.corpus.read_text())["queries"]

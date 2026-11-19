@@ -1,0 +1,188 @@
+{
+  "$defs": {
+    "ContextItem": {
+      "additionalProperties": false,
+      "description": "One authorized FHIR resource/passsage; resource boundaries never merge.",
+      "properties": {
+        "item_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Item Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceVersion"
+        },
+        "patient_reference": {
+          "pattern": "^Patient/[A-Za-z0-9.-]{1,64}$",
+          "title": "Patient Reference",
+          "type": "string"
+        },
+        "tier": {
+          "enum": [
+            "structured",
+            "longitudinal",
+            "relational"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "source_last_updated": {
+          "format": "date-time",
+          "title": "Source Last Updated",
+          "type": "string"
+        },
+        "verified_at": {
+          "format": "date-time",
+          "title": "Verified At",
+          "type": "string"
+        },
+        "permission_revision": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Permission Revision",
+          "type": "string"
+        },
+        "generation_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Generation Id",
+          "type": "string"
+        },
+        "authorized": {
+          "title": "Authorized",
+          "type": "boolean"
+        },
+        "source_verified": {
+          "title": "Source Verified",
+          "type": "boolean"
+        },
+        "reviewed": {
+          "title": "Reviewed",
+          "type": "boolean"
+        },
+        "text": {
+          "maxLength": 6000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        },
+        "offset_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset Start"
+        },
+        "offset_end": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offset End"
+        },
+        "offset_unit": {
+          "const": "unicode_code_points",
+          "default": "unicode_code_points",
+          "title": "Offset Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item_id",
+        "source",
+        "patient_reference",
+        "tier",
+        "source_last_updated",
+        "verified_at",
+        "permission_revision",
+        "generation_id",
+        "authorized",
+        "source_verified",
+        "reviewed",
+        "text"
+      ],
+      "title": "ContextItem",
+      "type": "object"
+    },
+    "ResourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "pattern": "^[A-Z][A-Za-z]+/[A-Za-z0-9.-]{1,64}$",
+          "title": "Reference",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9.-]+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference",
+        "version"
+      ],
+      "title": "ResourceVersion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "state": {
+      "enum": [
+        "verified",
+        "unknown"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "items": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ContextItem"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "refresh": {
+      "enum": [
+        "not_required",
+        "requested",
+        "failed"
+      ],
+      "title": "Refresh",
+      "type": "string"
+    },
+    "absence_claims_allowed": {
+      "const": false,
+      "default": false,
+      "title": "Absence Claims Allowed",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "state",
+    "refresh"
+  ],
+  "title": "RelateResolution",
+  "type": "object"
+}

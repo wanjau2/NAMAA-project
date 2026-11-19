@@ -13,6 +13,10 @@
 - Each resource remains an independent candidate: structured state, a
   `DocumentReference` longitudinal note, or `FamilyMemberHistory` relational
   context. Resource boundaries are not merged.
+- Multiple passages of the same document/version have distinct IDs incorporating
+  their exact text and offsets. Identical passages are deduplicated; conflicting
+  source versions or different text at the same offsets reject the envelope.
+  Unknown and repeated IDs returned by an injected retriever are ignored.
 - Local retrieval uses deterministic BM25. `DenseRetriever` is a replaceable
   ranking interface; `ReciprocalRankFusion` can combine lexical and injected
   dense rankings. Dense adapters receive only already authorized candidate
@@ -60,6 +64,25 @@ backend attestation of reviewed state. A backend must recheck HAPI versions and
 permission revisions before disclosure; this package cannot contact HAPI.
 
 ## Alfred / Ismail integration contract
+
+`context_assembler.ScopedContextAssembler` additionally accepts a
+`VerifiedGuidelines` envelope, separately verified by the backend for the current
+workspace and permission revision. Approved `Library` or `DocumentReference`
+passages retain source version, reviewer and approval time, and exact code-point
+offsets. Unapproved, expired, conflicting or unauthorized guidance never reaches
+the ranker. Guidelines and patient items share the item/text budget, but remain
+separate typed collections. No guideline is treated as a patient finding. There
+is no bundled clinical guideline corpus or claim that a real guideline has been
+approved. `render_bounded_context()` labels all source text as untrusted.
+
+`relate_graph.RelateResolver` requires an async authoritative verifier and an async
+refresh-queue callback. It calls the verifier on every resolution, including
+empty/stale batches, with session-derived scope and candidate references only.
+The verifier must perform PEP/PDP checks and current HAPI reads. Failures,
+missing supports and stale generations return `state="unknown"`, no items and
+`refresh="requested"` (or `"failed"` if enqueue fails). This is a new backend
+composition boundary; existing tuple-returning bridge clients retain their old
+interface and are not silently connected to a nonexistent refresh endpoint.
 
 Ismail's authenticated service should:
 
@@ -133,7 +156,7 @@ quality, or population generalization results.
 
 There is no real PDF/OCR engine, document parser deployment, embedding
 generation, vector database, live hybrid search, Relate query service, context synchronization, HAPI
-verification, automatic model explanation, policy-guideline retrieval, or
+verification, automatic model explanation, live guideline ingestion, or
 condition-based risk adjustment in this package. Those features require their
 own source, authorization, validation and evaluation contracts. The current
 synthetic rules ignore retrieved context entirely.
