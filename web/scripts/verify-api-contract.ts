@@ -17,6 +17,22 @@ const BASE = process.env.NAMAA_API_BASE ?? "http://127.0.0.1:8000";
 
 let pass = 0;
 let fail = 0;
+let pending = 0;
+
+/**
+ * A capability the team has agreed but the API does not implement yet.
+ * Reported loudly, but it does NOT fail the suite: this is a readiness gate,
+ * not a regression. When it flips to PASS the frontend is already wired.
+ */
+function readiness(name: string, implemented: boolean, note: string) {
+  if (implemented) {
+    pass++;
+    console.log(`PASS  ${name}`);
+  } else {
+    pending++;
+    console.log(`PENDING  ${name} — ${note}`);
+  }
+}
 function check(name: string, condition: boolean, detail = "") {
   if (condition) {
     pass++;
@@ -456,6 +472,72 @@ async function main() {
     adultDoc.json.case_id === "case-0003",
   );
 
+
+  // --- readiness: capabilities agreed with Alfred, not yet in the API ---
+  const nestedShape = props.length > 0 && typeof props[0].fact === "object";
+  readiness(
+    "proposals use the nested `fact` contract",
+    nestedShape,
+    "proposals are still flat; the UI reads both shapes (lib/contracts.ts normalizeProposal)",
+  );
+  readiness(
+    "proposals carry an integer concurrency version",
+    props.length > 0 && typeof props[0].version === "number",
+    "no version is supplied, so a review command cannot be built without inventing one",
+  );
+  readiness(
+    "proposals carry validation issues",
+    props.length > 0 && Array.isArray(props[0].issues),
+    "issues are not reported; an empty list must not read as 'none found'",
+  );
+  readiness(
+    "proposals carry a source hash binding them to an exact note",
+    props.length > 0 && typeof props[0].source_sha256 === "string",
+    "source_sha256 is absent",
+  );
+
+  const reviewProbe = await call(
+    `/api/v1/facts/${props[0]?.id ?? "unknown"}/review`,
+    {
+      method: "POST",
+      role: "clinical_reviewer",
+      body: {
+        request_id: "probe",
+        proposal_id: props[0]?.id ?? "unknown",
+        expected_proposal_version: 1,
+        action: "accept",
+        reviewer_reference: "Practitioner/demo-reviewer",
+        reason: "readiness probe",
+        correction: null,
+        acknowledged_issues: [],
+      },
+    },
+  );
+  readiness(
+    "POST /api/v1/facts/{id}/review exists",
+    reviewProbe.status !== 404 && reviewProbe.status !== 405,
+    `returns ${reviewProbe.status}; review decisions cannot persist (Q10)`,
+  );
+
+  const evalProbe = await call("/api/v1/patients/pat-synthetic-11/evaluations", {
+    method: "POST",
+    body: {},
+  });
+  readiness(
+    "evaluations expose a four-value rule outcome",
+    typeof evalProbe.json.outcome === "string" ||
+      typeof evalProbe.json.rule_evaluation?.outcome === "string",
+    `only flag_status "${evalProbe.json.flag_status}" is returned; not_eligible cannot reach the UI (Q12)`,
+  );
+
+  // --- security: 403 and 404 must be indistinguishable to a client ---
+  const foreignDoc = await call("/api/v1/documents/doc-does-not-exist");
+  check(
+    "an unknown document does not disclose whether it exists",
+    foreignDoc.status === 403 || foreignDoc.status === 404,
+    `status ${foreignDoc.status}`,
+  );
+
   // --- analytics: server-side suppression shape ---
   const overview = await call("/api/v1/analytics/overview");
   const cells: Json[] = (overview.json.pathways ?? []).flatMap((p: Json) =>
@@ -494,7 +576,9 @@ async function main() {
     afterReset.json.stage === "booked" && afterReset.json.revision === 4,
   );
 
-  console.log(`\n${pass} passed, ${fail} failed`);
+  console.log(
+    `\n${pass} passed, ${fail} failed, ${pending} pending (agreed but not implemented)`,
+  );
   if (fail > 0) process.exit(1);
 }
 

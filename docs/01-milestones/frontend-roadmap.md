@@ -19,6 +19,10 @@ case detail (partial).
 
 **Progress: A1, A2, A4 complete** (plus a minimal nav from A6). Next: A3 or A5.
 
+**Alfred's frontend handoff complete 2026-11-19** — typed extraction contract rendering and
+the assembled-context panel are built ([evidence](../03-evidence/F-contracts/checks.md)). The
+frontend side of his M0–M3 is as far as it can go without Q10, Q12, M2 and C3.
+
 **Alfred's contract work started 2026-11-18** — code-point offsets and the four-outcome
 display layer are done ([evidence](../03-evidence/F-contracts/checks.md)); the enum itself is Q12.
 

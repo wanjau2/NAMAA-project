@@ -8,12 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "verify:metrics": "node --experimental-strip-types --no-warnings scripts/verify-metrics.ts",
-    "verify": "npm run verify:metrics && npm run verify:contracts",
+    "verify": "npm run verify:metrics && npm run verify:contracts && npm run verify:shapes",
     "verify:api": "node --experimental-strip-types --no-warnings scripts/verify-api-contract.ts",
     "e2e": "playwright test",
     "e2e:desktop": "playwright test --project=desktop",
     "demo": "playwright test --project=demo",
-    "verify:contracts": "node --experimental-strip-types --no-warnings scripts/verify-offsets-outcomes.ts"
+    "verify:contracts": "node --experimental-strip-types --no-warnings scripts/verify-offsets-outcomes.ts",
+    "verify:shapes": "node --experimental-strip-types --no-warnings scripts/verify-contract-shapes.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
