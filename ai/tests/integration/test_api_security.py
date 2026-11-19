@@ -57,13 +57,14 @@ def test_enforcer_posts_versioned_audit_with_request_correlation(api_stack):
                 model_revision="simulated-fixture-v1", prompt_version="extract-v1.0.1"))
         assert decisions[0].decision_id != decisions[1].decision_id
         with api_stack.db() as db:
-            rows = db.query(AuditEvent).filter_by(event_type="ai.security.boundary").all()
+            rows = db.query(AuditEvent).filter_by(event_type="ai.security.boundary").order_by(AuditEvent.pk).all()
             assert len(rows) == 2
             for row, decision in zip(rows, decisions):
                 assert row.request_id == ctx.request_id
                 assert row.workspace_id == ctx.workspace_id
                 assert json.loads(row.source_versions_json) == {f"DocumentReference/{DOCUMENT}": "opaque-v2"}
-                assert json.loads(row.safe_detail_json)["client_decision_id"] == decision.decision_id
+                assert row.decision_id == decision.decision_id
+                assert row.decision == "Permit"
                 assert row.model_revision == "simulated-fixture-v1"
                 assert "note_text" not in row.safe_detail_json
     asyncio.run(run())
