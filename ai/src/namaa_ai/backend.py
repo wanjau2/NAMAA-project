@@ -15,7 +15,7 @@ from .context import VerifiedContextAdapter
 from .contracts import (ContextItem, ExtractionProposal, ExtractionRequest, LogicalId,
                         RelateCandidateBatch, ReviewCommand, ReviewDecision, RuleEvaluation, VerifiedContext)
 from .handoff import prepare_rule_handoff
-from .relate import VerifiedCandidateAdapter
+from .relate_graph import RelateResolution, RelateResolver
 from .security import AuthorizationDenied, BackendHttpClient, TrustedContext
 
 
@@ -177,37 +177,46 @@ class BackendApiClient(BackendHttpClient):
             request_id=context.request_id, json={"patient_id": _id(patient_id),
                 "generation_id": generation_id, "relate_hints": relate_hints or []})
         verified = BackendVerifiedContext.model_validate(response.json()).canonical()
-        VerifiedContextAdapter(enabled=True).accept(
+        VerifiedContextAdapter().accept(
             verified, workspace_id=context.workspace_id, patient_reference=f"Patient/{patient_id}",
             permission_revision=context.permission_revision,
             generation_id=generation_id or verified.generation_id, now=datetime.now(timezone.utc))
         return verified
 
-    async def _relate_context(self, operation: str, *, patient_id: str, limit: int) -> tuple[ContextItem, ...]:
+    async def _relate_resolution(self, operation: str, *, patient_id: str, limit: int) -> RelateResolution:
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("invalid_relate_limit")
         context = await self.trusted_context()
         response = await self._request("GET", f"/api/v1/relate/{operation}",
             request_id=context.request_id, params={"patient_id": _id(patient_id), "limit": limit})
         batch = RelateCandidateBatch.model_validate(response.json())
-        # Treat discovery solely as hints. Even an empty/stale batch goes through
-        # the authoritative verification endpoint; no graph text is disclosed.
-        scoped = (batch.state == "current" and batch.workspace_id == context.workspace_id and
-                  batch.patient_reference == f"Patient/{patient_id}" and
-                  batch.permission_revision == context.permission_revision)
-        references = sorted({ref for candidate in batch.candidates
-                             if scoped and candidate.patient_reference == f"Patient/{patient_id}"
-                             for ref in candidate.supporting_references})
-        hints = [dict(zip(("resource_type", "logical_id"), ref.split("/"))) for ref in references]
-        verified = await self.verified_context(patient_id=patient_id, context=context,
+        patient_reference = f"Patient/{patient_id}"
+
+        async def verify(*, workspace_id: str, patient_reference: str, references: tuple[str, ...]):
+            hints = []
+            for reference in references:
+                resource_type, _, logical_id = reference.partition("/")
+                if resource_type and logical_id:
+                    hints.append({"resource_type": resource_type, "logical_id": logical_id})
+            return await self.verified_context(patient_id=patient_id, context=context,
                                                generation_id=batch.generation_id, relate_hints=hints)
-        return VerifiedCandidateAdapter(enabled=True).resolve(
-            batch, verified, workspace_id=context.workspace_id, patient_reference=f"Patient/{patient_id}",
-            permission_revision=context.permission_revision, generation_id=batch.generation_id,
-            now=datetime.now(timezone.utc))
+
+        async def request_refresh(*, workspace_id: str, patient_reference: str):
+            # No refresh route is published; the resolver still records requested vs failed.
+            return None
+
+        return await RelateResolver(verify, request_refresh).resolve(
+            batch, workspace_id=context.workspace_id, patient_reference=patient_reference,
+            permission_revision=context.permission_revision)
+
+    async def family_history_resolution(self, patient_id: str, *, limit: int = 20) -> RelateResolution:
+        return await self._relate_resolution("family-history", patient_id=patient_id, limit=limit)
+
+    async def care_plan_resolution(self, patient_id: str, *, limit: int = 20) -> RelateResolution:
+        return await self._relate_resolution("care-plans", patient_id=patient_id, limit=limit)
 
     async def family_history_context(self, patient_id: str, *, limit: int = 20) -> tuple[ContextItem, ...]:
-        return await self._relate_context("family-history", patient_id=patient_id, limit=limit)
+        return (await self.family_history_resolution(patient_id, limit=limit)).items
 
     async def care_plan_context(self, patient_id: str, *, limit: int = 20) -> tuple[ContextItem, ...]:
-        return await self._relate_context("care-plans", patient_id=patient_id, limit=limit)
+        return (await self.care_plan_resolution(patient_id, limit=limit)).items

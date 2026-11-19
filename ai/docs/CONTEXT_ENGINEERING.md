@@ -6,10 +6,11 @@
   source-linked contract. Items retain patient scope, resource reference/version,
   retrieval tier, backend permission revision, generation ID, verification time,
   review marker and optional Unicode code-point offsets.
-- `ContextAssembler` is disabled by default. When explicitly enabled, it accepts
-  only a current authorized `VerifiedContext` whose workspace, patient,
-  permission revision, generation, time window and source checks match the
-  caller-supplied trusted context. Unsupported FHIR resource kinds are ignored.
+- `ContextAssembler` and `ScopedContextAssembler` are enabled. Pass
+  `enabled=False` to disable a composition boundary. They accept only a current
+  authorized `VerifiedContext` whose workspace, patient, permission revision,
+  generation, time window and source checks match the caller-supplied trusted
+  context. Unsupported FHIR resource kinds are ignored.
 - Each resource remains an independent candidate: structured state, a
   `DocumentReference` longitudinal note, or `FamilyMemberHistory` relational
   context. Resource boundaries are not merged.
@@ -17,11 +18,12 @@
   their exact text and offsets. Identical passages are deduplicated; conflicting
   source versions or different text at the same offsets reject the envelope.
   Unknown and repeated IDs returned by an injected retriever are ignored.
-- Local retrieval uses deterministic BM25. `DenseRetriever` is a replaceable
-  ranking interface; `ReciprocalRankFusion` can combine lexical and injected
-  dense rankings. Dense adapters receive only already authorized candidate
-  items, and may return only those item IDs. No embedding model, vector database,
-  hosted search service or graph client is implemented.
+- Default retrieval is hybrid: deterministic BM25 plus a hashed-token cosine
+  ranker (`HashedDenseRetriever`) fused with `ReciprocalRankFusion`. That dense
+  ranker is not a trained embedding model. Inject a real `DenseRetriever` for
+  production vectors; it still receives only already authorized candidate items
+  and may return only those item IDs. No vector database, hosted search service
+  or graph client is implemented. Pass `hybrid=False` for lexical-only ranking.
 - The assembler enforces an item and character budget by omitting whole items,
   never clipping excerpts. It labels incomplete or empty results; empty means
   unknown in the checked scope, never no gap. Output is explicitly
@@ -39,15 +41,17 @@
   adapter. It does not run OCR or parse real PDFs; production parsing must be
   injected by the backend and register a versioned, source-verifiable output.
 - **A5 — hybrid/vector retrieval boundary:** BM25 and reciprocal-rank fusion
-  are implemented. `InMemoryDenseRetriever` exercises cosine ranking over
-  externally supplied vectors for local tests only; it generates no embeddings
-  and persists no index. A production vector adapter must receive only the
-  authorized candidate set and use an explicitly authorized embedding
-  destination.
+  are implemented. Default fusion includes `HashedDenseRetriever`, a
+  token-hash cosine ranker that only scores candidates sharing a query token,
+  not a trained embedding model.
+  `InMemoryDenseRetriever` exercises cosine ranking over externally supplied
+  vectors for local tests only. A production vector adapter must receive only
+  the authorized candidate set and use an explicitly authorized embedding
+  destination. Pass `hybrid=False` for lexical-only ranking.
 - **A6 — Relate candidate verification:** `RelateCandidateBatch` contains only
   bounded references and generation/permission metadata. `FixedRelateOperations`
   exposes named parameterized operations; no query language or graph client is
-  exposed. `VerifiedCandidateAdapter` is disabled by default, suppresses stale
+  exposed. `VerifiedCandidateAdapter` is enabled, suppresses stale
   or wrong-scope batches, and resolves hints only to records already verified
   in the current backend context. Relate never grants access or supplies model
   text directly.
@@ -80,9 +84,11 @@ refresh-queue callback. It calls the verifier on every resolution, including
 empty/stale batches, with session-derived scope and candidate references only.
 The verifier must perform PEP/PDP checks and current HAPI reads. Failures,
 missing supports and stale generations return `state="unknown"`, no items and
-`refresh="requested"` (or `"failed"` if enqueue fails). This is a new backend
-composition boundary; existing tuple-returning bridge clients retain their old
-interface and are not silently connected to a nonexistent refresh endpoint.
+`refresh="requested"` (or `"failed"` if enqueue fails). `BackendApiClient`
+resolves family-history and care-plan discovery through this boundary.
+`request_refresh` is a documented no-op until Ismail publishes a refresh
+route. Prefer `family_history_resolution` / `care_plan_resolution` over the
+tuple helpers so unknown is not mistaken for absence.
 
 Ismail's authenticated service should:
 
@@ -102,7 +108,7 @@ Ismail's authenticated service should:
    backend. If a version changed, suppress that item and request context refresh.
 
 The current application package can pass the resulting `VerifiedContext` and
-trusted scope values to `ContextAssembler(enabled=True).assemble(...)`. The
+trusted scope values to `ContextAssembler().assemble(...)`. The
 backend must invoke this at the authorized service boundary; the browser must not
 construct or assert the trusted context. For queued jobs, preserve the initiating
 principal, workspace, patient scope and purpose, then reauthorize on claim and

@@ -7,7 +7,7 @@ fixed cohorts, authorization and protections against differencing across release
 """
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, StrictBool, model_validator
 
 from .contracts import Contract, LogicalId
 
@@ -43,6 +43,19 @@ class AnalyticsRelease(Contract):
     cells: tuple[PublishedMetric, ...]
 
 
+class AnalyticsViews(Contract):
+    """Overview and segments selected from one suppressed release. Never recompute."""
+    projection_version: LogicalId
+    suppression_threshold: int = Field(ge=10)
+    suppressed: StrictBool
+    overview: tuple[PublishedMetric, ...]
+    segments: tuple[PublishedMetric, ...]
+
+
+OVERVIEW_SEGMENT = "overview"
+FUNNEL_METRICS = ("invited", "booked", "attended", "follow_up", "completed", "declined", "unreachable")
+
+
 def suppress_population(cells: tuple[MetricCount, ...], *, projection_version: str,
                         threshold: int = 10) -> AnalyticsRelease:
     """One fixed, complete publication family; never pass individual cells here."""
@@ -62,3 +75,40 @@ def suppress_population(cells: tuple[MetricCount, ...], *, projection_version: s
             rate=None if suppressed else cell.count / cell.denominator,
             suppressed=suppressed, suppression_reason="release_suppressed" if suppressed else None)
             for cell in cells))
+
+
+def funnel_cells(
+    segments: dict[str, dict[str, int]],
+    *,
+    denominator_label: str = "Eligible patient-pathways at cohort entry",
+) -> tuple[MetricCount, ...]:
+    """Build the publication family. Cohort size is the denominator, never a cell.
+
+    Do not pass eligible/eligible rows: a zero complement would suppress the
+    entire release even for a large cohort.
+    """
+    cells = []
+    for segment, counts in segments.items():
+        if "eligible" not in counts:
+            raise ValueError("funnel_requires_eligible_denominator")
+        eligible = counts["eligible"]
+        for metric_id, count in counts.items():
+            if metric_id == "eligible":
+                continue
+            if metric_id not in FUNNEL_METRICS:
+                raise ValueError("unsupported_funnel_metric")
+            cells.append(MetricCount(metric_id=metric_id, segment=segment, count=count,
+                                     denominator=eligible, denominator_label=denominator_label))
+    return tuple(cells)
+
+
+def publish_population(cells: tuple[MetricCount, ...], *, projection_version: str,
+                       threshold: int = 10) -> AnalyticsViews:
+    """Suppress once, then expose overview and segment views of the same release."""
+    release = suppress_population(cells, projection_version=projection_version, threshold=threshold)
+    overview = tuple(cell for cell in release.cells if cell.segment == OVERVIEW_SEGMENT)
+    segments = tuple(cell for cell in release.cells if cell.segment != OVERVIEW_SEGMENT)
+    return AnalyticsViews(projection_version=release.projection_version,
+                          suppression_threshold=release.suppression_threshold,
+                          suppressed=any(cell.suppressed for cell in release.cells),
+                          overview=overview, segments=segments)

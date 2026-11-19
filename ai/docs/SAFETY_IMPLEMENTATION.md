@@ -69,9 +69,9 @@ completion metric and passage-specific context IDs.
 
 On base commit `bf754f1` plus this working-tree change:
 
-- Offline AI suite: **273 passed**.
+- Offline AI suite: **281 passed**.
 - Required isolated API integration selection: **13 passed, 16 deselected**.
-- Combined suite: **286 passed, 16 skipped**. Skips are explicitly configured
+- Combined suite: **294 passed, 16 skipped**. Skips are explicitly configured
   live-backend checks without an external URL/seed mapping, not skipped local
   safety tests. See [verification evidence](../../docs/03-evidence/alfred-safety/checks.md).
 
@@ -87,8 +87,8 @@ and the existing synthetic API. No real patient data or hosted model was used.
 | Fact review | `apply_review`, `propose_transaction` | Session-bound reviewer; command journal and proposal CAS; HAPI transaction with update preconditions; append-only Provenance; reconcile uncertain commits before retry. Local Bundles remain non-executable proposals pending validation. |
 | Evaluation | `evaluate`, `rules_for_reviewed_commit` | Replace the API evaluator stub with reviewed HAPI snapshots; invoke routing after confirmed commit; persist complete immutable results and input versions. Family history schedules review, not an order or a diagnosis. |
 | Context and guidelines | `ScopedContextAssembler`, `VerifiedGuidelines` | Per-request PEP/PDP and current HAPI verification; approval tied to the exact guideline version; supply verified text/offsets; reauthorize before disclosure or dispatch. No approved real guideline corpus is included. |
-| Optional graph | `RelateResolver(verify, request_refresh)` | Implement current-source/permission verification and idempotent authorized refresh enqueue. Legacy tuple-returning clients do not yet use this new boundary. |
-| Overview and segments | `suppress_population` | Build one complete fixed publication family, suppress it once, then select endpoint views. Wire `/segments` (absent in this checkout), rebuild projections and enforce cross-release privacy. |
+| Optional graph | `RelateResolver(verify, request_refresh)` | Implement current-source/permission verification and idempotent authorized refresh enqueue. `BackendApiClient` now resolves through this boundary. |
+| Overview and segments | `suppress_population`, `publish_population` | Build one complete fixed publication family, suppress it once, then select endpoint views. Wire `/segments` (absent in this checkout) from `AnalyticsViews`. |
 | Care workflow | Existing API acceptance tests and corrected metric definition | Draft CarePlan/Task, reviewer activation and ServiceRequest authorization, verified completion evidence, minute-based escalation, durable command concurrency. Existing API uses `expected_revision`, whereas the requested contract names `expected_version`; resolve this in the API contract. |
 
 The strict PostgreSQL/HAPI production architecture is **not delivered** by this

@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from namaa_ai.context_engineering import (BM25Retriever, ContextAssembler,
-    InMemoryDenseRetriever, ReciprocalRankFusion, render_explanation_context)
+    HashedDenseRetriever, InMemoryDenseRetriever, ReciprocalRankFusion, render_explanation_context)
 from namaa_ai.contracts import ContextQuery, RelateCandidateBatch, VerifiedContext
 from namaa_ai.relate import VerifiedCandidateAdapter
 from namaa_ai.ingestion import FixtureDocumentParser, LayoutBlock
@@ -37,9 +37,13 @@ def assemble(ctx, query, **query_changes):
         generation_id="gen-1", now=NOW)
 
 
-def test_context_assembly_is_disabled_by_default():
+def test_context_assembly_is_enabled_and_can_be_disabled():
+    result = ContextAssembler().assemble(verified(records=[record("Observation", "obs", "Screening history.")]),
+        ContextQuery(query="screening"), workspace_id="ws-demo", patient_reference="Patient/pat-demo",
+        permission_revision="perm-1", generation_id="gen-1", now=NOW)
+    assert result.state == "assembled"
     with pytest.raises(ValueError, match="disabled"):
-        ContextAssembler().assemble(verified(), ContextQuery(query="visit"), workspace_id="ws-demo",
+        ContextAssembler(enabled=False).assemble(verified(), ContextQuery(query="visit"), workspace_id="ws-demo",
             patient_reference="Patient/pat-demo", permission_revision="perm-1", generation_id="gen-1", now=NOW)
 
 
@@ -94,6 +98,17 @@ def test_empty_retrieval_is_explicit_unknown_not_no_gap():
     result = assemble(ctx, "well-child visit")
     assert result.state == "empty_unknown" and result.items == ()
     assert result.absence_claims_allowed is False and result.exhaustive is False
+
+
+def test_default_fusion_is_hybrid_and_cannot_rank_unauthorized_ids():
+    ctx = verified(records=[record("Observation", "obs-1", "Well-child visit."),
+                            record("FamilyMemberHistory", "fmh-1", "Mother has diabetes.")])
+    items = assemble(ctx, "diabetes")
+    ranked = ReciprocalRankFusion().rank("diabetes", items.items)
+    assert ranked and set(ranked) <= {item.item_id for item in items.items}
+    assert HashedDenseRetriever().rank("diabetes", items.items)
+    assert ReciprocalRankFusion(hybrid=False).dense is None
+    assert HashedDenseRetriever().rank("unrelated-query-with-no-overlap", items.items) == ()
 
 
 def test_fusion_ignores_dense_adapter_ids_outside_verified_candidate_set():
@@ -181,9 +196,9 @@ def test_relate_hints_only_resolve_to_current_verified_resources():
         permission_revision="perm-1", generation_id="gen-1", now=NOW) == ()
 
 
-def test_relate_adapter_default_disabled():
+def test_relate_adapter_can_be_disabled():
     with pytest.raises(ValueError, match="disabled"):
-        VerifiedCandidateAdapter().resolve(RelateCandidateBatch(
+        VerifiedCandidateAdapter(enabled=False).resolve(RelateCandidateBatch(
             workspace_id="ws-demo", patient_reference="Patient/pat-demo", generation_id="gen-1",
             permission_revision="perm-1", state="current", candidates=[]), verified(),
             workspace_id="ws-demo", patient_reference="Patient/pat-demo", permission_revision="perm-1",

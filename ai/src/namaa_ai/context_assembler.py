@@ -60,9 +60,9 @@ class BoundedContext(Contract):
 
 
 class ScopedContextAssembler:
-    """One shared item/text budget, BM25 plus an optional injected dense ranker."""
+    """One shared item/text budget; hybrid BM25 plus hashed dense by default."""
 
-    def __init__(self, *, enabled: bool = False, retriever: RankedRetriever | None = None):
+    def __init__(self, *, enabled: bool = True, retriever: RankedRetriever | None = None):
         self.patient_assembler = ContextAssembler(enabled=enabled)
         self.retriever = retriever or ReciprocalRankFusion()
 

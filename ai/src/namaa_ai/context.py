@@ -5,7 +5,7 @@ from .contracts import VerifiedContext
 
 
 class VerifiedContextAdapter:
-    def __init__(self, *, enabled: bool = False):
+    def __init__(self, *, enabled: bool = True):
         self.enabled = enabled
 
     def accept(self, context: VerifiedContext, *, workspace_id: str, patient_reference: str,

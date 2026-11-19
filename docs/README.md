@@ -34,6 +34,8 @@ messaging, no live bookings, no production EHR integration, and no clinically va
 | [namaa_software_design_specification.md](00-reference/namaa_software_design_specification.md) | Full architecture: FHIR R4 contracts, MedGemma extraction, rules, APIs, security/isolation, operations, delivery gates. |
 | [namaa_ui_theme_prompt.md](00-reference/namaa_ui_theme_prompt.md) | Design system "Clinical Desert Calm": color tokens, epistemic status tokens, typography, RTL rules, screen requirements, `globals.css`. |
 
+Team handoffs in `00-reference/`: [Alfred → Ismail](00-reference/alfred-handoff-to-ismail.md) (commit `1e694e3`), [Ismail → team](00-reference/team-handoff-from-ismail.md), [backend gap register](00-reference/ismail-gap-handoff-draft.md).
+
 ## The non-negotiables
 
 These hold in every milestone. A change here needs a decision record, not a commit message.

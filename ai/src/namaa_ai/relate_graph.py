@@ -35,7 +35,7 @@ class RelateResolver:
     or stale batch is rechecked. Unknown results expose no candidate references.
     """
     def __init__(self, verify: CandidateVerifier, request_refresh: RefreshRequester, *,
-                 enabled: bool = False, clock: Callable[[], datetime] | None = None):
+                 enabled: bool = True, clock: Callable[[], datetime] | None = None):
         self.verify, self.request_refresh, self.enabled = verify, request_refresh, enabled
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 

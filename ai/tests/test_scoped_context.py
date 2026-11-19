@@ -51,6 +51,14 @@ def test_assembler_ignores_ranker_fabrications_and_duplicate_ids():
     assert len(result.items) == 1
 
 
+def test_scoped_assembler_is_enabled_by_default():
+    result = ScopedContextAssembler().assemble(
+        verified(records=[record("Observation", "history", "Screening reported.")]),
+        ContextQuery(query="screening"), workspace_id="ws-demo", patient_reference="Patient/pat-demo",
+        permission_revision="perm-1", generation_id="gen-1", now=NOW)
+    assert result.patient_context.state == "assembled"
+
+
 def test_guidelines_share_budget_without_becoming_patient_facts():
     ctx = verified(records=[record("Observation", "history", "Screening reported.")])
     result = scoped(ctx, guidelines())

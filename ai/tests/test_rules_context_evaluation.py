@@ -100,7 +100,7 @@ def accept_context(ctx, enabled=True, **changes):
     return VerifiedContextAdapter(enabled=enabled).accept(ctx, **(args | changes))
 
 
-def test_context_default_disabled_and_empty_unknown():
+def test_context_default_enabled_and_can_be_disabled():
     with pytest.raises(ValueError, match="disabled"): accept_context(context(), enabled=False)
     out = accept_context(context())
     assert out["exhaustive"] is False and out["absence_claims_allowed"] is False

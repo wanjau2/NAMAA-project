@@ -8,6 +8,7 @@ from namaa_ai.adapters import HostedAdapter, HostedConfig, PROTOCOL, MODEL_ID, P
 from namaa_ai.contracts import (ContextQuery, ExtractionRequest, LayoutBlock, ModelIdentity,
     ParsedDocument, ProposedFact, RelateCandidateBatch, ReviewCommand, VerifiedContext)
 from namaa_ai.demo import DemoAuthorizer, run_demo, simulated_snapshot
+from namaa_ai.analytics import funnel_cells, publish_population
 from namaa_ai.context_engineering import ContextAssembler
 from namaa_ai.engagement import METRICS, TEMPLATES
 from namaa_ai.fhir import propose_transaction
@@ -95,3 +96,8 @@ save("condition-review-command", condition_review.model_dump(mode="json"))
 condition_reviewed = apply_review(condition_request, condition_proposal, condition_review, current_version=1,
     reviewed_at=datetime(2026, 11, 18, 9, tzinfo=timezone.utc), authorizer=DemoAuthorizer()).fact
 save("condition-transaction", propose_transaction(condition_reviewed).bundle)
+save("analytics-views", publish_population(funnel_cells({
+    "overview": {"eligible": 40, "completed": 20, "declined": 10},
+    "child_wcv": {"eligible": 20, "completed": 10, "declined": 10},
+    "adult_screening": {"eligible": 20, "completed": 10, "declined": 10},
+}), projection_version="demo-projection-1").model_dump(mode="json"))

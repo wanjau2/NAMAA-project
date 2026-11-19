@@ -1,0 +1,69 @@
+{
+  "projection_version": "demo-projection-1",
+  "suppression_threshold": 10,
+  "suppressed": false,
+  "overview": [
+    {
+      "metric_id": "completed",
+      "segment": "overview",
+      "count": 20,
+      "denominator": 40,
+      "denominator_label": "Eligible patient-pathways at cohort entry",
+      "rate": 0.5,
+      "suppressed": false,
+      "suppression_reason": null
+    },
+    {
+      "metric_id": "declined",
+      "segment": "overview",
+      "count": 10,
+      "denominator": 40,
+      "denominator_label": "Eligible patient-pathways at cohort entry",
+      "rate": 0.25,
+      "suppressed": false,
+      "suppression_reason": null
+    }
+  ],
+  "segments": [
+    {
+      "metric_id": "completed",
+      "segment": "child_wcv",
+      "count": 10,
+      "denominator": 20,
+      "denominator_label": "Eligible patient-pathways at cohort entry",
+      "rate": 0.5,
+      "suppressed": false,
+      "suppression_reason": null
+    },
+    {
+      "metric_id": "declined",
+      "segment": "child_wcv",
+      "count": 10,
+      "denominator": 20,
+      "denominator_label": "Eligible patient-pathways at cohort entry",
+      "rate": 0.5,
+      "suppressed": false,
+      "suppression_reason": null
+    },
+    {
+      "metric_id": "completed",
+      "segment": "adult_screening",
+      "count": 10,
+      "denominator": 20,
+      "denominator_label": "Eligible patient-pathways at cohort entry",
+      "rate": 0.5,
+      "suppressed": false,
+      "suppression_reason": null
+    },
+    {
+      "metric_id": "declined",
+      "segment": "adult_screening",
+      "count": 10,
+      "denominator": 20,
+      "denominator_label": "Eligible patient-pathways at cohort entry",
+      "rate": 0.5,
+      "suppressed": false,
+      "suppression_reason": null
+    }
+  ]
+}

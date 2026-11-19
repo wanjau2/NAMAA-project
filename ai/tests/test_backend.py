@@ -282,13 +282,17 @@ def test_relate_always_verifies_before_disclosing(operation, variant):
         if variant in {"empty", "foreign", "stale", "foreign_batch_workspace"}: assert body["relate_hints"] == []
         return httpx.Response(403 if variant == "denied" else 200, json=verified)
     backend = client(handle)
-    if variant in {"denied", "expired", "permission_changed", "generation_changed", "patient_changed",
-                   "unauthorized", "unverified_record", "production", "string_authorized"}:
-        with pytest.raises(httpx.HTTPStatusError if variant == "denied" else ValueError):
-            asyncio.run(getattr(backend, operation)("pat-a"))
+    resolution_name = ("family_history_resolution" if operation == "family_history_context"
+                       else "care_plan_resolution")
+    resolution = asyncio.run(getattr(backend, resolution_name)("pat-a"))
+    if variant == "valid":
+        assert resolution.state == "verified" and resolution.refresh == "not_required"
+        assert len(resolution.items) == 1 and resolution.items[0].text == verified["records"][0]["text"]
     else:
-        result = asyncio.run(getattr(backend, operation)("pat-a"))
-        assert len(result) == (1 if variant == "valid" else 0)
-        if result: assert result[0].text == verified["records"][0]["text"]
+        assert resolution.state == "unknown" and resolution.items == ()
+        if variant == "denied":
+            assert resolution.refresh == "requested"
+    result = asyncio.run(getattr(backend, operation)("pat-a"))
+    assert result == resolution.items
     assert calls[-1] == ("POST", "/api/v1/security/verified-context")
     assert calls[1][1] == "/api/v1/relate/" + ("family-history" if operation == "family_history_context" else "care-plans")

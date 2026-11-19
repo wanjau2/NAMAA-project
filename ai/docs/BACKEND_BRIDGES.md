@@ -73,11 +73,12 @@ operations with `patient_id` and bounded `limit`. The client uses the existing
 remains to be checked. No arbitrary graph query is accepted.
 
 After every valid discovery response, including empty or stale batches, the
-client calls `POST /api/v1/security/verified-context`. Only scoped references
-are sent as hints. Only text from the fresh verified envelope may be returned,
-after workspace, patient, generation, permission, expiry and supporting-reference
-checks. Verification failures propagate. Malformed discovery fails closed
-before any records are disclosed. Relate never grants access.
+client runs `RelateResolver`. Verification uses `POST /api/v1/security/verified-context`
+with scoped references as hints. Failed, stale or unauthorized support becomes
+`state=unknown` with no items and `refresh=requested` (or `failed`).
+`family_history_context` / `care_plan_context` return `.items` only. Prefer
+`family_history_resolution` / `care_plan_resolution` so unknown is not mistaken
+for absence. Relate never grants access.
 
 The API verified-context builder checks the exact FHIR `subject.reference` or
 `patient.reference` for supported resource types. A graph hint or patient

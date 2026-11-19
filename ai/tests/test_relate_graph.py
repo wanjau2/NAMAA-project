@@ -15,6 +15,19 @@ def batch(**changes):
             "supporting_references": ["FamilyMemberHistory/mother"]}]) | changes)
 
 
+def test_relate_resolver_is_enabled_by_default():
+    async def verify(**kwargs):
+        return verified(records=[record("FamilyMemberHistory", "mother", "Mother has diabetes.")])
+    async def refresh(**kwargs):
+        raise AssertionError("verified resolution must not refresh")
+    result = asyncio.run(RelateResolver(verify, refresh, clock=lambda: NOW).resolve(
+        batch(), workspace_id="ws-demo", patient_reference="Patient/pat-demo", permission_revision="perm-1"))
+    assert result.state == "verified" and result.refresh == "not_required"
+    with pytest.raises(ValueError, match="disabled"):
+        asyncio.run(RelateResolver(verify, refresh, enabled=False, clock=lambda: NOW).resolve(
+            batch(), workspace_id="ws-demo", patient_reference="Patient/pat-demo", permission_revision="perm-1"))
+
+
 def test_every_graph_resolution_calls_current_source_and_policy_verifier():
     calls, refreshes = [], []
     async def verify(**kwargs):

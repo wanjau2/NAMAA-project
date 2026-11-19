@@ -1,70 +1,89 @@
-# Draft handover — Alfred to Ismail
+# Handoff — Alfred to Ismail
 
 **Prepared:** 19 November 2026  
-**Scope:** AI extraction, context, reviewed-fact evaluation and reporting safeguards  
-**Change set:** working-tree changes based on `bf754f1`; no delivery commit or PR recorded yet  
-**Status:** ready for backend integration; synthetic testing only
+**From:** Alfred (`ai/`)  
+**To:** Ismail (`api/`, FHIR, workers, workflow)  
+**On `main`:** `1e694e3` (`test(ai): align audit assertions with backend decision fields`)  
+**Also on this line:** `514d93f` (Alfred safety package), `dc962da` (your review/acceptance work)  
+**Status:** Alfred's package is ready to connect. Synthetic only. Not a deployment approval.
 
-Ismail — Alfred's package is ready for the next integration pass. This session
-hardened extraction and review boundaries, added approved-guideline context and
-graph refresh contracts, added family-history evaluation routing, and implemented
-a reusable population suppression policy. The work is in `ai/`; your API,
-database, workflow and infrastructure implementations were not changed.
+Ismail — please integrate the callables below into the endpoints you already
+own. Do not copy extraction validation, quote offsets, review mapping, or rule
+semantics into a second implementation. `api/` was not changed for this
+handoff. SQLite, the FHIR stub, guest identity, and fixture extraction remain
+your current runtime.
 
-Please connect these components to the existing backend foundations rather than
-duplicate the extraction validation or rule logic. An accepted proposal, a
-generated Bundle and a successful synthetic API response are distinct from a
-confirmed clinical commit. Rules must use reviewed resources reloaded from HAPI.
+An accepted proposal, a generated Bundle, an outbox row, and a 200 from the
+stub gateway are not a HAPI commit. Rules must consume reviewed resources
+reloaded from the clinical store, with versions.
 
-The current backend remains SQLite with a stub FHIR gateway. PostgreSQL leases,
-partitioned HAPI authority and production identity are still required to meet
-the requested target architecture.
+Copy for Mark: keep `legacy_flag_status` / `api_compatibility` as explicit
+projections. Do not collapse `not_eligible` into `no_gap`.
 
-## 1. What is available
+---
 
-Paths below are relative to `ai/`. Existing components are marked separately
-from additions made this session.
+## 1. What to import
 
-| Component | This session's delivery | Integration entry point |
+Paths are relative to `ai/src/namaa_ai/`. Assemblers and resolvers are on.
+Pass `enabled=False` at a composition boundary that must stay dark.
+
+| Boundary | Call | Notes |
 | --- | --- | --- |
-| Model response decoding | New decoder rejects duplicate JSON keys, non-JSON numeric constants and mismatched deployment identity | [`extraction.decode_response`](../src/namaa_ai/extraction.py), called by the existing `HostedAdapter` |
-| Extraction boundary | Hardened existing schemas and pipeline: explicit dates, input revalidation, source-ID binding before dispatch | [`AuthorizedExtractionPipeline.run`](../src/namaa_ai/security.py), [`HostedAdapter`](../src/namaa_ai/adapters.py) |
-| Human review | Existing accept/correct/reject logic now revalidates its input objects | [`apply_review`](../src/namaa_ai/review.py), `apply_review_authorized` in `security.py` |
-| FHIR mapping | Existing reviewed-fact mapper retained; no live gateway added | [`propose_transaction`](../src/namaa_ai/fhir.py) |
-| Patient context | Fixed passage-ID collisions, duplicate ranker output and conflicting source versions | [`ContextAssembler`](../src/namaa_ai/context_engineering.py) |
-| Approved guidance | New typed guideline corpus and shared patient/guideline retrieval budget | [`ScopedContextAssembler`, `VerifiedGuidelines`, `render_bounded_context`](../src/namaa_ai/context_assembler.py) |
-| Optional graph | New per-request verifier and refresh callback composition | [`RelateResolver`](../src/namaa_ai/relate_graph.py) |
-| Deterministic rules | Added family-history explanation factors and post-commit routing | [`evaluate`, `rules_for_reviewed_commit`](../src/namaa_ai/rules.py) |
-| Population disclosure | New pure small-cell and complementary suppression function | [`MetricCount`, `suppress_population`](../src/namaa_ai/analytics.py) |
-| Completion definition | Corrected numerator to require evidence-backed, reviewer-authorized completion; version `demo-1.1.0` | [`METRICS`](../src/namaa_ai/engagement.py) |
+| Extraction | `AuthorizedExtractionPipeline.run`, `HostedAdapter`, `decode_response` | Worker-only. HTTPS endpoint, no DB access in the model process. |
+| Source grounding | `make_proposals` / `check_fact` | Server-side excerpts; zero-based, end-exclusive Unicode offsets. |
+| Review | `apply_review` or `apply_review_authorized` | Accept / correct / reject. Bind reviewer from the session. |
+| FHIR mapping | `propose_transaction` | Returns a non-executable Bundle (`executable=false`) plus Provenance. |
+| Rules | `evaluate`, `rules_for_reviewed_commit` | `DEMO_WCV_01`, `DEMO_ADULT_01`. Fictional 37/73-day intervals. |
+| Compatibility | `prepare_rule_handoff` | Lossy flag for Mark. Persist the nested `rule_evaluation`. |
+| Context | `ScopedContextAssembler`, `VerifiedGuidelines`, `render_bounded_context` | Enabled. Pass server-minted scope. `enabled=False` remains a kill switch. Hybrid BM25 + hashed dense is default. |
+| Graph | `RelateResolver(verify, request_refresh)` | Enabled. Every resolve re-verifies. Failure → `unknown`, no items. `BackendApiClient.family_history_resolution` uses this path. |
+| Analytics | `suppress_population`, `publish_population`, `funnel_cells` | One publication family; overview and segments are views of that release. Eligible is a denominator, never a self-complement cell. |
+| Completion metric | `METRICS` in `engagement.py` | Version `demo-1.1.0`. |
+| Wire checks | `BackendApiClient`, `BackendReviewResult`, `BackendExtractionJob` | Consumer-side codecs, not a second API. |
 
-Contracts and examples are in [`examples/`](../examples/). New JSON schemas are
-under [`schemas/analytics/`](../examples/schemas/analytics/),
-[`schemas/context_assembler/`](../examples/schemas/context_assembler/) and
-[`schemas/relate_graph/`](../examples/schemas/relate_graph/).
+JSON examples and schemas: `ai/examples/` including
+`schemas/analytics/`, `schemas/context_assembler/`, `schemas/relate_graph/`.
 
-## 2. Recommended integration order
+Serving protocol: [`ENDPOINT.md`](ENDPOINT.md). Worker env:
+`NAMAA_HF_ENDPOINT_URL`, `NAMAA_HF_TOKEN`, `NAMAA_MODEL_REVISION` (40-char
+commit), `NAMAA_ENDPOINT_PROTOCOL=namaa-extraction-v1`. No endpoint was
+provisioned or called.
 
-The order below is a proposed backend work sequence, not a claim that these
-steps are already integrated.
+The API image currently copies only `api/`. To import `namaa_ai`, add the
+package to the API environment (editable install from `ai/` or an equivalent
+image layer). Do not vendor a truncated copy of the validators.
 
-| Order | Ismail's work | Acceptance checkpoint |
+---
+
+## 2. Suggested order
+
+Keep the existing routes. Change what they call.
+
+| Step | Your work | Done when |
 | --- | --- | --- |
-| 1 | Establish authenticated session-to-workspace/partition mapping and current authorization at each boundary | Client-supplied partition claims and out-of-scope patient access cannot select clinical data |
-| 2 | Connect durable extraction jobs to the authorized pipeline | Two workers cannot finalize the same lease; failures never become successful empty results |
-| 3 | Connect strict review to journaled, version-checked HAPI transactions | One accepted/corrected command produces one intended clinical change plus Provenance; rejection produces no clinical write |
-| 4 | Build reviewed HAPI snapshots and replace the evaluator stub | Review-to-commit-to-evaluation works; all four outcomes survive persistence/readback |
-| 5 | Supply verified patient/guideline context and optional graph callbacks | Stale or denied sources are withheld; graph failure produces unknown and a refresh outcome |
-| 6 | Wire one suppressed reporting release to overview and segments | Related responses cannot reveal a hidden count through subtraction |
-| 7 | Complete accountable workflow and recovery verification | Booking cannot close care; authorized closure requires verified evidence; overdue work retains its owner |
+| 1 | Session → workspace/partition; never trust a client partition id | Out-of-scope patients cannot select clinical data |
+| 2 | Durable extraction worker → `AuthorizedExtractionPipeline` | Two workers cannot finalize one lease; hosted failure is not a successful empty/fixture job |
+| 3 | Review → `apply_review` + journaled HAPI transaction | One accept/correct → one typed resource + Provenance; reject writes nothing clinical |
+| 4 | Replace `app.rules.evaluator` with `evaluate` on a reviewed HAPI snapshot | All four outcomes persist and read back; unreviewed/rejected facts are absent |
+| 5 | Verified context + `RelateResolver` callbacks | Stale/denied graph hints become `unknown` + refresh; no leaked references |
+| 6 | One `suppress_population()` release feeding `/overview` and `/segments` | Related responses cannot recover a hidden count by subtraction |
+| 7 | Accountable workflow (your module) | Booking ≠ completion; overdue escalation keeps the owner |
 
-## 3. Extraction endpoint and durable worker
+PostgreSQL leases, partitioned HAPI, and production identity remain required
+for the target architecture. They are not delivered by this package.
 
-Use the existing `POST /api/v1/documents/{id}/extractions` entry point for
-authorization and enqueueing; return `202` with `job_id`. Invoke the hosted model
-only from the durable Python worker.
+The older itemized backend register is still useful for defects on the
+synthetic API: [`docs/00-reference/ismail-gap-handoff-draft.md`](../../docs/00-reference/ismail-gap-handoff-draft.md)
+(I00–I23, baseline `167b797`). This document is the current Alfred integration
+contract on `1e694e3`.
 
-The existing composition is:
+---
+
+## 3. Extraction
+
+Keep `POST /api/v1/documents/{id}/extractions` → `202` + `job_id`. Call the
+model only from the durable worker, after re-authorizing the **initiating**
+principal. A worker service identity must not replace that principal.
 
 ```python
 pipeline = AuthorizedExtractionPipeline(enforcer, source_provider, hosted_adapter)
@@ -76,218 +95,227 @@ result = await pipeline.run(
 )
 ```
 
-These variables are backend-owned objects. The source provider's async
-`fetch(context=..., patient_id=..., source_id=...)` must return an
-`ExtractionRequest` for the authorized, version-bound DocumentReference.
-Explicitly compare the fetched version with the version captured by the job;
-the pipeline binds document ID, workspace and patient but does not load the job
-or enforce its stored version itself.
+`source_provider.fetch(context=..., patient_id=..., source_id=...)` must return
+an `ExtractionRequest` for the authorized, version-bound DocumentReference.
+Compare that version with the version stored on the job. The pipeline binds
+document, workspace and patient; it does not load your job row.
 
-The pipeline checks `note.retrieve`, separately checks `model.dispatch`, and
-checks `proposal.disclose` after inference. Reconstruct the initiating principal's
-current authority on claim; a worker's service identity must not replace it.
-Reauthorize subsequent status/SSE/excerpt disclosure as well.
+Pipeline checks: `note.retrieve`, then `model.dispatch`, then
+`proposal.disclose`. Re-check disclosure on status/SSE/excerpt reads.
 
-You own PostgreSQL transactional claims, lease tokens, heartbeat/expiry, fencing
-of stale workers, bounded retries and atomic persistence of the final job result
-with its staged proposals. The adapter's total inference deadline is 90 seconds;
-the lease must remain valid through inference and finalization. Persist enough
-attempt information to bound retries across crashes. Adapter budgets reset per
-invocation, so job retries must not accidentally create an unlimited repair loop.
+Your ownership: PostgreSQL claim (`FOR UPDATE SKIP LOCKED` or equivalent),
+lease token, heartbeat, fencing of stale workers, bounded job retries, atomic
+persist of the terminal result and staged proposals. Adapter wall clock is
+90 seconds; the lease must cover inference and finalization. Adapter budgets
+reset per invocation — job retries must not create an unbounded repair loop.
 
-Existing adapter limits remain: 6,000 Unicode code points per note, rejection
-without truncation, `do_sample=false`, 2,048 new tokens, one transient retry and
-one formatting repair, at most three HTTP attempts per invocation. Deployment
-identity mismatch and source-grounding errors are terminal for that invocation.
-Exact excerpts and offsets are computed server-side; offsets are zero-based,
-end-exclusive Unicode code points.
+Hard limits already in the adapter:
 
-Retain `success`, `no_supported_facts`, `invalid_output` and `transport_failure`
-as distinct extraction outcomes. None is a clinical risk conclusion. An invalid
-source-grounded result can contain blocked proposals for explicit correction or
-rejection; it must not be silently relabelled successful. Store proposals only
-in the application database. Hosted failures must not fall back to fixture output.
+- 6,000 Unicode code points; reject, never truncate
+- `do_sample=false`, `max_new_tokens=2048`
+- one transient HTTP retry, one format repair, at most three HTTP attempts
+- deployment identity mismatch and source-grounding errors are terminal for
+  that invocation
 
-Endpoint credentials and the immutable model revision belong in worker-only
-configuration. The serving protocol and required environment variables are in
-[`ENDPOINT.md`](ENDPOINT.md). No endpoint was provisioned or called in this work.
+Persist distinct statuses: `success`, `no_supported_facts`, `invalid_output`,
+`transport_failure`. None of these is a care-gap or “no risk” conclusion.
+Blocked proposals may be returned for human correct/reject; do not relabel
+them as successful. Store proposals only in the application DB.
 
-## 4. Review, clinical commit and evaluation
+**Current API gap on this checkout:** `advance_job` still materializes
+fixtures. If `extraction_mode != "offline_fixture"` it still succeeds and
+sets `offline-fixture-v1 (fallback — live model unavailable)`. That path
+must go. Job column default `extract-v0.3` is stale; wire `extract-v1.0.1`.
 
-At `POST /api/v1/facts/{id}/review`, validate `ReviewCommand`, bind the path target
-and reviewer identity to the authenticated session, and call the shared review
-logic. `correct` requires a complete replacement `ProposedFact`; correction on
-accept/reject is invalid. Reasons are required. Recheck the source version/hash,
-exact selected excerpt, offsets, subject mapping and required acknowledgements.
-Acknowledging an issue must never override a blocking validation failure.
+---
 
-Use an atomic proposal-version check and a command journal bound to workspace,
-target, operation and payload. Replays must be reauthorized before disclosing a
-cached response. Return the original proposal snapshot and complete review
-command in the canonical decision, with API/outbox metadata outside strict
-canonical objects. [`BackendReviewResult`](../src/namaa_ai/backend.py) is the
-consumer-side validation contract.
+## 4. Review, commit, evaluation
 
-`propose_transaction(reviewed_fact)` returns a stable-ID transaction proposal
-containing a typed resource and Provenance. It does not execute a write or add
-backend-resolved update preconditions. You own current-version checks, `If-Match`
-for updates, reference validation, immutable Provenance enforcement and HAPI
-execution. Local mapping checks are not official R4/profile validation; the
-proposal is deliberately marked `executable=false` until backend validation.
+`POST /api/v1/facts/{id}/review`:
 
-Keep the application journal/outbox recoverable across the separate HAPI commit.
-A timeout can mean the clinical transaction succeeded but its response was lost;
-reconcile that outcome before retrying. Do not expose journaled acceptance as
-committed clinical truth or feed it to rules before confirmed commit/readback.
+1. Bind `proposal_id` and reviewer identity from the session (do not trust
+   `reviewer_reference` unless it matches the server mapping).
+2. Validate a `ReviewCommand`. `correct` requires a complete replacement
+   `ProposedFact`. Correction on accept/reject is invalid. Reason is required.
+3. Re-check source version/hash, excerpt, offsets, subject mapping, and
+   acknowledgements. An acknowledgement must not override a blocking issue.
+4. CAS the expected proposal version. Journal workspace + target + operation
+   + payload. Reauthorize before returning a cached replay.
+5. Call `apply_review` (or `apply_review_authorized`). Echo the **original**
+   proposal snapshot and the full command. Put outbox/stub metadata outside
+   the canonical object. Consumer check: `BackendReviewResult`.
 
-After commit, build a `RuleSnapshot` from current, authorized, reviewed HAPI
-resources with exact resource versions and review attestations. Then:
+Then `propose_transaction(reviewed_fact)` for the Bundle. You attach
+`If-Match`, resolve create vs update, validate references, enforce immutable
+Provenance, and execute through HAPI. Local mapping checks are not HL7
+validator output.
+
+Timeouts: the HAPI write may have succeeded. Reconcile before retry. Do not
+feed journaled acceptance to rules until commit/readback is confirmed.
+
+After a confirmed commit:
 
 ```python
 for rule_id in rules_for_reviewed_commit(snapshot, changed_resource_version):
     evaluation = evaluate(snapshot, rule_id)
-    # Backend persists the complete immutable evaluation and input versions.
+    # persist evaluation + input versions immutably
 ```
 
-The routing function returns rule IDs; it does not enqueue work or write data.
-FamilyMemberHistory routes to `DEMO_ADULT_01` without becoming a patient
-Condition. Missing screening history remains `needs_review`. Neither family
-history nor retrieved context establishes eligibility or authorizes an order.
+`FamilyMemberHistory` routes to `DEMO_ADULT_01`. It must not become a patient
+`Condition` or fill last-screening history. Missing history is `needs_review`,
+never `no_gap_identified_in_available_data`. Context retrieval does not
+establish eligibility or authorize an order.
 
-Persist the complete canonical evaluation, not just a legacy flag. Preserve:
+Canonical outcomes to persist (not only `flag_status`):
 
 - `gap_identified`
 - `no_gap_identified_in_available_data`
 - `needs_review`
-- `not_eligible`
+- `not_eligible` — `legacy_flag_status` is null; must not become `no_gap`
 
-Use `prepare_rule_handoff()` for the explicit compatibility projection.
-`not_eligible` has a null legacy flag and must not become `no_gap`.
-The rules remain `synthetic-1.0.0`, with fictional eligibility cards and 37/73-day
-intervals. They are not clinical screening schedules.
+**Current API gaps:** review still upserts every accepted fact as a patient
+`Observation`, including family history. The placeholder evaluator does not
+call `namaa_ai.rules.evaluate`; adult missing screening is treated as a gap;
+age bands starting with 4 or 5 can be classified as children. Replace the
+stub rather than patching those heuristics in place.
 
-## 5. Patient context, approved guidelines and optional Relate
+---
 
-Supply `VerifiedContext` only after current resource and permission verification.
-`ScopedContextAssembler` is disabled by default and must be explicitly enabled
-at the backend composition boundary. Its trusted workspace, patient, generation,
-permission revision and timestamps must come from server state.
+## 5. Context, guidelines, Relate
 
-Patient passages and approved guideline passages share `ContextQuery` item/text
-limits; whole passages are omitted rather than truncated. The character budget
-counts source text, not serialization overhead. Distinct passages of a document
-now have distinct IDs, so any cached vectors keyed by old context IDs must be
-rebuilt. BM25 is available; dense ranking is an injectable interface, not a
-deployed embedding service.
+Mint `VerifiedContext` only after current resource and permission checks.
+`ScopedContextAssembler()` needs workspace, patient,
+generation, permission revision and clocks from **server** state.
 
-For `VerifiedGuidelines`, verify approval of the exact Library/DocumentReference
-version and supply source-verified text and offsets. A boolean supplied by a
-browser or retrieved note is not approval. Guidelines remain a separate
-collection from patient facts. No real approved guideline corpus is included.
-Use `render_bounded_context()` for the untrusted-data representation; any model
-dispatch or response disclosure still requires its own authorization boundary.
+Patient passages and approved guidelines share `ContextQuery` item/text
+limits. Omit whole passages; do not truncate. Character budget is source
+text, not JSON overhead. Passage IDs are now distinct per document span —
+rebuild any vectors keyed by the old IDs. Default ranking is hybrid BM25
+plus a hashed-token dense ranker; inject a production `DenseRetriever` when
+you have an authorized vector destination.
 
-For the optional graph, construct `RelateResolver(verify, request_refresh,
-enabled=True)`. Supply these async callbacks:
+`VerifiedGuidelines`: approval is the exact Library/DocumentReference
+version, with source-verified text and offsets. A browser boolean or a note
+is not approval. No real guideline corpus is in this repo. Use
+`render_bounded_context()` for the untrusted payload. Model dispatch and
+disclosure still need their own authorization checks.
 
-| Callback | Required signature and behavior |
+Relate:
+
+```python
+resolver = RelateResolver(verify, request_refresh)
+resolution = await resolver.resolve(
+    batch,
+    workspace_id=session.workspace_id,
+    patient_reference=session.patient_reference,
+    permission_revision=session.permission_revision,
+)
+```
+
+| Callback | Contract |
 | --- | --- |
-| `verify` | Keyword arguments `workspace_id`, `patient_reference`, `references`; returns `VerifiedContext` after current PEP/PDP checks and HAPI verification. Bind/check the supplied scope against the actual authenticated principal. Verify relational supports, not merely resource existence. |
-| `request_refresh` | Keyword arguments `workspace_id`, `patient_reference`; independently authorizes and idempotently enqueues refresh for that scope. No graph text or caller-selected partition is trusted. |
+| `verify` | `workspace_id`, `patient_reference`, `references` → `VerifiedContext` after PEP/PDP + current HAPI. Bind the authenticated principal. Check relational support, not mere existence. |
+| `request_refresh` | `workspace_id`, `patient_reference`. Authorize independently. Idempotent enqueue. Ignore graph text and caller-selected partitions. |
 
-Every resolution calls verification, including stale or empty batches. Successful
-resolution returns `state="verified"`. Failed, missing, expired or unauthorized
-support produces `state="unknown"`, no items, and `refresh="requested"` or
-`"failed"`. Empty graph results never establish absence of care. Existing
-tuple-returning bridge methods have not been rewired to this new resolver; no
-refresh endpoint is assumed to exist.
+`state="verified"` only when every candidate re-checks. Otherwise
+`state="unknown"`, empty items, `refresh="requested"` or `"failed"`. Empty
+results do not mean “no family history / no broken handoff”.
 
-## 6. Analytics and accountable workflow
+`BackendApiClient.family_history_resolution` / `care_plan_resolution` use
+`RelateResolver`. The older `*_context` helpers return `.items` only (empty
+when unknown — that is not evidence of absence). Supply a real
+`request_refresh` enqueue when you add a refresh route.
 
-Build fixed, workspace-scoped reporting projections from confirmed clinical and
-workflow evidence. Pass the complete related overview/segment publication family
-to `suppress_population()` once, then select views from that returned release.
-Do not invoke it independently on each requested segment.
+**Current API gap:** `relate_hints` on verified-context are unused as a
+verification batch. Discovery remains hints only and must stay that way.
 
-The current policy is deliberately conservative: if any count, denominator or
-complement is below 10, all numeric values in that release are null, including
-rates and denominators. Denominator labels and projection version remain. This
-protects related margins within one release; cross-release differencing,
-authorized cohorts, safe public segment labels and projection rebuilding are
-backend responsibilities.
+---
 
-The helper models subset counts with complements. A row with
-`count == denominator` has a zero complement and suppresses the release. Agree
-with Alfred how standalone cohort totals should be represented before wiring
-such rows; increasing the cohort alone will not resolve that behavior. Preserve
-suppression while resolving the contract. `/segments` is absent in this checkout
-and still needs an API implementation.
+## 6. Analytics and workflow
 
-The completion metric is now `demo-1.1.0`: completed disposition plus verified
-Encounter, Procedure or DiagnosticReport evidence and reviewer authorization.
-Booking or attendance alone does not count. Do not infer completed milestones
-from a generic closed case.
+Build workspace-scoped projections from **confirmed** clinical and workflow
+evidence. Pass the whole related family (overview + segments) into
+`suppress_population()` **once**, then pick views from that `AnalyticsRelease`.
+Do not call it per endpoint.
 
-You retain ownership of draft CarePlan/review Task creation, owner and deadline,
-reviewer activation, authorized ServiceRequest creation, Appointment handling,
-verified closure evidence, and the one-minute overdue check that preserves
-ownership and creates one escalation per missed deadline. Existing actions use
-`expected_revision`; the requested target contract names `expected_version`.
-Record the agreed API contract and coordinate any consumer change with Mark.
+If any count, denominator, or complement is `< 10`, every numeric value in
+that release is null (rates and denominators included). Labels and
+`projection_version` remain. Cross-release differencing and cohort
+authorization are yours.
 
-## 7. Verification and remaining acceptance gates
+A cell with `count == denominator` has complement 0 and suppresses the
+release. Agree the representation for standalone cohort totals before wiring
+those rows. Raising N alone will not make `eligible/eligible` publishable.
 
-The recorded run for this change set was **286 passed, 16 skipped**: 273 AI
-unit/contract tests and 13 integration tests against the real FastAPI application
-using isolated in-memory SQLite and stub FHIR. The 16 optional external-backend
-checks lacked a configured target/fixture mapping. These are prior execution
-results, not a fresh run performed while drafting this document.
+`GET /api/v1/analytics/segments` is still missing on the API. Call
+`publish_population()` once and serve both `/overview` and `/segments` from
+that `AnalyticsViews` object. Overview currently suppresses per cell and does
+not import these helpers.
 
-From `ai/`, with the documented test dependencies installed:
+Completion metric `demo-1.1.0`: completed disposition **and** verified
+`Encounter` | `Procedure` | `DiagnosticReport` **and** reviewer
+authorization. Booking, attendance, or a generic close is not completion.
+
+Workflow remains yours: draft CarePlan + review Task (owner +
+`Task.restriction.period.end`) on gap; activate plan + authorize
+`ServiceRequest`; Appointment separate from completion; one escalation per
+missed deadline without dropping ownership. Actions today use
+`expected_revision`; the target name is `expected_version`. Agree with Mark
+before renaming.
+
+---
+
+## 7. Checks
+
+Recorded on this line (synthetic data, isolated SQLite, stub FHIR):
 
 ```bash
+cd ai
 .venv/bin/python -m pytest -q --ignore=tests/integration
 .venv/bin/python -m pytest -q --require-backend -m api_integration tests/integration
 .venv/bin/python -m pytest -q
 ```
 
-See [recorded evidence](../../docs/03-evidence/alfred-safety/checks.md) and
-[`BACKEND_BRIDGES.md`](BACKEND_BRIDGES.md) for opt-in HTTP acceptance commands.
-That guide also contains older checkout findings; do not treat those historical
-results as proof for this build. No hosted model quality, real HAPI transaction,
-PostgreSQL concurrency or production authorization was validated.
+Last combined run: **294 passed, 16 skipped**. Skips are live-URL / seed-map
+checks, not local safety tests. Evidence:
+[`docs/03-evidence/alfred-safety/checks.md`](../../docs/03-evidence/alfred-safety/checks.md).
+[`BACKEND_BRIDGES.md`](BACKEND_BRIDGES.md) has older notes — do not treat those
+as proof for this build.
 
-Before calling the integration complete, supply evidence for:
+Not validated here: hosted MedGemma quality, real HAPI, PostgreSQL
+concurrency, production PDP.
 
-- Two competing workers, lease expiry, worker restart and rejected stale writes.
-- Accept/correct/reject through authenticated endpoints, exact-command replay,
-  changed-payload conflict, stale proposal version and reviewer substitution.
-- Crash/timeout around HAPI commit with reconciliation and no duplicate facts.
-- Reviewed commit changing a subsequent persisted/read-back evaluation; pending
-  and rejected proposals excluded; all four canonical outcomes retained.
-- Graph version/permission change between discovery and disclosure; refresh
-  enqueue failure visible as unknown without leaked references.
-- Appointment-only closure rejection, unauthorized closure rejection and
-  successful closure only with verified evidence and reviewer sign-off.
-- Suppression across overview, segments and exports, plus repeated-query checks.
-- Overdue escalation retry/restart without duplicate escalation or lost owner.
+Before calling the join complete, keep evidence for:
 
-## 8. Decisions and return handoff
+- Competing workers, lease expiry, restart, rejected stale writes
+- Accept / correct / reject, exact replay, payload conflict, stale version,
+  reviewer substitution
+- HAPI crash/timeout reconciliation, no duplicate facts
+- Confirmed commit changes a persisted evaluation; pending/rejected excluded;
+  four outcomes survive reload
+- Graph version or permission change between discovery and disclosure;
+  refresh failure → unknown, no leaked refs
+- Appointment-only close rejected; unauthorized close rejected; success only
+  with verified evidence + reviewer
+- Suppression on overview, segments, and exports; repeated queries
+- Overdue escalation retry without a second escalation or lost owner
 
-Please record the integration commit/build, supported run mode and startup
-command; the authenticated identity and partition-binding contract; actual
-source/review/evaluation response examples; model endpoint protocol/revision;
-context verifier/refresh callback implementation; analytics publication-family
-definition; and test evidence with remaining failures/skips.
+---
 
-Alfred retains rule semantics, extraction validation, mapping collaboration and
-AI-side contract changes. Mark owns frontend consumption. Production policy
-integration will need a jointly reviewed codec: current HTTP security adapters
-explicitly identify the synthetic guest policy and must not simply be relabelled
-as production. QuestionnaireResponse mapping remains unsupported until an
-approved versioned Questionnaire and answer mapping are supplied.
+## 8. Please send back
 
-This draft is a repository handover, not a sent message or a deployment approval.
-The broader existing [backend gap register](../../docs/00-reference/ismail-gap-handoff-draft.md)
-remains useful historical context; the concrete delivery and test scope for this
-session is recorded in [SAFETY_IMPLEMENTATION.md](SAFETY_IMPLEMENTATION.md).
+- Integration commit, supported run mode, startup command
+- Session → workspace/partition binding
+- Example source, review, and evaluation responses from the live API
+- Model endpoint protocol and actual revision (not the all-zero placeholder)
+- `verify` / `request_refresh` implementation
+- Analytics publication-family definition (especially cohort totals)
+- Test log with remaining failures/skips
+
+Alfred keeps rule semantics, extraction validation, mapping collaboration, and
+AI-side contract changes. Mark owns UI consumption. Production policy must not
+relabel `synthetic_guest_v1` as production. `QuestionnaireResponse` mapping
+stays unsupported until you supply an approved versioned Questionnaire and
+answer map.
+
+This is a repository handoff, not a sent message.

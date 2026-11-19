@@ -1,4 +1,4 @@
-"""Disabled-by-default Relate candidate boundary; no graph client or query language."""
+"""Relate candidate boundary; no graph client or query language."""
 from hashlib import sha256
 from typing import Protocol
 
@@ -20,11 +20,11 @@ class VerifiedCandidateAdapter:
     """Resolve graph hints only to records already verified in the backend envelope.
 
     Relate supplies references, not text. Only source text from the current
-    VerifiedContext may continue to assembly. The operation is disabled unless
-    a caller explicitly composes this adapter after backend verification.
+    VerifiedContext may continue to assembly. Pass enabled=False at a
+    composition boundary that must not disclose graph-derived text.
     """
 
-    def __init__(self, *, enabled: bool = False):
+    def __init__(self, *, enabled: bool = True):
         self.enabled = enabled
 
     def resolve(self, batch: RelateCandidateBatch, verified: VerifiedContext, *,

@@ -149,9 +149,9 @@ evaluation into API persistence/UI flows.
 
 ## Optional context
 
-`VerifiedContextAdapter` and `ContextAssembler` are disabled by default. Enabling
-is an explicit backend composition choice only after Ismail supplies a tested
-verification contract.
+`VerifiedContextAdapter` and `ContextAssembler` are enabled. Pass `enabled=False`
+to disable a boundary. The backend must still supply a tested verification
+contract; the browser must not construct trusted context.
 The adapter requires matching workspace/patient/generation/permission revision,
 current authorized verified state, bounded verification times and valid per-record
 authorization and source verification. It returns source references, versions,

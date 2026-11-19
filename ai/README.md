@@ -108,12 +108,14 @@ From the repository root, run the isolated HTTP acceptance checks with
 synthetic stack, use `--api-url` instead. The command returns a failing exit code
 for contract failures; see the guide for compact JSON evidence and rule fixtures.
 
-The context assembler is disabled by default and accepts only current,
-backend-verified context envelopes. It ranks source-versioned resources using
-deterministic BM25; an optional dense retriever can be injected through the
-rank-fusion interface. The in-memory cosine adapter uses supplied vectors only;
-there is no embedding model or vector database. The layout/OCR parser and Relate
-candidate adapters are test boundaries, not deployed parsers or graph services.
+The context assembler is on and accepts only current, backend-verified
+context envelopes. Default ranking is hybrid BM25 plus a hashed-token dense
+ranker; a production dense retriever can be injected. That hashed ranker is
+not an embedding model or vector database. The layout/OCR parser remains a
+test boundary. Relate resolution is on and returns verified items or unknown
+plus refresh. `publish_population` exposes overview and segment views of one
+suppressed analytics release.
+
 Context evaluation uses separate synthetic development and held-out queries; it
 tests retrieval plumbing, not clinical relevance. Rules continue to
 consume reviewed committed snapshots directly and never retrieval results.

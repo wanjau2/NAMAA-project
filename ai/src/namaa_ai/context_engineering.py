@@ -46,6 +46,34 @@ class DenseRetriever(Protocol):
     def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]: ...
 
 
+class HashedDenseRetriever:
+    """Deterministic token-hash cosine ranker for offline hybrid retrieval.
+
+    Not a trained embedding model and not a vector store. Production callers
+    inject a DenseRetriever over the currently authorized candidate set only.
+    """
+    dimensions = 32
+
+    def vector(self, text: str) -> tuple[float, ...]:
+        values = [0.0] * self.dimensions
+        for token in _tokens(text):
+            digest = hashlib.sha256(token.encode()).digest()
+            values[int.from_bytes(digest[:2], "big") % self.dimensions] += 1.0
+        return tuple(values)
+
+    def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]:
+        query_tokens = set(_tokens(query))
+        if not query_tokens:
+            return ()
+        overlapping = tuple(item for item in items if query_tokens & set(_tokens(item.text)))
+        if not overlapping:
+            return ()
+        return InMemoryDenseRetriever(
+            {item.item_id: self.vector(item.text) for item in overlapping},
+            self.vector,
+        ).rank(query, overlapping)
+
+
 class InMemoryDenseRetriever:
     """Synthetic/test cosine ranker over precomputed vectors; not an embedding model.
 
@@ -112,11 +140,16 @@ class BM25Retriever:
 class ReciprocalRankFusion:
     """Combine lexical and optional dense candidate rankings without score mixing."""
     def __init__(self, lexical: RankedRetriever | None = None, dense: DenseRetriever | None = None,
-                 *, rank_constant: int = 60):
+                 *, rank_constant: int = 60, hybrid: bool = True):
         if rank_constant < 1:
             raise ValueError("rank_constant_must_be_positive")
         self.lexical = lexical or BM25Retriever()
-        self.dense = dense
+        if dense is not None:
+            self.dense = dense
+        elif hybrid:
+            self.dense = HashedDenseRetriever()
+        else:
+            self.dense = None
         self.rank_constant = rank_constant
 
     def rank(self, query: str, items: Sequence[RetrievalText]) -> Sequence[str]:
@@ -138,7 +171,7 @@ class ReciprocalRankFusion:
 
 class ContextAssembler:
     """Retrieves only source-verified items from one current backend envelope."""
-    def __init__(self, *, enabled: bool = False, retriever: RankedRetriever | None = None):
+    def __init__(self, *, enabled: bool = True, retriever: RankedRetriever | None = None):
         self.enabled = enabled
         self.retriever = retriever or ReciprocalRankFusion()
 
