@@ -194,20 +194,67 @@ class Proposal(Base):
     id: Mapped[str] = mapped_column(String(64), index=True)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
     job_id: Mapped[str] = mapped_column(String(64), index=True)
+    patient_id: Mapped[str] = mapped_column(String(64), index=True, default="")
     document_id: Mapped[str] = mapped_column(String(64), index=True)
     document_version: Mapped[int] = mapped_column(Integer)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    source_sha256: Mapped[str] = mapped_column(String(64), default="")
     concept: Mapped[str] = mapped_column(String(128))
     value_text: Mapped[str] = mapped_column(Text)
     subject: Mapped[str] = mapped_column(String(32))
     assertion: Mapped[str] = mapped_column(String(32))
     effective_date: Mapped[str | None] = mapped_column(String(32), nullable=True)
     proposed_resource_type: Mapped[str] = mapped_column(String(64))
+    relationship: Mapped[str | None] = mapped_column(String(32), nullable=True)
     excerpt: Mapped[str] = mapped_column(Text)
     offset_start: Mapped[int] = mapped_column(Integer)
     offset_end: Mapped[int] = mapped_column(Integer)
+    issues_json: Mapped[str] = mapped_column(Text, default="[]")
+    model_id: Mapped[str] = mapped_column(String(128), default="google/medgemma-1.5-4b-it")
+    model_revision: Mapped[str] = mapped_column(String(128), default="offline-fixture-v1")
+    prompt_version: Mapped[str] = mapped_column(String(64), default="extract-v1.0.1")
+    model_simulated: Mapped[bool] = mapped_column(Boolean, default=True)
     # proposed | accepted | corrected | rejected
     review_state: Mapped[str] = mapped_column(String(32), default="proposed")
     review_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reviewer_reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reviewed_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class ReviewCommandJournal(Base):
+    """Idempotent human-review journal (outside FHIR until commit)."""
+
+    __tablename__ = "review_commands"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "request_id", name="uq_review_request"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    request_id: Mapped[str] = mapped_column(String(64))
+    proposal_id: Mapped[str] = mapped_column(String(64), index=True)
+    action: Mapped[str] = mapped_column(String(32))
+    payload_hash: Mapped[str] = mapped_column(String(128))
+    response_json: Mapped[str] = mapped_column(Text)
+    reviewer_reference: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[str] = mapped_column(String(64))
+    outbox_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class PrincipalRevocation(Base):
+    """Simple revocation list for guest/service principals (synthetic prototype)."""
+
+    __tablename__ = "principal_revocations"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "principal_id", name="uq_revocation"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    principal_id: Mapped[str] = mapped_column(String(128), index=True)
+    reason_code: Mapped[str] = mapped_column(String(64), default="revoked")
+    revoked_at: Mapped[str] = mapped_column(String(64))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class OutboxEntry(Base):

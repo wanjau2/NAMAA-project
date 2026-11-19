@@ -7,7 +7,18 @@ from app import __version__
 from app.config import get_settings
 from app.db import init_db
 from app.errors import AppError, app_error_handler
-from app.routers import analytics, cases, demo, extractions, health, meta, ops, patients, security
+from app.routers import (
+    analytics,
+    cases,
+    demo,
+    extractions,
+    facts,
+    health,
+    meta,
+    ops,
+    patients,
+    security,
+)
 from app.workers import runtime
 
 
@@ -52,6 +63,7 @@ def create_app(*, start_workers: bool = True) -> FastAPI:
     app.include_router(analytics.router)
     app.include_router(meta.router)
     app.include_router(extractions.router)
+    app.include_router(facts.router)
     app.include_router(ops.router)
     app.include_router(security.router)
     return app

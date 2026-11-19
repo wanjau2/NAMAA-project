@@ -13,7 +13,10 @@ from app.security.audit import emit_audit
 from app.security.context import TrustedRequestContext
 from app.security.deps import get_trusted_context
 from app.security.pdp import evaluate_access
+from app.models import PrincipalRevocation
 from app.security.verified_context import build_verified_context
+from app.services.relate_index import care_plan_candidates, family_history_candidates
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/v1", tags=["security"])
 
@@ -248,3 +251,88 @@ def verified_context(
     )
     db.commit()
     return result
+
+
+@router.get("/relate/family-history")
+def relate_family_history(
+    patient_id: str,
+    limit: int = 20,
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """I7 — fixed Relate operation; does not authorize access."""
+    if patient_id not in ctx.patient_ids:
+        raise AppError(
+            code="forbidden",
+            message="Patient outside trusted assignment.",
+            status_code=403,
+        )
+    return family_history_candidates(
+        db, workspace_id=ctx.workspace_id, patient_id=patient_id, limit=limit
+    )
+
+
+@router.get("/relate/care-plans")
+def relate_care_plans(
+    patient_id: str,
+    limit: int = 20,
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if patient_id not in ctx.patient_ids:
+        raise AppError(
+            code="forbidden",
+            message="Patient outside trusted assignment.",
+            status_code=403,
+        )
+    return care_plan_candidates(
+        db, workspace_id=ctx.workspace_id, patient_id=patient_id, limit=limit
+    )
+
+
+class RevokeBody(BaseModel):
+    principal_id: str
+    reason_code: str = "revoked"
+
+
+@router.post("/security/revocations", status_code=201)
+def revoke_principal(
+    body: RevokeBody,
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Synthetic revocation — blocks future job claim/disclosure for the principal."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    existing = (
+        db.query(PrincipalRevocation)
+        .filter(
+            PrincipalRevocation.workspace_id == ctx.workspace_id,
+            PrincipalRevocation.principal_id == body.principal_id,
+        )
+        .one_or_none()
+    )
+    if existing:
+        existing.active = True
+        existing.reason_code = body.reason_code
+        existing.revoked_at = now
+    else:
+        db.add(
+            PrincipalRevocation(
+                workspace_id=ctx.workspace_id,
+                principal_id=body.principal_id,
+                reason_code=body.reason_code,
+                revoked_at=now,
+                active=True,
+            )
+        )
+    emit_audit(
+        db,
+        event_type="principal.revoked",
+        ctx=ctx,
+        action="audit.write",
+        resource_type="Principal",
+        resource_id=body.principal_id,
+        reason_code=body.reason_code,
+    )
+    db.commit()
+    return {"principal_id": body.principal_id, "active": True, "revoked_at": now}

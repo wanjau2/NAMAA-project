@@ -15,6 +15,8 @@ from app.security.audit import emit_audit
 from app.security.context import TrustedRequestContext, build_trusted_context
 from app.security.enforce import authorize
 from app.services.extraction_fixtures import proposals_for_document
+from app.services.proposals import proposal_to_alfred, source_sha256
+from app.models import PrincipalRevocation
 
 
 TERMINAL = {"succeeded", "failed", "cancelled", "timed_out"}
@@ -174,11 +176,33 @@ def queue_extraction(
     return job
 
 
+def _assert_not_revoked(db: Session, *, workspace_id: str, principal_id: str | None) -> None:
+    if not principal_id:
+        return
+    row = (
+        db.query(PrincipalRevocation)
+        .filter(
+            PrincipalRevocation.workspace_id == workspace_id,
+            PrincipalRevocation.principal_id == principal_id,
+            PrincipalRevocation.active.is_(True),
+        )
+        .one_or_none()
+    )
+    if row is not None:
+        raise AppError(
+            code="forbidden",
+            message="Initiating principal has been revoked; processing and disclosure are blocked.",
+            status_code=403,
+            field_errors={"reason_code": "principal_revoked"},
+        )
+
+
 def reauthorize_job_execution(db: Session, job: ExtractionJob) -> TrustedRequestContext:
     """Re-authorize when a worker claims a job (preserved initiating scope)."""
     workspace = db.get(Workspace, job.workspace_id)
     if workspace is None:
         raise AppError(code="not_found", message="Workspace missing for job.", status_code=404)
+    _assert_not_revoked(db, workspace_id=job.workspace_id, principal_id=job.initiating_user_id)
     ctx = build_trusted_context(
         db,
         workspace=workspace,
@@ -259,24 +283,7 @@ def proposals_for_job(db: Session, job: ExtractionJob) -> list[dict]:
         .order_by(Proposal.pk.asc())
         .all()
     )
-    return [
-        {
-            "id": p.id,
-            "concept": p.concept,
-            "value_text": p.value_text,
-            "subject": p.subject,
-            "assertion": p.assertion,
-            "effective_date": p.effective_date,
-            "proposed_resource_type": p.proposed_resource_type,
-            "source_document_id": p.document_id,
-            "source_document_version": p.document_version,
-            "excerpt": p.excerpt,
-            "offset_start": p.offset_start,
-            "offset_end": p.offset_end,
-            "review_state": p.review_state,
-        }
-        for p in rows
-    ]
+    return [proposal_to_alfred(p) for p in rows]
 
 
 def claim_queued_jobs(db: Session, *, worker_id: str, limit: int = 5) -> list[ExtractionJob]:
@@ -360,23 +367,38 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
         .one()
     )
     fixtures = proposals_for_document(doc.id, doc.text)
+    digest = source_sha256(doc.text)
+    issues_uncertain = (
+        '[{"code":"uncertain_date","severity":"review","message":"Effective date is uncertain; acknowledgment required."}]'
+    )
     for item in fixtures:
+        issues = issues_uncertain if item.get("assertion") == "uncertain" else "[]"
+        relationship = "sibling" if item.get("subject") == "family_member" else None
         db.add(
             Proposal(
                 id=item["id"],
                 workspace_id=job.workspace_id,
                 job_id=job.id,
+                patient_id=job.patient_id,
                 document_id=doc.id,
                 document_version=doc.version,
+                version=1,
+                source_sha256=digest,
                 concept=item["concept"],
                 value_text=item["value_text"],
                 subject=item["subject"],
                 assertion=item["assertion"],
                 effective_date=item["effective_date"],
                 proposed_resource_type=item["proposed_resource_type"],
+                relationship=relationship,
                 excerpt=item["excerpt"],
                 offset_start=item["offset_start"],
                 offset_end=item["offset_end"],
+                issues_json=issues,
+                model_id="google/medgemma-1.5-4b-it",
+                model_revision=job.model_revision,
+                prompt_version=job.prompt_version or "extract-v1.0.1",
+                model_simulated=True,
                 review_state="proposed",
             )
         )

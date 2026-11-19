@@ -17,7 +17,9 @@ from app.models import (
     Observation,
     OutboxEntry,
     Patient,
+    PrincipalRevocation,
     Proposal,
+    ReviewCommandJournal,
     RuleEvaluation,
     Workspace,
 )
@@ -47,6 +49,8 @@ def ensure_workspace(db: Session, workspace_id: str | None = None) -> Workspace:
 def wipe_workspace_data(db: Session, workspace_id: str) -> None:
     for model in (
         AuditEvent,
+        ReviewCommandJournal,
+        PrincipalRevocation,
         Proposal,
         ExtractionJob,
         OutboxEntry,

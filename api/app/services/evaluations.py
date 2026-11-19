@@ -10,7 +10,16 @@ from app.errors import AppError
 from app.models import CareGap, Case, Event, Observation, Patient, RuleEvaluation
 from app.rules import evaluate_patient
 from app.schemas import EvaluationResult
+from app.security.context import TrustedRequestContext
+from app.security.enforce import authorize
 from app.services.serializers import case_to_out
+
+_OUTCOME_TO_LEGACY = {
+    "gap_identified": "gap",
+    "no_gap_identified_in_available_data": "no_gap",
+    "needs_review": "needs_review",
+    "not_eligible": "not_eligible",
+}
 
 
 def run_evaluation(
@@ -19,6 +28,7 @@ def run_evaluation(
     workspace_id: str,
     patient_id: str,
     pathway: str | None = None,
+    ctx: TrustedRequestContext | None = None,
 ) -> EvaluationResult:
     settings = get_settings()
     patient = (
@@ -31,6 +41,16 @@ def run_evaluation(
             code="not_found",
             message=f"Patient '{patient_id}' was not found in this guest session.",
             status_code=404,
+        )
+
+    if ctx is not None:
+        authorize(
+            db,
+            ctx,
+            action="evaluation.run",
+            resource_type="Patient",
+            resource_id=patient_id,
+            patient_id=patient_id,
         )
 
     observations = (
@@ -157,16 +177,46 @@ def run_evaluation(
             db.flush()
             case_out = case_to_out(db, open_case)
 
+    outcome = getattr(result, "outcome", None) or {
+        "gap": "gap_identified",
+        "needs_review": "needs_review",
+        "no_gap": "no_gap_identified_in_available_data",
+        "not_eligible": "not_eligible",
+    }.get(result.flag_status, "needs_review")
+    legacy = _OUTCOME_TO_LEGACY.get(outcome, result.flag_status)
+    rule_evaluation = {
+        "patient_reference": f"Patient/{patient_id}",
+        "as_of": settings.demo_now[:10],
+        "rule_id": result.rule_id_version,
+        "rule_version": getattr(result, "rule_version", "synthetic-1.0.0"),
+        "outcome": outcome,
+        "input_versions": result.input_versions
+        or [{"reference": f"Patient/{patient_id}", "version": "app-1"}],
+        "contributing_factors": [f.get("label", "") for f in result.factors],
+        "missing_information": [m.get("label", "") for m in result.missing],
+        "due_date": getattr(result, "due_date", None),
+        "simulated": True,
+        "synthetic_rule": True,
+    }
+    api_compat = (
+        "api_outcome_extension_required"
+        if legacy == "not_eligible"
+        else "current_api_outcome_supported"
+    )
+
     db.commit()
     return EvaluationResult(
         patient_id=patient_id,
         pathway=result.pathway,  # type: ignore[arg-type]
         rule_id_version=result.rule_id_version,
-        flag_status=result.flag_status,  # type: ignore[arg-type]
+        flag_status=legacy,  # type: ignore[arg-type]
         factors=result.factors,  # type: ignore[arg-type]
         missing=result.missing,  # type: ignore[arg-type]
         uncertainty=result.uncertainty,
         suggested_review_action=result.suggested_review_action,
         case=case_out,
         evaluation_id=eval_id,
+        rule_evaluation=rule_evaluation,
+        legacy_flag_status=None if legacy == "not_eligible" else legacy,
+        api_compatibility=api_compat,
     )

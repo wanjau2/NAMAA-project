@@ -18,6 +18,8 @@ ACTIONS = {
     "audit.write",
 }
 
+# review.apply requires clinical_reviewer (enforced in PDP + review service)
+
 PURPOSE_OF_USE = {
     "demo_care_coordination",
     "demo_clinical_review",

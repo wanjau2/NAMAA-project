@@ -181,13 +181,20 @@ class EvaluationResult(BaseModel):
     patient_id: str
     pathway: Pathway
     rule_id_version: str
-    flag_status: Literal["gap", "needs_review", "no_gap"]
+    flag_status: Literal["gap", "needs_review", "no_gap", "not_eligible"]
     factors: list[SourceFact]
     missing: list[MissingItem]
     uncertainty: str
     suggested_review_action: str
     case: CaseOut | None = None
     evaluation_id: str
+    # Alfred lossless handoff (I6) — persist alongside any legacy flag
+    rule_evaluation: dict | None = None
+    legacy_flag_status: str | None = None
+    api_compatibility: str | None = None
+    notice: str = (
+        "Canonical rule_evaluation must be retained; legacy_flag_status may be lossy."
+    )
 
 
 class HealthOut(BaseModel):

@@ -58,6 +58,11 @@ uvicorn app.main:app --reload --port 8000
 | GET | `/api/v1/extractions/{id}/events` | **SSE progress** (preferred) |
 | GET | `/api/v1/ops/outbox` | Outbox / DLQ inspection |
 | POST | `/api/v1/ops/outbox/{id}/retry` | Re-queue dead-lettered FHIR command |
+| GET | `/api/v1/facts/{id}` | Alfred-shaped proposal |
+| POST | `/api/v1/facts/{id}/review` | Human review (clinical_reviewer; FHIR stub) |
+| GET | `/api/v1/relate/family-history` | Relate discovery (no authz grant) |
+| GET | `/api/v1/relate/care-plans` | Relate discovery (no authz grant) |
+| POST | `/api/v1/security/revocations` | Synthetic principal revoke |
 
 Extraction UI helper: `web/lib/extraction-sse.ts`. See [D004](../docs/02-decisions/D004-sse-and-outbox.md).
 

@@ -141,3 +141,57 @@ def test_verified_context_relate_hints_do_not_grant_foreign_patient(client: Test
         },
     )
     assert res.status_code == 403
+
+
+def test_authzen_review_apply_requires_clinical_reviewer(client: TestClient):
+    sid = _session(client)
+    denied = client.post(
+        "/api/v1/authz/evaluation",
+        headers=_headers(sid, "coordinator"),
+        json={
+            "resource": {
+                "type": "Proposal",
+                "id": "prop-1101",
+                "workspace_id": sid,
+                "patient_id": "pat-synthetic-11",
+            },
+            "action": {"name": "review.apply"},
+        },
+    )
+    assert denied.status_code == 200
+    assert denied.json()["decision"] is False
+
+    allowed = client.post(
+        "/api/v1/authz/evaluation",
+        headers=_headers(sid, "clinical_reviewer"),
+        json={
+            "resource": {
+                "type": "Proposal",
+                "id": "prop-1101",
+                "workspace_id": sid,
+                "patient_id": "pat-synthetic-11",
+            },
+            "action": {"name": "review.apply"},
+        },
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["decision"] is True
+
+
+def test_relate_family_history_and_revocation(client: TestClient):
+    sid = _session(client)
+    ok = client.get(
+        "/api/v1/relate/family-history",
+        headers=_headers(sid),
+        params={"patient_id": "pat-synthetic-11"},
+    )
+    assert ok.status_code == 200
+    assert "candidates" in ok.json()
+
+    rev = client.post(
+        "/api/v1/security/revocations",
+        headers=_headers(sid),
+        json={"principal_id": "guest-synthetic", "reason_code": "demo_revoke"},
+    )
+    assert rev.status_code == 201
+    assert rev.json()["active"] is True
