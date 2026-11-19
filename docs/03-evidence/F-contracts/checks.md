@@ -274,6 +274,19 @@ without a replacement fact refused and `accept` with one refused; empty reason r
 indistinguishable for all four operations; denied disclosure marked an access outcome rather than
 a clinical finding.
 
+## Update — Ismail I4–I7 landed on API (2026-11-19)
+
+Against current `main` API, the readiness probes should flip:
+
+| Item | Now |
+| --- | --- |
+| Nested `fact` proposals + version / issues / `source_sha256` | **Present** |
+| `POST /api/v1/facts/{id}/review` | **Present** (FHIR outbox still stub) |
+| `rule_evaluation.outcome` incl. path to `not_eligible` | **Present** on evaluations |
+| `POST /api/v1/security/verified-context` + Relate GETs | **Present** (context panel still shows absence until Mark wires live fetch) |
+
+`CaseRow.flag_status` remains `gap | needs_review` for worklist rows; four-value outcomes live on evaluation responses. Re-run `npm run verify:api` with API up to refresh the PASS/PENDING counts.
+
 ## What Alfred still needs to land
 
 Items 1, 2 and 3 of his list. The frontend is wired for all three and will start exercising them

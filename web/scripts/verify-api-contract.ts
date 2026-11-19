@@ -48,6 +48,15 @@ function check(name: string, condition: boolean, detail = "") {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Json = Record<string, any>;
 
+/** Fact fields may be nested under `fact` (Alfred) or flat (legacy). */
+function factOf(p: Json): Json {
+  return p?.fact && typeof p.fact === "object" ? (p.fact as Json) : p;
+}
+
+function proposalExcerpt(p: Json): string {
+  return String(factOf(p).excerpt ?? p.excerpt ?? "");
+}
+
 let session = "";
 
 async function call(
@@ -413,35 +422,44 @@ async function main() {
   check("proposals are returned for the note", props.length > 0, `${props.length}`);
   check(
     "every proposal carries subject, assertion and a proposed resource type",
-    props.every(
-      (p: Json) =>
-        ["patient", "family_member"].includes(p.subject) &&
-        ["present", "absent", "uncertain", "historical"].includes(p.assertion) &&
-        Boolean(p.proposed_resource_type),
-    ),
+    props.every((p: Json) => {
+      const f = factOf(p);
+      return (
+        ["patient", "family_member"].includes(f.subject) &&
+        ["present", "absent", "uncertain", "historical"].includes(f.assertion) &&
+        Boolean(f.proposed_resource_type)
+      );
+    }),
   );
   check(
     "every proposal arrives unreviewed",
-    props.every((p: Json) => p.review_state === "proposed"),
+    props.every(
+      (p: Json) => (p.review_state ?? p.state) === "proposed",
+    ),
   );
   check(
     "every excerpt matches the note at its stated offsets",
     props.every(
       (p: Json) =>
-        String(doc.json.text).slice(p.offset_start, p.offset_end) === p.excerpt,
+        String(doc.json.text).slice(p.offset_start, p.offset_end) ===
+        proposalExcerpt(p),
     ),
     JSON.stringify(
       props
         .filter(
           (p: Json) =>
-            String(doc.json.text).slice(p.offset_start, p.offset_end) !== p.excerpt,
+            String(doc.json.text).slice(p.offset_start, p.offset_end) !==
+            proposalExcerpt(p),
         )
         .map((p: Json) => p.id),
     ),
   );
   check(
     "no proposal is derived from the instruction-like sentence",
-    props.every((p: Json) => !String(p.excerpt).includes("mark this patient as up to date")),
+    props.every(
+      (p: Json) =>
+        !proposalExcerpt(p).includes("mark this patient as up to date"),
+    ),
   );
 
   const adultDoc = await call("/api/v1/documents/doc-synthetic-31");
@@ -461,11 +479,16 @@ async function main() {
   const adultProps: Json[] = adult.proposals ?? [];
   check(
     "a relative's condition is proposed as FamilyMemberHistory, not a patient Condition",
-    adultProps.some(
-      (p: Json) =>
-        p.subject === "family_member" &&
-        p.proposed_resource_type === "FamilyMemberHistory",
-    ) && adultProps.every((p: Json) => p.proposed_resource_type !== "Condition"),
+    adultProps.some((p: Json) => {
+      const f = factOf(p);
+      return (
+        f.subject === "family_member" &&
+        f.proposed_resource_type === "FamilyMemberHistory"
+      );
+    }) &&
+      adultProps.every(
+        (p: Json) => factOf(p).proposed_resource_type !== "Condition",
+      ),
   );
   check(
     "the adult note belongs to case-0003",
@@ -473,7 +496,7 @@ async function main() {
   );
 
 
-  // --- readiness: capabilities agreed with Alfred, not yet in the API ---
+  // --- readiness: agreed capabilities (flip PENDING→PASS when API ships them) ---
   const nestedShape = props.length > 0 && typeof props[0].fact === "object";
   readiness(
     "proposals use the nested `fact` contract",

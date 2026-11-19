@@ -5,9 +5,9 @@
  * exact excerpts with code-point offsets, source versions, validation issues
  * and model identity — plus the assembled-context envelope.
  *
- * The API does not speak these shapes yet. `fromApiProposal` adapts what it
- * does send and REPORTS what is absent, so a field the API cannot supply shows
- * as "not provided" rather than being invented or quietly defaulted.
+ * Prefer `normalizeProposal`: the API now speaks Alfred's nested shape
+ * (Ismail I4). `fromApiProposal` remains for flat payloads and REPORTS absent
+ * fields so nothing is invented or quietly defaulted.
  */
 
 import type { ApiProposal } from "@/lib/api-types";

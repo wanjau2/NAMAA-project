@@ -180,9 +180,8 @@ export const api = {
     ),
 
   /**
-   * POST /api/v1/facts/{id}/review — not yet implemented by the API.
-   * A 404/405 here means the endpoint is absent, which the caller
-   * distinguishes from a refusal so review can fall back to local state.
+   * POST /api/v1/facts/{id}/review — Ismail I5 (synthetic; FHIR commit still stub).
+   * 404/405 means the route is absent; other 4xx are real refusals / validation.
    */
   reviewFact: (
     session: string,
