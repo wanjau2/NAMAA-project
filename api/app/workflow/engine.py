@@ -91,6 +91,7 @@ def _apply_transition(case: Case, action: str, data: dict[str, Any]) -> None:
             case.stage = "attended"
             case.next_action = "Record follow-up or close with evidence"
         else:
+            case.stage = "invited"
             case.next_action = "Did not attend — re-contact and rebook"
     elif action == "record_referral_outcome":
         outcome = str(data["outcome"])

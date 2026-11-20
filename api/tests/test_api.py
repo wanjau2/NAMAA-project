@@ -141,7 +141,7 @@ def test_did_not_attend_is_not_counted_as_attendance(client: TestClient):
         },
     )
     assert res.status_code == 200
-    assert res.json()["case"]["stage"] == "booked"
+    assert res.json()["case"]["stage"] == "invited"
     assert res.json()["event"]["outcome"] == "did_not_attend"
     detail = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
     attend_events = [

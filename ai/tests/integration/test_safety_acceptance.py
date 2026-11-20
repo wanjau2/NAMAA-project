@@ -67,13 +67,21 @@ def test_booking_alone_and_missing_reviewer_authority_cannot_close_case(api_stac
 
 def test_api_small_cohort_hides_counts_and_denominators(api_stack):
     async def run():
-        await api_stack.backend.trusted_context()
+        from app.models import Case
+        context = await api_stack.backend.trusted_context()
+        # Keep an explicit small cohort regardless of reporting-demo seed growth.
+        with api_stack.db() as db:
+            cohort = db.query(Case).filter_by(workspace_id=context.workspace_id)
+            cohort.update({Case.eligible: False})
+            cohort.filter(Case.id.in_(["case-0001", "case-0004"])).update({Case.eligible: True})
+            assert cohort.filter_by(eligible=True).count() == 2
+            db.commit()
         async with httpx.AsyncClient(transport=api_stack.transport, base_url=api_stack.backend.base,
                                     headers=api_stack.headers) as http:
             response = await http.get("/api/v1/analytics/overview")
             assert response.status_code == 200
             for pathway in response.json()["pathways"]:
-                for name in ("eligible", "invited", "booked", "attended", "completed", "declined"):
+                for name in ("eligible", "invited", "booked", "attended", "follow_up", "completed", "declined", "unreachable"):
                     cell = pathway[name]
                     assert cell["suppressed"]
                     assert cell["numerator"] is cell["denominator"] is cell["value"] is None

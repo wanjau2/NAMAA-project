@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.ai_runtime import ensure_namaa_ai
-from app.models import FhirResource, Observation, Patient, Proposal
+from app.models import FhirResource, Observation, Patient
 
 ensure_namaa_ai()
 
@@ -118,6 +118,7 @@ def build_rule_snapshot(
         )
     ]
     seen: set[str] = {f"Patient/{patient.id}"}
+    retrieval_complete = True
 
     for row in (
         db.query(FhirResource)
@@ -127,8 +128,10 @@ def build_rule_snapshot(
         try:
             body = json.loads(row.body_json)
         except (TypeError, ValueError):
+            retrieval_complete = False
             continue
         if not isinstance(body, dict):
+            retrieval_complete = False
             continue
         kind = body.get("resourceType")
         if kind not in {"Observation", "Condition", "FamilyMemberHistory"}:
@@ -177,21 +180,15 @@ def build_rule_snapshot(
             )
         )
 
-    pending = (
-        db.query(Proposal)
-        .filter(
-            Proposal.workspace_id == workspace_id,
-            Proposal.patient_id == patient.id,
-            Proposal.review_state == "proposed",
-        )
-        .count()
-    )
     return RuleSnapshot(
         workspace_id=workspace_id,
         patient_reference=patient_ref,
         as_of=as_of,
         authority="simulated_fhir",
         authorized=authorized,
-        complete_for_rule=pending == 0,
+        # These unpaginated queries exhaust the local authoritative store. A review
+        # backlog is not a retrieval failure and must not alter rule inputs/output.
+        # Missing clinical facts still produce needs_review in the rule evaluator.
+        complete_for_rule=retrieval_complete,
         resources=tuple(resources),
     )

@@ -8,6 +8,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -108,6 +109,8 @@ def apply_transaction_bundle(
                 existing.version_id += 1
                 existing.body_json = json.dumps(resource)
                 existing.updated_at = now
+                # Compensation belongs to the latest write, not the first creator.
+                existing.request_id = request_id
                 version = existing.version_id
             else:
                 version = 1
@@ -167,9 +170,21 @@ def compensate_uncertain(
             **(body.get("meta") or {}),
             "tag": [{"system": "https://namaa.example/fhir", "code": "compensated"}],
         }
-        row.version_id += 1
-        row.body_json = json.dumps(body)
-        row.updated_at = now
+        changed = db.execute(
+            update(FhirResource)
+            .where(
+                FhirResource.pk == row.pk,
+                FhirResource.workspace_id == workspace_id,
+                FhirResource.request_id == request_id,
+                FhirResource.version_id == row.version_id,
+            )
+            .values(version_id=FhirResource.version_id + 1,
+                    body_json=json.dumps(body), updated_at=now)
+            .execution_options(synchronize_session=False)
+        )
+        if changed.rowcount != 1:
+            continue  # A newer writer owns this resource now.
+        db.refresh(row)
         refs.append(f"{row.resource_type}/{row.logical_id}/_history/{row.version_id}")
     db.flush()
     return BundleResult(status="compensated", resource_refs=refs, request_id=request_id)

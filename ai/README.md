@@ -98,6 +98,13 @@ roles, prompts, or Relate paths as authority. The local policy adapter is an
 explicit deterministic test fixture only. Backend guest decisions always carry
 `production_authorization=false`.
 
+`AuthorizedExtractionPipeline` runs with a backend-authenticated service identity:
+`model.dispatch` is service-only. Human users queue extraction through the API;
+the worker checks authorization before dispatch. Integration tests cover permitted
+service dispatch and denied coordinator/reviewer dispatch without calling the model.
+Small-cohort reporting tests explicitly select their cohort instead of assuming
+the growing demo seed remains below the suppression threshold.
+
 The [backend bridge guide](docs/BACKEND_BRIDGES.md) covers API integration tests,
 live AuthZEN checks, and the review/rule/Relate clients. HAPI commit is still
 stubbed. Current acceptance evidence is recorded in the safety handoff above;

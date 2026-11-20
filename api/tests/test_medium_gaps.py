@@ -164,6 +164,39 @@ def test_available_actions_follow_the_server(client):
     assert "approve_pathway" not in by_id
 
 
+def test_no_show_exposes_rebooking_and_preserves_history(client):
+    sid = client.post("/api/v1/demo/sessions").json()["session_id"]
+    headers = {"X-Namaa-Session": sid, "X-Namaa-Role": "coordinator"}
+    url = "/api/v1/cases/case-0002"
+    current = client.get(url, headers=headers).json()
+
+    def submit(action, data, request_id):
+        nonlocal current
+        response = client.post(url + "/actions", headers=headers, json={
+            "action": action, "data": data, "request_id": request_id,
+            "expected_revision": current["revision"],
+        })
+        assert response.status_code == 200, response.text
+        current = client.get(url, headers=headers).json()
+        return response.json()
+
+    first = submit("record_attendance", {"attended": "did_not_attend"}, "missed-first")
+    actions = {item["id"] for item in current["available_actions"]}
+    assert current["stage"] == "invited"
+    assert "book_appointment" in actions and "record_attendance" not in actions
+    booking = {"appointment_time": "2026-12-01", "location": "Clinic A"}
+    booked = submit("book_appointment", booking, "rebook-first")
+    submit("record_attendance", {"attended": "did_not_attend"}, "missed-again")
+    replacement = {"appointment_time": "2026-12-03", "location": "Clinic B"}
+    submit("book_appointment", replacement, "rebook-again")
+    submit("record_attendance", {"attended": "attended"}, "attended-finally")
+    assert current["stage"] == "attended"
+    assert current["detail"]["booking"] == replacement
+    events = {event["id"]: event for event in current["detail"]["events"]}
+    assert first["event"]["id"] in events
+    assert events[booked["event"]["id"]]["booking"] == booking
+
+
 def test_reporting_cases_are_not_on_the_worklist(client):
     sid = client.post("/api/v1/demo/sessions").json()["session_id"]
     headers = {"X-Namaa-Session": sid, "X-Namaa-Role": "coordinator"}

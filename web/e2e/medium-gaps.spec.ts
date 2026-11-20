@@ -1,6 +1,20 @@
 import { expect, test } from "@playwright/test";
 import { setRole } from "./helpers";
 
+// Optional isolated API target when another developer is using the default port.
+function testApiUrl(url: string) {
+  const target = process.env.NAMAA_E2E_API_URL;
+  return target ? `${target}${new URL(url).pathname}${new URL(url).search}` : url;
+}
+
+test.beforeEach(async ({ page }) => {
+  if (!process.env.NAMAA_E2E_API_URL) return;
+  await page.route("**/api/v1/**", async (route) => {
+    const response = await route.fetch({ url: testApiUrl(route.request().url()) });
+    await route.fulfill({ response });
+  });
+});
+
 const casePath = "/api/v1/cases/case-0002";
 
 test("role changes clear case data and keep the same guest workspace", async ({ page }) => {
@@ -16,7 +30,7 @@ test("role changes clear case data and keep the same guest workspace", async ({ 
   await expect(title).toBeVisible();
   await setRole(page, "population_analyst");
   await expect(title).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Could not load this case" })).toBeVisible();
+  await expect(page.getByText("Could not load this case", { exact: true })).toBeVisible();
   await expect.poll(() => seen.some((r) => r.path === casePath && r.role === "population_analyst")).toBe(true);
   await expect.poll(() => seen.some((r) => r.path === "/api/v1/cases" && r.role === "population_analyst")).toBe(true);
   await setRole(page, "clinical_reviewer");
@@ -35,10 +49,10 @@ test("late responses from the previous role cannot restore case data", async ({ 
   const completed = new Promise<void>((resolve) => { settled = resolve; });
   await page.route(`**${casePath}`, async (route) => {
     if (route.request().headers()["x-namaa-role"] !== "coordinator") {
-      await route.continue();
+      await route.fallback();
       return;
     }
-    const response = await route.fetch();
+    const response = await route.fetch({ url: testApiUrl(route.request().url()) });
     ready();
     await held;
     try {
@@ -52,7 +66,7 @@ test("late responses from the previous role cannot restore case data", async ({ 
   await page.goto("/cases/case-0002");
   await received;
   await setRole(page, "population_analyst");
-  await expect(page.getByRole("heading", { name: "Could not load this case" })).toBeVisible();
+  await expect(page.getByText("Could not load this case", { exact: true })).toBeVisible();
   release();
   await completed;
   await expect(page.getByRole("heading", { name: "Child B (synthetic)" })).toHaveCount(0);

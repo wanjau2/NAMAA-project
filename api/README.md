@@ -126,6 +126,17 @@ pytest
   response; fetch the case for its current state. Successful persistence adds a
   `completion_committed` event and advances the case revision.
 - Attendance metrics include only events transitioning to `attended`, excluding no-shows.
+- A no-show returns the case to `invited`, enabling rebooking before attendance can be
+  recorded again. Previous booking and attendance events remain in the case history.
+- Approval workers lock the case before writing or compensating. Closed cases and later
+  approval/completion commands supersede older approvals, which are dead-lettered; manual
+  retries recheck this boundary. Ordinary invitation/attendance progress permits delayed approval.
+- FHIR compensation checks the latest writer and resource version, so an older command
+  cannot revoke a resource subsequently updated by another command.
+- Rule snapshots use authoritative resources only. Pending, rejected, or accepted proposals
+  without a committed resource cannot change rule results or retrieval completeness.
+  Malformed authoritative data marks retrieval incomplete; missing clinical facts still
+  require review through the rule evaluator.
 
 New/reset guest sessions include explicitly synthetic evidence `Encounter/enc-synthetic-02`
 for Child B and `Encounter/enc-synthetic-06` for Child F. Reset an existing demo session to load

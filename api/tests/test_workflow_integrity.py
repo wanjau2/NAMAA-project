@@ -98,7 +98,12 @@ def test_no_show_not_counted_and_later_attendance_counted_once(sessions):
     with sessions() as db:
         missed = act(db, "record_attendance", {"attended": "did_not_attend"})
         assert missed.event.outcome == "did_not_attend"
+        assert missed.case.stage == "invited"
         assert _funnel_counts(db, "test", [case(db)])["attended"] == 0
+        from app.workflow.actions import ACTIONS
+        assert ACTIONS["book_appointment"].applies(case(db))
+        assert not ACTIONS["record_attendance"].applies(case(db))
+        act(db, "book_appointment", {"appointment_time": "2026-12-01", "location": "Clinic A"})
         result = act(db, "record_attendance", {"attended": "attended"}, request_id="attendance")
         replay = act(db, "reassign_owner", {"owner": "New owner", "reason": "test"})
         assert replay.case.stage == "attended"

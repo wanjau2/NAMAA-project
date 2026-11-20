@@ -130,6 +130,46 @@ def _finalize_completion(db: Session, entry: OutboxEntry, now: str) -> None:
     ))
 
 
+def _guard_approval(db: Session, entry: OutboxEntry) -> None:
+    """Serialize approval with case changes and reject obsolete care-plan writes.
+
+    Ordinary progress (invitation/attendance) may precede a delayed approval write.
+    A later completion command or closure supersedes it, even after reopening.
+    The no-op UPDATE holds the case write lock until this transaction commits.
+    """
+    command = db.query(Command).filter_by(
+        workspace_id=entry.workspace_id,
+        outbox_id=entry.id,
+        case_id=entry.case_id,
+        action="approve_pathway",
+    ).one_or_none()
+    if command is None:
+        raise FhirConflictError("Approval command is missing; refusing an unbound care-plan write.")
+
+    locked = db.execute(
+        update(Case)
+        .where(
+            Case.workspace_id == entry.workspace_id,
+            Case.id == entry.case_id,
+            Case.stage != "closed",
+        )
+        .values(revision=Case.revision)
+        .execution_options(synchronize_session=False)
+    )
+    if locked.rowcount != 1:
+        raise FhirConflictError("Approval superseded: case is closed or no longer exists.")
+
+    newer = db.query(Command.pk).filter(
+        Command.workspace_id == entry.workspace_id,
+        Command.case_id == entry.case_id,
+        Command.pk > command.pk,
+        Command.action.in_(["approve_pathway", "close_as_completed"]),
+        Command.outbox_id.is_not(None),
+    ).first()
+    if newer is not None:
+        raise FhirConflictError("Approval superseded by a later care-plan command; review current state.")
+
+
 def claim_due_entries(db: Session, *, worker_id: str, limit: int = 10) -> list[OutboxEntry]:
     settings = get_settings()
     now = _utcnow()
@@ -164,6 +204,9 @@ def _process_entry(db: Session, entry: OutboxEntry) -> OutboxEntry:
     bundle = json.loads(entry.intended_bundle_json)
 
     try:
+        if entry.action == "approve_pathway":
+            # Also guard compensation: an old approval must not revoke a newer plan.
+            _guard_approval(db, entry)
         if entry.state == "compensating" or entry.compensation_reason:
             result = compensate_uncertain(
                 db,

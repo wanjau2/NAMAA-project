@@ -103,7 +103,8 @@ def test_service_token_and_session_are_checked_by_api(api_stack, monkeypatch):
     asyncio.run(run())
 
 
-def test_real_source_and_security_boundaries_surround_extraction(api_stack):
+def test_real_source_and_security_boundaries_surround_extraction(api_stack, monkeypatch):
+    monkeypatch.setenv("NAMAA_SERVICE_TOKEN", "synthetic-extraction-test-token")
     class SimulatedModel:
         async def extract(self, request):
             assert request.source_id == DOCUMENT and request.source_version == "2"
@@ -112,14 +113,38 @@ def test_real_source_and_security_boundaries_surround_extraction(api_stack):
 
     async def run():
         from app.models import AuditEvent
-        backend = api_stack.backend
+        backend = BackendApiClient("http://testserver", dict(api_stack.headers,
+            **{"X-Namaa-Service-Token": "synthetic-extraction-test-token"}), transport=api_stack.transport)
+        context = await backend.trusted_context()
+        assert context.user_type == context.membership_role == "service"
         result = await AuthorizedExtractionPipeline(SecurityEnforcer(backend, backend), backend, SimulatedModel()).run(
-            context=await backend.trusted_context(), patient_id=PATIENT, source_id=DOCUMENT)
+            context=context, patient_id=PATIENT, source_id=DOCUMENT)
         assert result.model.simulated is True
         with api_stack.db() as db:
             rows = db.query(AuditEvent).filter_by(event_type="ai.security.boundary").order_by(AuditEvent.pk).all()
             assert [row.action for row in rows] == ["note.retrieve", "model.dispatch", "proposal.disclose"]
             assert json.loads(rows[-1].source_versions_json) == {f"DocumentReference/{DOCUMENT}": "2"}
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("role", ["coordinator", "clinical_reviewer"])
+def test_human_extraction_cannot_dispatch_model(api_stack, role):
+    class ForbiddenModel:
+        async def extract(self, request):
+            pytest.fail("A human principal must not dispatch the model")
+
+    async def run():
+        from app.models import AuditEvent
+        backend = BackendApiClient("http://testserver", dict(api_stack.headers,
+            **{"X-Namaa-Role": role}), transport=api_stack.transport)
+        context = await backend.trusted_context()
+        with pytest.raises(AuthorizationDenied):
+            await AuthorizedExtractionPipeline(SecurityEnforcer(backend, backend), backend, ForbiddenModel()).run(
+                context=context, patient_id=PATIENT, source_id=DOCUMENT)
+        with api_stack.db() as db:
+            rows = db.query(AuditEvent).filter_by(event_type="ai.security.boundary").order_by(AuditEvent.pk).all()
+            assert [row.action for row in rows] == ["note.retrieve", "model.dispatch"]
+            assert rows[-1].decision == "Deny"
     asyncio.run(run())
 
 
