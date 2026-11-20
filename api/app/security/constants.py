@@ -16,6 +16,75 @@ ACTIONS = {
     "review.apply",
     "evaluation.run",
     "audit.write",
+    "audit.read",
+    "case.read",
+    "case.act",
+    "analytics.read",
+    "document.list",
+    "outbox.read",
+    "outbox.retry",
+    "principal.revoke",
+}
+
+PATIENT_SCOPED_ACTIONS = {
+    "note.retrieve",
+    "model.dispatch",
+    "context.retrieve",
+    "proposal.disclose",
+    "excerpt.display",
+    "excerpt.export",
+    "review.apply",
+    "evaluation.run",
+}
+
+ROLE_ACTIONS: dict[str, frozenset[str]] = {
+    "coordinator": frozenset(
+        {
+            "note.retrieve",
+            "context.retrieve",
+            "proposal.disclose",
+            "excerpt.display",
+            "evaluation.run",
+            "audit.write",
+            "audit.read",
+            "case.read",
+            "case.act",
+            "analytics.read",
+            "document.list",
+            "outbox.read",
+            "outbox.retry",
+            "principal.revoke",
+        }
+    ),
+    "clinical_reviewer": frozenset(
+        {
+            "note.retrieve",
+            "context.retrieve",
+            "proposal.disclose",
+            "excerpt.display",
+            "excerpt.export",
+            "review.apply",
+            "evaluation.run",
+            "audit.write",
+            "audit.read",
+            "case.read",
+            "case.act",
+            "analytics.read",
+            "document.list",
+            "principal.revoke",
+        }
+    ),
+    "population_analyst": frozenset({"analytics.read", "audit.write", "audit.read"}),
+    "service": frozenset(
+        {
+            "note.retrieve",
+            "model.dispatch",
+            "proposal.disclose",
+            "excerpt.display",
+            "review.apply",
+            "audit.write",
+        }
+    ),
 }
 
 # review.apply requires clinical_reviewer (enforced in PDP + review service)

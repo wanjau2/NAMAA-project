@@ -202,8 +202,12 @@ class BackendApiClient(BackendHttpClient):
                                                generation_id=batch.generation_id, relate_hints=hints)
 
         async def request_refresh(*, workspace_id: str, patient_reference: str):
-            # No refresh route is published; the resolver still records requested vs failed.
-            return None
+            await self._request(
+                "POST",
+                "/api/v1/relate/refresh",
+                json={"patient_id": _id(patient_reference.removeprefix("Patient/"))},
+                request_id=context.request_id,
+            )
 
         return await RelateResolver(verify, request_refresh).resolve(
             batch, workspace_id=context.workspace_id, patient_reference=patient_reference,

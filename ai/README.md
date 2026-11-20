@@ -69,11 +69,11 @@ not a successful empty extraction.
 | `src/namaa_ai/backend.py` | Session-bound API bridges for nested proposals, review, canonical rules and verified Relate discovery |
 | `src/namaa_ai/fhir.py` | Deterministic reviewed Observation, Condition and FamilyMemberHistory mappings, Provenance and local mapping checks |
 | `src/namaa_ai/rules.py` | Versioned fictional rules over backend resource snapshots |
-| `src/namaa_ai/context.py` | Default-disabled verified-context gate |
+| `src/namaa_ai/context.py` | Verified-context gate (enabled by default; `enabled=False` is a kill switch) |
 | `src/namaa_ai/context_engineering.py` | FHIR-resource-bounded retrieval, BM25, optional dense adapter, rank fusion and bounded context assembly |
 | `src/namaa_ai/context_assembler.py` | Approved guidelines and patient passages with a shared retrieval budget |
 | `src/namaa_ai/ingestion.py` | Layout/OCR parser protocol and explicitly simulated fixture parser |
-| `src/namaa_ai/relate.py` | Default-disabled Relate candidate verification against current backend context |
+| `src/namaa_ai/relate.py` | Relate candidate verification (enabled by default; `enabled=False` is a kill switch) |
 | `src/namaa_ai/relate_graph.py` | Per-request verification callback, unknown suppression and refresh requests |
 | `src/namaa_ai/analytics.py` | Pure small-cell/complementary suppression for one complete publication family |
 | `src/namaa_ai/engagement.py` | English-only, non-sending demo templates and versioned metric definitions |

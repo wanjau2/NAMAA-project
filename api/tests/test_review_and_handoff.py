@@ -45,7 +45,7 @@ def _hdr(sid: str, role: str = "clinical_reviewer") -> dict[str, str]:
     return {"X-Namaa-Session": sid, "X-Namaa-Role": role}
 
 
-def _complete_extraction(client: TestClient, sid: str) -> str:
+def _complete_extraction(client: TestClient, sid: str) -> dict:
     accepted = client.post(
         "/api/v1/documents/doc-synthetic-11/extractions",
         headers=_hdr(sid),
@@ -64,12 +64,13 @@ def _complete_extraction(client: TestClient, sid: str) -> str:
     assert status.status_code == 200
     props = status.json()["proposals"]
     assert props and "fact" in props[0]
-    return props[0]["id"]
+    return props[0]
 
 
 def test_alfred_shaped_proposal_and_review_accept(client: TestClient):
     sid = _sid(client)
-    prop_id = _complete_extraction(client, sid)
+    proposal = _complete_extraction(client, sid)
+    prop_id = proposal["id"]
     req = str(uuid.uuid4())
     body = {
         "request_id": req,
@@ -78,9 +79,8 @@ def test_alfred_shaped_proposal_and_review_accept(client: TestClient):
         "action": "accept",
         "reviewer_reference": "Practitioner/demo-reviewer",
         "reason": "Synthetic reviewer accepts quoted statement for demo.",
-        "acknowledged_issues": [],
+        "acknowledged_issues": [i["code"] for i in proposal.get("issues") or []],
     }
-    # prop-1101 has no review issues; prop-1102 needs acknowledgment — accept first proposal
     res = client.post(f"/api/v1/facts/{prop_id}/review", headers=_hdr(sid), json=body)
     assert res.status_code == 200, res.text
     assert res.json()["state"] == "accepted"
@@ -93,7 +93,7 @@ def test_alfred_shaped_proposal_and_review_accept(client: TestClient):
 
 def test_review_requires_clinical_role(client: TestClient):
     sid = _sid(client)
-    prop_id = _complete_extraction(client, sid)
+    prop_id = _complete_extraction(client, sid)["id"]
     res = client.post(
         f"/api/v1/facts/{prop_id}/review",
         headers=_hdr(sid, "coordinator"),

@@ -13,6 +13,7 @@ Unresolved choices live in [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md) until someone 
 | D003 | 2026-11-18 | [Backend stack, API paths, and metrics suppression](D003-backend-stack-and-api.md) | Accepted |
 | D004 | 2026-11-18 | [Extraction SSE and FHIR outbox compensation](D004-sse-and-outbox.md) | Accepted |
 | D005 | 2026-11-18 | [Trusted context, AuthZEN PDP, enforcement, audit](D005-authz-audit-pdp.md) | Accepted |
+| D006 | 2026-11-20 | [Canonical rule-outcome contract and case lifecycle](D006-outcome-contract.md) | Accepted |
 
 To add one: copy [TEMPLATE.md](TEMPLATE.md) to `DNNN-short-slug.md`, fill it in, add a row above,
 and strike the matching row out of the open-questions register.

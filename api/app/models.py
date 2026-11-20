@@ -168,7 +168,7 @@ class ExtractionJob(Base):
     lease_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
     lease_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
     model_revision: Mapped[str] = mapped_column(String(128), default="offline-fixture-v1")
-    prompt_version: Mapped[str] = mapped_column(String(64), default="extract-v0.3")
+    prompt_version: Mapped[str] = mapped_column(String(64), default="extract-v1.0.1")
     progress_percent: Mapped[int] = mapped_column(Integer, default=0)
     progress_message: Mapped[str] = mapped_column(String(256), default="Queued")
     error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -311,6 +311,22 @@ class FhirResource(Base):
     body_json: Mapped[str] = mapped_column(Text)
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     updated_at: Mapped[str] = mapped_column(String(64))
+
+
+class FhirTransactionResult(Base):
+    """Durable stub-gateway result per command so later updates do not erase replay (I16)."""
+
+    __tablename__ = "fhir_transaction_results"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "request_id", name="uq_fhir_tx_request"),
+    )
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    request_id: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32))
+    result_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String(64))
 
 
 class RuleEvaluation(Base):

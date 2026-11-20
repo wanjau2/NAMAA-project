@@ -273,6 +273,8 @@ def test_relate_always_verifies_before_disclosing(operation, variant):
         calls.append((request.method, request.url.path))
         if request.url.path == "/api/v1/security/context":
             return httpx.Response(200, json=context().model_dump(mode="json"))
+        if request.url.path == "/api/v1/relate/refresh":
+            return httpx.Response(200, json={"refresh": "requested", "patient_id": "pat-a"})
         if request.url.path.startswith("/api/v1/relate/"):
             assert request.url.params["patient_id"] == "pat-a"
             return httpx.Response(200, json=batch)
@@ -294,5 +296,9 @@ def test_relate_always_verifies_before_disclosing(operation, variant):
             assert resolution.refresh == "requested"
     result = asyncio.run(getattr(backend, operation)("pat-a"))
     assert result == resolution.items
-    assert calls[-1] == ("POST", "/api/v1/security/verified-context")
+    if variant == "valid":
+        assert calls[-1] == ("POST", "/api/v1/security/verified-context")
+        assert all(path != "/api/v1/relate/refresh" for _, path in calls)
+    else:
+        assert calls[-1] == ("POST", "/api/v1/relate/refresh")
     assert calls[1][1] == "/api/v1/relate/" + ("family-history" if operation == "family_history_context" else "care-plans")

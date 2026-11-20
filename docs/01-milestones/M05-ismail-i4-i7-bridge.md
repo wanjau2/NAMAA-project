@@ -29,8 +29,8 @@ cd api && pytest -q
 ai/.venv/Scripts/python ai/scripts/check_backend.py --local --report ai/evidence/backend-acceptance-local.json
 ```
 
-**2026-11-19 follow-up (I03/I05/I07 + I01/I02):** Alfred local acceptance **12 passed, 0 failed**
-(`ai/evidence/backend-acceptance-local.json`). Canonical proposal/review wire shape,
-bound `Practitioner/demo-reviewer`, unique proposal IDs per job, durable
-`rule_evaluation` + `GET /patients/{id}/evaluations/latest`, reviewed facts upserted
-as observations for the evaluation path.
+**2026-11-20 follow-up:** API evaluations call `namaa_ai.rules.evaluate` on a
+reviewed RuleSnapshot (stub FHIR + mapped seed observations). Review uses
+`apply_review` + `propose_transaction`; family history stays FamilyMemberHistory.
+`GET /patients/{id}/evaluations/latest` reloads the nested canonical object.
+HAPI remains stub.

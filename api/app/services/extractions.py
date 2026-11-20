@@ -7,16 +7,24 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.ai_runtime import ensure_namaa_ai
 from app.config import get_settings
 from app.errors import AppError
+from sqlalchemy import and_, or_
+
 from app.models import Document, ExtractionJob, Proposal, Workspace
 from app.realtime import extraction_channel, extraction_hub
 from app.security.audit import emit_audit
 from app.security.context import TrustedRequestContext, build_trusted_context
 from app.security.enforce import authorize
 from app.services.extraction_fixtures import proposals_for_document
-from app.services.proposals import proposal_to_alfred, source_sha256
-from app.models import PrincipalRevocation
+from app.services.proposals import alfred_concept, proposal_to_alfred, source_sha256
+from app.security.revocation import assert_not_revoked
+
+ensure_namaa_ai()
+
+from namaa_ai.contracts import ExtractionRequest, ProposedFact  # noqa: E402
+from namaa_ai.validation import check_fact  # noqa: E402
 
 
 TERMINAL = {"succeeded", "failed", "cancelled", "timed_out"}
@@ -56,7 +64,11 @@ def job_event_payload(job: ExtractionJob, *, proposals: list[dict] | None = None
         "error_code": job.error_code,
         "error_message": job.error_message,
         "synthetic": True,
-        "inference_mode": settings.extraction_mode,
+        "inference_mode": (
+            "offline_fixture"
+            if (job.model_revision or "").startswith("offline-fixture")
+            else settings.extraction_mode
+        ),
     }
     if proposals is not None:
         payload["proposals"] = proposals
@@ -94,7 +106,7 @@ def queue_extraction(
         )
 
     if ctx is not None:
-        # Fresh checks before note retrieval and model dispatch (D005).
+        # Human queue is note.retrieve. Workers re-check model.dispatch as service (D005).
         authorize(
             db,
             ctx,
@@ -103,15 +115,6 @@ def queue_extraction(
             resource_id=doc.id,
             patient_id=doc.patient_id,
             extra_context={"document_version": str(doc.version)},
-        )
-        authorize(
-            db,
-            ctx,
-            action="model.dispatch",
-            resource_type="ExtractionJob",
-            resource_id=doc.id,
-            patient_id=doc.patient_id,
-            extra_context={"model_destination": ctx.approved_model_destination},
         )
 
     # Reuse an active job for the same document version (avoid duplicate inference).
@@ -176,33 +179,12 @@ def queue_extraction(
     return job
 
 
-def _assert_not_revoked(db: Session, *, workspace_id: str, principal_id: str | None) -> None:
-    if not principal_id:
-        return
-    row = (
-        db.query(PrincipalRevocation)
-        .filter(
-            PrincipalRevocation.workspace_id == workspace_id,
-            PrincipalRevocation.principal_id == principal_id,
-            PrincipalRevocation.active.is_(True),
-        )
-        .one_or_none()
-    )
-    if row is not None:
-        raise AppError(
-            code="forbidden",
-            message="Initiating principal has been revoked; processing and disclosure are blocked.",
-            status_code=403,
-            field_errors={"reason_code": "principal_revoked"},
-        )
-
-
 def reauthorize_job_execution(db: Session, job: ExtractionJob) -> TrustedRequestContext:
     """Re-authorize when a worker claims a job (preserved initiating scope)."""
     workspace = db.get(Workspace, job.workspace_id)
     if workspace is None:
         raise AppError(code="not_found", message="Workspace missing for job.", status_code=404)
-    _assert_not_revoked(db, workspace_id=job.workspace_id, principal_id=job.initiating_user_id)
+    assert_not_revoked(db, workspace_id=job.workspace_id, principal_id=job.initiating_user_id)
     ctx = build_trusted_context(
         db,
         workspace=workspace,
@@ -242,6 +224,8 @@ def authorize_proposal_disclosure(
     ctx: TrustedRequestContext,
     job: ExtractionJob,
 ) -> None:
+    assert_not_revoked(db, workspace_id=job.workspace_id, principal_id=ctx.user_id)
+    assert_not_revoked(db, workspace_id=job.workspace_id, principal_id=job.initiating_user_id)
     authorize(
         db,
         ctx,
@@ -301,16 +285,38 @@ def claim_queued_jobs(db: Session, *, worker_id: str, limit: int = 5) -> list[Ex
     for job in jobs:
         if len(claimed) >= limit:
             break
-        lease_expired = job.lease_until is None or job.lease_until <= now_s
-        if job.state == "queued" or (job.state == "running" and lease_expired):
-            job.state = "running"
-            job.attempts += 1
-            job.lease_owner = worker_id
-            job.lease_until = lease_until
-            if not job.started_at:
-                job.started_at = now_s
-                job.progress_message = "Extracting…"
-                job.progress_percent = 5
+        claimed_row = (
+            db.query(ExtractionJob)
+            .filter(
+                ExtractionJob.pk == job.pk,
+                or_(
+                    ExtractionJob.state == "queued",
+                    and_(
+                        ExtractionJob.state == "running",
+                        or_(
+                            ExtractionJob.lease_until.is_(None),
+                            ExtractionJob.lease_until <= now_s,
+                        ),
+                    ),
+                ),
+            )
+            .update(
+                {
+                    "state": "running",
+                    "attempts": ExtractionJob.attempts + 1,
+                    "lease_owner": worker_id,
+                    "lease_until": lease_until,
+                    "started_at": job.started_at or now_s,
+                    "progress_message": job.progress_message
+                    if job.started_at
+                    else "Extracting…",
+                    "progress_percent": job.progress_percent if job.started_at else 5,
+                },
+                synchronize_session="fetch",
+            )
+        )
+        if claimed_row == 1:
+            db.refresh(job)
             claimed.append(job)
     db.commit()
     return claimed
@@ -357,6 +363,21 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
         db.commit()
         return job
 
+    if settings.extraction_mode != "offline_fixture":
+        job.state = "failed"
+        job.progress_percent = 100
+        job.progress_message = "Hosted extraction is not configured"
+        job.error_code = "live_inference_unavailable"
+        job.error_message = (
+            "NAMAA_EXTRACTION_MODE is not offline_fixture and no hosted adapter ran. "
+            "This failure is not a care-gap or no-risk result."
+        )
+        job.finished_at = now_s
+        job.lease_owner = None
+        job.lease_until = None
+        db.commit()
+        return job
+
     doc = (
         db.query(Document)
         .filter(
@@ -368,14 +389,32 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
     )
     fixtures = proposals_for_document(doc.id, doc.text)
     digest = source_sha256(doc.text)
-    issues_uncertain = (
-        '[{"code":"uncertain_date","severity":"review","message":"Effective date is uncertain; acknowledgment required."}]'
+    request = ExtractionRequest(
+        request_id=job.id,
+        workspace_id=job.workspace_id,
+        patient_reference=f"Patient/{job.patient_id}",
+        source_id=doc.id,
+        source_version=str(doc.version),
+        source_date=doc.document_date[:10],
+        note_text=doc.text,
     )
     # I07 — immutable proposal id per extraction job (never reuse bare fixture ids).
     job_suffix = job.id.removeprefix("ext-")[:12]
     for item in fixtures:
-        issues = issues_uncertain if item.get("assertion") == "uncertain" else "[]"
         relationship = "sibling" if item.get("subject") == "family_member" else None
+        fact = ProposedFact.model_validate(
+            {
+                "concept": alfred_concept(item["concept"]),
+                "value_text": item["value_text"],
+                "subject": item["subject"],
+                "assertion": item["assertion"],
+                "effective_date": item["effective_date"],
+                "excerpt": item["excerpt"],
+                "proposed_resource_type": item["proposed_resource_type"],
+                "relationship": relationship,
+            }
+        )
+        start, end, issues = check_fact(request, fact)
         fixture_stem = str(item["id"]).removeprefix("prop-")
         proposal_id = f"prop-{job_suffix}-{fixture_stem}"[:64]
         db.add(
@@ -396,9 +435,9 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
                 proposed_resource_type=item["proposed_resource_type"],
                 relationship=relationship,
                 excerpt=item["excerpt"],
-                offset_start=item["offset_start"],
-                offset_end=item["offset_end"],
-                issues_json=issues,
+                offset_start=item["offset_start"] if start is None else start,
+                offset_end=item["offset_end"] if end is None else end,
+                issues_json=json.dumps([issue.model_dump() for issue in issues]),
                 model_id="google/medgemma-1.5-4b-it",
                 model_revision=job.model_revision,
                 prompt_version="extract-v1.0.1",
@@ -409,10 +448,10 @@ def advance_job(db: Session, job: ExtractionJob) -> ExtractionJob:
     job.state = "succeeded"
     job.progress_percent = 100
     job.progress_message = "Extraction complete (offline fixture)"
+    job.model_revision = "offline-fixture-v1 (no live inference)"
+    job.prompt_version = "extract-v1.0.1"
     job.finished_at = now_s
     job.lease_owner = None
     job.lease_until = None
-    if settings.extraction_mode != "offline_fixture":
-        job.model_revision = "offline-fixture-v1 (fallback — live model unavailable)"
     db.commit()
     return job

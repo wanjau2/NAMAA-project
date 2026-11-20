@@ -1,12 +1,22 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
+from app.ai_runtime import ensure_namaa_ai
 from app.config import get_settings
 from app.db import init_db
-from app.errors import AppError, app_error_handler
+from app.errors import (
+    AppError,
+    app_error_handler,
+    http_exception_handler,
+    validation_error_handler,
+)
+
+ensure_namaa_ai()
 from app.routers import (
     analytics,
     cases,
@@ -55,6 +65,8 @@ def create_app(*, start_workers: bool = True) -> FastAPI:
         allow_headers=["*"],
     )
     app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
     app.include_router(health.router)
     app.include_router(demo.router)

@@ -8,6 +8,7 @@ import uuid
 
 from app.config import get_settings
 from app.db import SessionLocal
+from app.errors import AppError
 from app.services.extractions import (
     TERMINAL,
     advance_job,
@@ -74,9 +75,18 @@ class WorkerRuntime:
         try:
             jobs = claim_queued_jobs(db, worker_id=self.worker_id)
             for job in jobs:
-                # D005: re-authorize at execution start using preserved initiating scope.
-                reauthorize_job_execution(db, job)
-                db.commit()
+                try:
+                    reauthorize_job_execution(db, job)
+                    db.commit()
+                except AppError as exc:
+                    job.state = "failed"
+                    job.error_code = exc.code
+                    job.error_message = exc.message
+                    job.lease_owner = None
+                    job.lease_until = None
+                    db.commit()
+                    await publish_job(job)
+                    continue
                 await publish_job(job)
                 while job.state not in TERMINAL:
                     await asyncio.sleep(0.35)

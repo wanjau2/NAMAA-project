@@ -86,9 +86,9 @@ The verifier must perform PEP/PDP checks and current HAPI reads. Failures,
 missing supports and stale generations return `state="unknown"`, no items and
 `refresh="requested"` (or `"failed"` if enqueue fails). `BackendApiClient`
 resolves family-history and care-plan discovery through this boundary.
-`request_refresh` is a documented no-op until Ismail publishes a refresh
-route. Prefer `family_history_resolution` / `care_plan_resolution` over the
-tuple helpers so unknown is not mistaken for absence.
+`BackendApiClient.request_refresh` POSTs `/api/v1/relate/refresh`. Prefer
+`family_history_resolution` / `care_plan_resolution` over the tuple helpers so
+unknown is not mistaken for absence.
 
 Ismail's authenticated service should:
 

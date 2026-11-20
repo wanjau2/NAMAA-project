@@ -7,7 +7,7 @@ from app.db import get_db
 from app.schemas import EvaluationRequest, EvaluationResult
 from app.security.context import TrustedRequestContext
 from app.security.deps import get_trusted_context
-from app.services.evaluations import latest_evaluation, run_evaluation
+from app.services.evaluations import latest_evaluation, list_evaluations, run_evaluation
 
 router = APIRouter(prefix="/api/v1/patients", tags=["patients"])
 
@@ -37,6 +37,20 @@ def latest_evaluation_endpoint(
 ) -> dict[str, Any]:
     """I01 — reload the last persisted canonical rule_evaluation for this patient."""
     return latest_evaluation(
+        db,
+        workspace_id=ctx.workspace_id,
+        patient_id=patient_id,
+        ctx=ctx,
+    )
+
+
+@router.get("/{patient_id}/evaluations")
+def list_evaluation_endpoint(
+    patient_id: str,
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    return list_evaluations(
         db,
         workspace_id=ctx.workspace_id,
         patient_id=patient_id,

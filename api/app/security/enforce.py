@@ -64,6 +64,9 @@ def authorize(
             patient_id=patient_id,
         )
     if not decision.decision or decision.decision_value != "Permit":
+        if audit:
+            # Persist the deny independently of the failed clinical transaction (I11).
+            db.commit()
         raise AuthorizationDenied(decision, request_id=ctx.request_id)
     return decision
 

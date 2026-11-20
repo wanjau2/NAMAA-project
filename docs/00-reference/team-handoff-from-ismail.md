@@ -1,4 +1,4 @@
-# Team handoff from Ismail — 19 Nov 2026
+# Team handoff from Ismail — 20 Nov 2026
 
 ## Status (synthetic prototype only)
 
@@ -7,11 +7,11 @@
 | I1 Trusted context | Done (`GET /api/v1/security/context`) |
 | I2 AuthZEN + enforcement | Done for note/model/context/disclose/review/eval |
 | I3 Audit + job reauth + revocation hook | Done (prototype; not production audit store) |
-| I4 Source + proposals | Done (Alfred-shaped proposals) |
-| I5 Human review + FHIR | **Partial** — review endpoint live; **FHIR = stub**, not HAPI |
-| I6 Rule handoff | Done (canonical `rule_evaluation` on eval response) |
-| I7 Relate + verified-context | Done (Relate discovery + verified-context) |
-| I8 Mark contracts + security tests | Partial — OpenAPI live; expand UI/tests as below |
+| I4 Source + proposals | Done (Alfred-shaped proposals; unique ids per job) |
+| I5 Human review + FHIR | **Partial** — `apply_review` + `propose_transaction`; **FHIR = stub**, not HAPI |
+| I6 Rule handoff | Done — evaluations call `namaa_ai.rules.evaluate`; persist canonical object |
+| I7 Relate + verified-context | Done (Relate discovery, `/relate/refresh`, verified-context) |
+| I8 Mark contracts + security tests | Partial — OpenAPI live; Mark P0 UI gaps are separate |
 
 Guest auth remains `policy_adapter=synthetic_guest_v1`, `production_authorization=false`.
 **No real patient data.**
@@ -38,17 +38,19 @@ Backend bridges for your AI module are up on the synthetic stack:
    Proposals from extraction status/SSE are now **nested Alfred shape** (`fact`, `model`,
    `source_sha256`, `offset_unit`, `issues`).
 
-3. **Rules** — `POST /api/v1/patients/{id}/evaluations` returns:
+3. **Rules** — `POST /api/v1/patients/{id}/evaluations` runs Alfred `evaluate` and
+   returns:
    - `rule_evaluation` (canonical outcome including `not_eligible`)
    - `legacy_flag_status` / `api_compatibility` (lossy projection for Mark)
-   Prefer persisting `rule_evaluation`; call `prepare_rule_handoff` against that object
-   if you still need the handoff wrapper locally.
+   - `case: null` for `no_gap_identified_in_available_data` and `not_eligible` (D006)
+   Reload via `GET /api/v1/patients/{id}/evaluations/latest`.
 
 4. **Relate / context** — Discovery only:
    - `GET /api/v1/relate/family-history?patient_id=`
    - `GET /api/v1/relate/care-plans?patient_id=`
+   - `POST /api/v1/relate/refresh` (synthetic enqueue; hints still do not grant access)
    Then **always** `POST /api/v1/security/verified-context` before
-   `VerifiedContextAdapter` / `VerifiedCandidateAdapter`. Relate never grants access.
+   `VerifiedContextAdapter` / `VerifiedCandidateAdapter`.
 
 5. **Please add/adjust on your side**
    - Integration tests hitting the real API (not only `LocalSyntheticPolicy`)

@@ -28,18 +28,21 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _sanitize(extra: dict[str, Any] | None) -> dict[str, Any]:
-    if not extra:
+def _sanitize(extra: Any) -> Any:
+    if extra is None:
         return {}
-    clean: dict[str, Any] = {}
-    for key, value in extra.items():
-        if key.lower() in FORBIDDEN_PAYLOAD_KEYS:
-            continue
-        if isinstance(value, str) and len(value) > 512:
-            clean[key] = value[:512] + "…"
-        else:
-            clean[key] = value
-    return clean
+    if isinstance(extra, dict):
+        clean: dict[str, Any] = {}
+        for key, value in extra.items():
+            if str(key).lower() in FORBIDDEN_PAYLOAD_KEYS:
+                continue
+            clean[str(key)] = _sanitize(value)
+        return clean
+    if isinstance(extra, list):
+        return [_sanitize(item) for item in extra]
+    if isinstance(extra, str) and len(extra) > 512:
+        return extra[:512] + "…"
+    return extra
 
 
 def emit_audit(
@@ -86,7 +89,7 @@ def emit_audit(
         prompt_version=prompt_version,
         reviewer_id=reviewer_id,
         reason_code=reason_code or (decision.reason_code if decision else None),
-        safe_detail_json=json.dumps(_sanitize(extra)),
+        safe_detail_json=json.dumps(_sanitize(extra) if extra is not None else {}),
     )
     db.add(event)
     db.flush()

@@ -259,7 +259,7 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
 
     pending = client.get("/api/v1/ops/outbox", headers=_headers(sid))
     assert pending.status_code == 200
-    assert any(r["request_id"] == close_id for r in pending.json())
+    assert any(close_id in r["request_id"] for r in pending.json())
 
     db = client.app.state.session_factory()  # type: ignore[attr-defined]
     try:
@@ -277,7 +277,7 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
         headers=_headers(sid),
         params={"state": "committed"},
     )
-    assert any(r["request_id"] == close_id for r in committed.json())
+    assert any(close_id in r["request_id"] for r in committed.json())
 
     # Force a dead-letter via injected failures, then retry.
     monkeypatch.setenv("NAMAA_FHIR_INJECT_FAILURE_RATE", "1.0")
@@ -333,7 +333,7 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
         params={"state": "dead_lettered"},
     )
     assert dlq.status_code == 200
-    dead = [r for r in dlq.json() if r["request_id"] == req]
+    dead = [r for r in dlq.json() if req in r["request_id"]]
     assert dead, dlq.json()
 
     monkeypatch.setenv("NAMAA_FHIR_INJECT_FAILURE_RATE", "0.0")
@@ -361,4 +361,4 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
         headers=_headers(sid),
         params={"state": "committed"},
     )
-    assert any(r["request_id"] == req for r in ok.json())
+    assert any(req in r["request_id"] for r in ok.json())

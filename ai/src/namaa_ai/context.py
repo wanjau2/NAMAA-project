@@ -1,4 +1,4 @@
-"""Optional Relate boundary. No graph process, queries, synchronization or inference."""
+"""Verified-context gate. Enabled by default; pass enabled=False to keep a composition dark."""
 from datetime import datetime
 
 from .contracts import VerifiedContext

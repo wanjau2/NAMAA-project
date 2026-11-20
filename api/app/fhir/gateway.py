@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import FhirResource
+from app.models import FhirResource, FhirTransactionResult
 
 
 class FhirConflictError(Exception):
@@ -55,70 +55,92 @@ def apply_transaction_bundle(
     if settings.fhir_gateway_mode != "stub":
         raise FhirTransientError("HAPI gateway is not enabled in this deployment.")
 
-    prior = (
-        db.query(FhirResource)
+    prior_tx = (
+        db.query(FhirTransactionResult)
         .filter(
-            FhirResource.workspace_id == workspace_id,
-            FhirResource.request_id == request_id,
+            FhirTransactionResult.workspace_id == workspace_id,
+            FhirTransactionResult.request_id == request_id,
         )
-        .all()
+        .one_or_none()
     )
-    if prior:
-        refs = [f"{r.resource_type}/{r.logical_id}/_history/{r.version_id}" for r in prior]
-        return BundleResult(status="replayed", resource_refs=refs, request_id=request_id)
+    if prior_tx is not None:
+        payload = json.loads(prior_tx.result_json)
+        return BundleResult(
+            status=payload.get("status") or prior_tx.status,
+            resource_refs=list(payload.get("resource_refs") or []),
+            request_id=request_id,
+        )
 
     if settings.fhir_inject_failure_rate > 0 and random.random() < settings.fhir_inject_failure_rate:
         raise FhirTransientError("Injected transient FHIR gateway failure.")
 
     entries = bundle.get("entry") or []
     refs: list[str] = []
-    for entry in entries:
-        resource = entry.get("resource") or {}
-        resource_type = resource.get("resourceType")
-        if not resource_type:
-            raise FhirTransientError("Bundle entry missing resourceType.")
-        logical_id = resource.get("id") or f"syn-{uuid.uuid4().hex[:10]}"
-        resource = {**resource, "id": logical_id}
-        existing = (
-            db.query(FhirResource)
-            .filter(
-                FhirResource.workspace_id == workspace_id,
-                FhirResource.resource_type == resource_type,
-                FhirResource.logical_id == logical_id,
+    nested = db.begin_nested()
+    try:
+        for entry in entries:
+            resource = entry.get("resource") or {}
+            resource_type = resource.get("resourceType")
+            if not resource_type:
+                raise FhirTransientError("Bundle entry missing resourceType.")
+            logical_id = resource.get("id") or f"syn-{uuid.uuid4().hex[:10]}"
+            resource = {**resource, "id": logical_id}
+            existing = (
+                db.query(FhirResource)
+                .filter(
+                    FhirResource.workspace_id == workspace_id,
+                    FhirResource.resource_type == resource_type,
+                    FhirResource.logical_id == logical_id,
+                )
+                .one_or_none()
             )
-            .one_or_none()
+            if_match = (entry.get("request") or {}).get("ifMatch") or (
+                entry.get("request") or {}
+            ).get("If-Match")
+            if existing and if_match:
+                expected = str(if_match).replace("W/", "").strip('"')
+                if str(existing.version_id) != expected:
+                    raise FhirConflictError(
+                        f"Version conflict on {resource_type}/{logical_id}: "
+                        f"expected {expected}, current {existing.version_id}."
+                    )
+            if existing:
+                existing.version_id += 1
+                existing.body_json = json.dumps(resource)
+                existing.updated_at = now
+                version = existing.version_id
+            else:
+                version = 1
+                db.add(
+                    FhirResource(
+                        workspace_id=workspace_id,
+                        resource_type=resource_type,
+                        logical_id=logical_id,
+                        version_id=version,
+                        body_json=json.dumps(resource),
+                        request_id=request_id,
+                        updated_at=now,
+                    )
+                )
+            refs.append(f"{resource_type}/{logical_id}/_history/{version}")
+        result = BundleResult(status="committed", resource_refs=refs, request_id=request_id)
+        db.add(
+            FhirTransactionResult(
+                workspace_id=workspace_id,
+                request_id=request_id,
+                status=result.status,
+                result_json=json.dumps(
+                    {"status": result.status, "resource_refs": result.resource_refs}
+                ),
+                created_at=now,
+            )
         )
-        if_match = (entry.get("request") or {}).get("ifMatch")
-        if existing and if_match:
-            expected = if_match.replace("W/", "").strip('"')
-            if str(existing.version_id) != expected:
-                raise FhirConflictError(
-                    f"Version conflict on {resource_type}/{logical_id}: "
-                    f"expected {expected}, current {existing.version_id}."
-                )
-        if existing:
-            existing.version_id += 1
-            existing.body_json = json.dumps(resource)
-            existing.request_id = request_id
-            existing.updated_at = now
-            version = existing.version_id
-        else:
-            version = 1
-            db.add(
-                FhirResource(
-                    workspace_id=workspace_id,
-                    resource_type=resource_type,
-                    logical_id=logical_id,
-                    version_id=version,
-                    body_json=json.dumps(resource),
-                    request_id=request_id,
-                    updated_at=now,
-                )
-            )
-        refs.append(f"{resource_type}/{logical_id}/_history/{version}")
-
+        nested.commit()
+    except Exception:
+        nested.rollback()
+        raise
     db.flush()
-    return BundleResult(status="committed", resource_refs=refs, request_id=request_id)
+    return result
 
 
 def compensate_uncertain(
@@ -140,7 +162,7 @@ def compensate_uncertain(
     refs: list[str] = []
     for row in rows:
         body = json.loads(row.body_json)
-        body["status"] = body.get("status") or "entered-in-error"
+        body["status"] = "entered-in-error"
         body["meta"] = {
             **(body.get("meta") or {}),
             "tag": [{"system": "https://namaa.example/fhir", "code": "compensated"}],

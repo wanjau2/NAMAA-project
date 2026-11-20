@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.models import CareGap, Case, Event
+from app.models import CareGap, Case, Event, Patient
 from app.schemas import (
     CaseDetail,
     CaseOut,
@@ -65,6 +65,15 @@ def case_to_out(db: Session, case: Case) -> CaseOut:
             evidence_reference=case.evidence_reference,
         )
 
+    patient = (
+        db.query(Patient)
+        .filter(Patient.workspace_id == case.workspace_id, Patient.id == case.patient_id)
+        .one_or_none()
+    )
+    authority = patient.caregiver_authority if patient else "unknown"
+    if authority not in {"verified_caregiver", "self", "unknown", "not_supplied"}:
+        authority = "unknown"
+
     detail = CaseDetail(
         explanation=gap.explanation if gap else "",
         factors=factors,
@@ -75,6 +84,8 @@ def case_to_out(db: Session, case: Case) -> CaseOut:
         recall_date=case.recall_date,
         completion_evidence=evidence,
         referral_outcome=case.referral_outcome,  # type: ignore[arg-type]
+        caregiver_authority=authority,  # type: ignore[arg-type]
+        caregiver_relationship=None,
     )
 
     return CaseOut(

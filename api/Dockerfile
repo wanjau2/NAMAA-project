@@ -1,4 +1,5 @@
 # Namaa API — synthetic demo only. Not for clinical use.
+# Build from repository root: docker compose build api
 FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -15,11 +16,13 @@ RUN apt-get update \
     && mkdir -p /data \
     && chown appuser:appuser /data
 
-COPY requirements.txt .
+COPY api/requirements.txt /tmp/requirements.txt
+COPY ai /opt/namaa-ai
 RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+    && pip install -r /tmp/requirements.txt \
+    && pip install /opt/namaa-ai
 
-COPY app ./app
+COPY api/app ./app
 
 USER appuser
 EXPOSE 8000

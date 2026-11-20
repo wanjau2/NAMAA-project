@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.deps import require_workspace
 from app.errors import AppError
-from app.models import Workspace
 from app.schemas_extraction import OutboxRetryOut, OutboxRow
+from app.security.context import TrustedRequestContext
+from app.security.deps import get_trusted_context
+from app.security.enforce import authorize
 from app.services.outbox import list_outbox, retry_dead_letter
 
 router = APIRouter(prefix="/api/v1/ops", tags=["ops"])
@@ -14,10 +15,12 @@ router = APIRouter(prefix="/api/v1/ops", tags=["ops"])
 @router.get("/outbox", response_model=list[OutboxRow])
 def get_outbox(
     state: str | None = Query(default=None),
-    workspace: Workspace = Depends(require_workspace),
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
     db: Session = Depends(get_db),
 ) -> list[OutboxRow]:
-    rows = list_outbox(db, workspace_id=workspace.id, state=state)
+    authorize(db, ctx, action="outbox.read", resource_type="OutboxEntry", resource_id="list")
+    rows = list_outbox(db, workspace_id=ctx.workspace_id, state=state)
+    db.commit()
     return [
         OutboxRow(
             id=r.id,
@@ -40,16 +43,18 @@ def get_outbox(
 @router.post("/outbox/{outbox_id}/retry", response_model=OutboxRetryOut)
 def retry_outbox(
     outbox_id: str,
-    workspace: Workspace = Depends(require_workspace),
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
     db: Session = Depends(get_db),
 ) -> OutboxRetryOut:
+    authorize(db, ctx, action="outbox.retry", resource_type="OutboxEntry", resource_id=outbox_id)
     try:
-        entry = retry_dead_letter(db, workspace_id=workspace.id, outbox_id=outbox_id)
+        entry = retry_dead_letter(db, workspace_id=ctx.workspace_id, outbox_id=outbox_id)
     except KeyError:
         raise AppError(
             code="not_found",
             message=f"Outbox entry '{outbox_id}' was not found.",
             status_code=404,
+            request_id=ctx.request_id,
         ) from None
     db.commit()
     return OutboxRetryOut(

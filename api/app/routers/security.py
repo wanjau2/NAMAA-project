@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,7 @@ from app.models import AuditEvent
 from app.security.audit import emit_audit
 from app.security.context import TrustedRequestContext
 from app.security.deps import get_trusted_context
+from app.security.enforce import authorize
 from app.security.pdp import evaluate_access
 from app.models import PrincipalRevocation
 from app.security.verified_context import build_verified_context
@@ -153,9 +154,19 @@ def post_audit_event(
     }:
         raise AppError(code="forbidden", message="Not permitted to write audit events.", status_code=403)
 
-    # Reject obvious forbidden keys even before sanitize
-    forbidden = {"note_text", "token", "prompt", "full_prompt", "authorization"}
-    if forbidden.intersection(body.detail):
+    authorize(db, ctx, action="audit.write", resource_type="AuditEvent", resource_id="new")
+
+    def _forbidden(value) -> bool:
+        if isinstance(value, dict):
+            keys = {str(k).lower() for k in value}
+            if keys & {"note_text", "token", "prompt", "full_prompt", "authorization", "note", "raw_model_output"}:
+                return True
+            return any(_forbidden(v) for v in value.values())
+        if isinstance(value, list):
+            return any(_forbidden(v) for v in value)
+        return False
+
+    if _forbidden(body.detail):
         raise AppError(
             code="validation_failed",
             message="Audit detail must not include note text, tokens, or prompts.",
@@ -209,6 +220,8 @@ def list_audit_events(
     db: Session = Depends(get_db),
     limit: int = 50,
 ) -> list[dict[str, Any]]:
+    authorize(db, ctx, action="audit.read", resource_type="AuditEvent", resource_id="list")
+    db.commit()
     rows = (
         db.query(AuditEvent)
         .filter(AuditEvent.workspace_id == ctx.workspace_id)
@@ -266,7 +279,7 @@ def verified_context(
 @router.get("/relate/family-history")
 def relate_family_history(
     patient_id: str,
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=100),
     ctx: TrustedRequestContext = Depends(get_trusted_context),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -276,16 +289,22 @@ def relate_family_history(
             code="forbidden",
             message="Patient outside trusted assignment.",
             status_code=403,
+            request_id=ctx.request_id,
         )
     return family_history_candidates(
-        db, workspace_id=ctx.workspace_id, patient_id=patient_id, limit=limit
+        db,
+        workspace_id=ctx.workspace_id,
+        patient_id=patient_id,
+        limit=limit,
+        permission_revision=ctx.permission_revision,
+        generation_id=f"rel-gen-{patient_id}",
     )
 
 
 @router.get("/relate/care-plans")
 def relate_care_plans(
     patient_id: str,
-    limit: int = 20,
+    limit: int = Query(default=20, ge=1, le=100),
     ctx: TrustedRequestContext = Depends(get_trusted_context),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -294,10 +313,60 @@ def relate_care_plans(
             code="forbidden",
             message="Patient outside trusted assignment.",
             status_code=403,
+            request_id=ctx.request_id,
         )
     return care_plan_candidates(
-        db, workspace_id=ctx.workspace_id, patient_id=patient_id, limit=limit
+        db,
+        workspace_id=ctx.workspace_id,
+        patient_id=patient_id,
+        limit=limit,
+        permission_revision=ctx.permission_revision,
+        generation_id=f"rel-gen-{patient_id}",
     )
+
+
+class RelateRefreshBody(BaseModel):
+    patient_id: str
+
+
+@router.post("/relate/refresh")
+def relate_refresh(
+    body: RelateRefreshBody,
+    ctx: TrustedRequestContext = Depends(get_trusted_context),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    if body.patient_id not in ctx.patient_ids:
+        raise AppError(
+            code="forbidden",
+            message="Patient outside trusted assignment.",
+            status_code=403,
+            request_id=ctx.request_id,
+        )
+    authorize(
+        db,
+        ctx,
+        action="context.retrieve",
+        resource_type="Patient",
+        resource_id=body.patient_id,
+        patient_id=body.patient_id,
+    )
+    emit_audit(
+        db,
+        event_type="relate.refresh_requested",
+        ctx=ctx,
+        action="context.retrieve",
+        resource_type="Patient",
+        resource_id=body.patient_id,
+        patient_id=body.patient_id,
+        reason_code="refresh_requested",
+    )
+    db.commit()
+    return {
+        "refresh": "requested",
+        "patient_id": body.patient_id,
+        "workspace_id": ctx.workspace_id,
+        "notice": "Synthetic refresh enqueue only. Discovery remains hints.",
+    }
 
 
 class RevokeBody(BaseModel):
@@ -312,6 +381,13 @@ def revoke_principal(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Synthetic revocation — blocks future job claim/disclosure for the principal."""
+    authorize(
+        db,
+        ctx,
+        action="principal.revoke",
+        resource_type="Principal",
+        resource_id=body.principal_id,
+    )
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     existing = (
         db.query(PrincipalRevocation)

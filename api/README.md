@@ -27,6 +27,7 @@ python -m venv .venv
 # source .venv/bin/activate
 
 pip install -r requirements.txt
+pip install -e ../ai   # or rely on app.ai_runtime path insert when the repo layout is intact
 copy .env.example .env   # or: cp .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
@@ -44,15 +45,18 @@ uvicorn app.main:app --reload --port 8000
 
 ## Contract for Mark
 
-| Method | Path |
-| --- | --- |
-| GET | `/api/v1/cases` |
-| GET | `/api/v1/cases/{id}` |
-| POST | `/api/v1/cases/{id}/actions` |
-| POST | `/api/v1/patients/{id}/evaluations` |
-| GET | `/api/v1/analytics/overview` |
-| POST | `/api/v1/demo/sessions` |
-| POST | `/api/v1/demo/reset` |
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/api/v1/cases` | |
+| GET | `/api/v1/cases/{id}` | Includes `caregiver_authority` |
+| GET | `/api/v1/cases/{id}/documents` | Case source documents |
+| POST | `/api/v1/cases/{id}/actions` | |
+| POST | `/api/v1/patients/{id}/evaluations` | Canonical `rule_evaluation` (Alfred `evaluate`) |
+| GET | `/api/v1/patients/{id}/evaluations/latest` | Persisted canonical evaluation |
+| GET | `/api/v1/analytics/overview` | One `suppress_population` family |
+| GET | `/api/v1/analytics/segments` | Same family, segment view |
+| POST | `/api/v1/demo/sessions` | |
+| POST | `/api/v1/demo/reset` | |
 | POST | `/api/v1/documents/{id}/extractions` | Queue extraction (202 + job id) |
 | GET | `/api/v1/extractions/{id}` | Snapshot (fallback only) |
 | GET | `/api/v1/extractions/{id}/events` | **SSE progress** (preferred) |
@@ -62,6 +66,7 @@ uvicorn app.main:app --reload --port 8000
 | POST | `/api/v1/facts/{id}/review` | Human review (clinical_reviewer; FHIR stub) |
 | GET | `/api/v1/relate/family-history` | Relate discovery (no authz grant) |
 | GET | `/api/v1/relate/care-plans` | Relate discovery (no authz grant) |
+| POST | `/api/v1/relate/refresh` | Synthetic refresh enqueue |
 | POST | `/api/v1/security/revocations` | Synthetic principal revoke |
 
 Extraction UI helper: `web/lib/extraction-sse.ts`. See [D004](../docs/02-decisions/D004-sse-and-outbox.md).

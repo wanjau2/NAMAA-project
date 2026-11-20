@@ -11,7 +11,13 @@ from namaa_ai.demo import simulated_snapshot
 from namaa_ai.fhir import propose_transaction
 from namaa_ai.review import ReviewError
 from namaa_ai.rules import evaluate, rules_for_reviewed_commit
-from namaa_ai.security import AuthorizedExtractionPipeline, AuthorizationDenied, SecurityEnforcer
+from namaa_ai.security import (
+    AuthorizedExtractionPipeline,
+    AuthorizationDenied,
+    LocalSyntheticPolicy,
+    SecurityEnforcer,
+    apply_review_authorized,
+)
 from namaa_ai.validation import make_proposals
 from test_hosted import envelope
 from test_review_fhir import command, review
@@ -75,6 +81,40 @@ def test_injected_note_cannot_authorize_review_or_enter_rules(request_note, fact
     with pytest.raises(TypeError):
         evaluate(proposal, "DEMO_ADULT_01")
     assert evaluate(simulated_snapshot([], rule_id="DEMO_ADULT_01"), "DEMO_ADULT_01").outcome == "needs_review"
+
+
+def test_apply_review_authorized_requires_enforcer_permit(request_note, proposal):
+    async def run():
+        ctx = context(
+            membership_role="clinical_reviewer",
+            purpose_of_use="demo_clinical_review",
+            patient_ids=("demo-patient",),
+        )
+        audit = Audit()
+        allowed_policy = LocalSyntheticPolicy(
+            allow=frozenset({("review.apply", "demo_clinical_review")})
+        )
+        decision = await apply_review_authorized(
+            enforcer=SecurityEnforcer(allowed_policy, audit),
+            context=ctx,
+            request=request_note,
+            proposal=proposal,
+            command=command(proposal),
+            current_version=1,
+            reviewed_at=datetime(2026, 11, 18, 9, tzinfo=timezone.utc),
+        )
+        assert decision.state == "accepted"
+        with pytest.raises(AuthorizationDenied):
+            await apply_review_authorized(
+                enforcer=SecurityEnforcer(LocalSyntheticPolicy(), audit),
+                context=ctx,
+                request=request_note,
+                proposal=proposal,
+                command=command(proposal),
+                current_version=1,
+                reviewed_at=datetime(2026, 11, 18, 9, tzinfo=timezone.utc),
+            )
+    asyncio.run(run())
 
 
 def test_family_review_commit_routes_adult_evaluation_without_patient_condition(request_note):

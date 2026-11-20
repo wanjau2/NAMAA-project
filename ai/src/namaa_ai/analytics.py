@@ -53,7 +53,7 @@ class AnalyticsViews(Contract):
 
 
 OVERVIEW_SEGMENT = "overview"
-FUNNEL_METRICS = ("invited", "booked", "attended", "follow_up", "completed", "declined", "unreachable")
+FUNNEL_METRICS = ("invited", "booked", "attended", "follow-up", "completed", "declined", "unreachable")
 
 
 def suppress_population(cells: tuple[MetricCount, ...], *, projection_version: str,

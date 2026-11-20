@@ -6,7 +6,14 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from app.security.constants import ACTIONS, POLICY_ADAPTER, POLICY_REVISION, PRODUCTION_AUTHORIZATION
+from app.security.constants import (
+    ACTIONS,
+    PATIENT_SCOPED_ACTIONS,
+    POLICY_ADAPTER,
+    POLICY_REVISION,
+    PRODUCTION_AUTHORIZATION,
+    ROLE_ACTIONS,
+)
 from app.security.context import TrustedRequestContext
 
 
@@ -114,19 +121,21 @@ def evaluate_access(
     if res_workspace and res_workspace != ctx.workspace_id:
         return _deny(reason_code="workspace_mismatch", ctx=ctx)
 
+    if action_name in PATIENT_SCOPED_ACTIONS and not patient_id:
+        return _deny(reason_code="missing_patient_scope", ctx=ctx)
+
     if patient_id and patient_id not in ctx.patient_ids:
         return _deny(reason_code="patient_not_in_assignment", ctx=ctx)
 
-    # Role matrix (synthetic demo)
     role = ctx.membership_role
-    if action_name in {"review.apply"} and role not in {"clinical_reviewer", "service"}:
-        # Service may re-check on behalf of preserved initiating reviewer only when
-        # context carries initiating_role — still require clinical_reviewer initiator.
+    permitted = ROLE_ACTIONS.get(role, frozenset())
+    if action_name not in permitted:
+        return _deny(reason_code="role_forbidden", ctx=ctx)
+
+    if action_name == "review.apply" and role == "service":
         initiating = (context or {}).get("initiating_role")
-        if role == "service" and initiating == "clinical_reviewer":
-            pass
-        else:
-            return _deny(reason_code="role_forbidden", ctx=ctx)
+        if initiating != "clinical_reviewer":
+            return _deny(reason_code="service_review_requires_initiating_reviewer", ctx=ctx)
 
     if action_name == "model.dispatch":
         dest = (context or {}).get("model_destination") or ctx.approved_model_destination
@@ -135,14 +144,6 @@ def evaluate_access(
 
     if action_name in {"excerpt.export"} and ctx.resource_sensitivity != "synthetic_demo":
         return _deny(reason_code="export_sensitivity_blocked", ctx=ctx)
-
-    if action_name == "audit.write" and role not in {
-        "service",
-        "clinical_reviewer",
-        "coordinator",
-        "population_analyst",
-    }:
-        return _deny(reason_code="audit_writer_forbidden", ctx=ctx)
 
     # Caregiver authority: child notes may require verified_caregiver for disclose
     if (

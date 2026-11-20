@@ -2,24 +2,67 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.ai_runtime import ensure_namaa_ai
 from app.config import get_settings
 from app.errors import AppError
-from app.models import CareGap, Case, Event, Observation, Patient, Proposal, RuleEvaluation
-from app.rules import evaluate_patient
-from app.schemas import EvaluationResult
+from app.models import CareGap, Case, Event, Patient, RuleEvaluation
+from app.schemas import EvaluationResult, MissingItem, SourceFact
 from app.security.context import TrustedRequestContext
 from app.security.enforce import authorize
+from app.services.rule_snapshots import (
+    build_rule_snapshot,
+    infer_pathway,
+    pathway_rule_id,
+)
 from app.services.serializers import case_to_out
 
-_OUTCOME_TO_LEGACY = {
-    "gap_identified": "gap",
-    "no_gap_identified_in_available_data": "no_gap",
-    "needs_review": "needs_review",
-    "not_eligible": "not_eligible",
-}
+ensure_namaa_ai()
+
+from namaa_ai.handoff import prepare_rule_handoff  # noqa: E402
+from namaa_ai.rules import evaluate  # noqa: E402
+
+CASE_OUTCOMES = {"gap_identified": "gap", "needs_review": "needs_review"}
+
+
+def _as_of(demo_now: str) -> date:
+    return date.fromisoformat(demo_now[:10])
+
+
+def _factors(evaluation) -> list[SourceFact]:
+    return [
+        SourceFact(
+            label=item,
+            value=item,
+            source=f"Rule/{evaluation.rule_id}",
+            observed_time=f"{evaluation.as_of.isoformat()}T00:00:00Z",
+            verified=True,
+        )
+        for item in evaluation.contributing_factors
+    ]
+
+
+def _missing(evaluation) -> list[MissingItem]:
+    return [
+        MissingItem(
+            label=item,
+            consequence="The pathway stays blocked until this is resolved. Unknown is not up to date.",
+        )
+        for item in evaluation.missing_information
+    ]
+
+
+def _suggested(evaluation) -> str:
+    if evaluation.outcome == "needs_review":
+        return "Resolve missing or unverified inputs, then re-evaluate before any invitation"
+    if evaluation.outcome == "gap_identified":
+        return "Clinical reviewer to confirm eligibility"
+    if evaluation.outcome == "not_eligible":
+        return "No invitation — not eligible on the synthetic enrolment card"
+    return "No configured gap in the available data; this is not assurance of health"
 
 
 def run_evaluation(
@@ -53,93 +96,60 @@ def run_evaluation(
             patient_id=patient_id,
         )
 
-    observations = (
-        db.query(Observation)
-        .filter(
-            Observation.workspace_id == workspace_id,
-            Observation.patient_id == patient_id,
-        )
-        .all()
+    chosen = infer_pathway(patient.age_band, pathway)
+    rule_id = pathway_rule_id(chosen)
+    snapshot = build_rule_snapshot(
+        db,
+        workspace_id=workspace_id,
+        patient=patient,
+        pathway=chosen,
+        as_of=_as_of(settings.demo_now),
+        authorized=True,
     )
-    # I02 — reviewed proposals are already upserted as Observation rows on accept/correct.
-    reviewed = (
-        db.query(Proposal)
-        .filter(
-            Proposal.workspace_id == workspace_id,
-            Proposal.patient_id == patient_id,
-            Proposal.review_state.in_(("accepted", "corrected")),
-        )
-        .all()
-    )
-
-    result = evaluate_patient(patient, observations, pathway)
+    evaluation = evaluate(snapshot, rule_id)
+    handoff = prepare_rule_handoff(evaluation)
     eval_id = f"eval-{uuid.uuid4().hex[:12]}"
-
-    outcome = getattr(result, "outcome", None) or {
-        "gap": "gap_identified",
-        "needs_review": "needs_review",
-        "no_gap": "no_gap_identified_in_available_data",
-        "not_eligible": "not_eligible",
-    }.get(result.flag_status, "needs_review")
-    legacy = _OUTCOME_TO_LEGACY.get(outcome, result.flag_status)
-    rule_evaluation = {
-        "patient_reference": f"Patient/{patient_id}",
-        "as_of": settings.demo_now[:10],
-        "rule_id": result.rule_id_version,
-        "rule_version": getattr(result, "rule_version", "synthetic-1.0.0"),
-        "outcome": outcome,
-        "input_versions": result.input_versions
-        or [{"reference": f"Patient/{patient_id}", "version": "app-1"}],
-        "contributing_factors": [f.get("label", "") for f in result.factors],
-        "missing_information": [m.get("label", "") for m in result.missing],
-        "due_date": getattr(result, "due_date", None),
-        "simulated": True,
-        "synthetic_rule": True,
-    }
-    api_compat = (
-        "api_outcome_extension_required"
-        if legacy == "not_eligible"
-        else "current_api_outcome_supported"
+    factors = _factors(evaluation)
+    missing = _missing(evaluation)
+    suggested = _suggested(evaluation)
+    uncertainty = evaluation.missing_information[0] if evaluation.missing_information else ""
+    explanation = (
+        f"{evaluation.rule_id} returned {evaluation.outcome}. "
+        "Synthetic demonstration rule only."
     )
+    rule_evaluation = evaluation.model_dump(mode="json")
+    snapshot_dump = snapshot.model_dump(mode="json")
 
     db.add(
         RuleEvaluation(
             id=eval_id,
             workspace_id=workspace_id,
             patient_id=patient_id,
-            pathway=result.pathway,
-            rule_id_version=result.rule_id_version,
+            pathway=chosen,
+            rule_id_version=evaluation.rule_id,
             input_snapshot_json=json.dumps(
                 {
-                    "patient_id": patient_id,
-                    "age_band": patient.age_band,
-                    "pathway": result.pathway,
-                    "observation_ids": [o.id for o in observations],
-                    "observation_versions": [
-                        {"reference": f"Observation/{o.id}", "version": "app-1"}
-                        for o in observations
-                    ],
-                    "reviewed_proposal_ids": [p.id for p in reviewed],
-                    "reviewed_proposal_versions": [
-                        {
-                            "reference": f"Proposal/{p.id}",
-                            "version": str(p.version),
-                            "review_state": p.review_state,
-                        }
-                        for p in reviewed
-                    ],
-                    "rule_version": rule_evaluation["rule_version"],
+                    "workspace_id": snapshot.workspace_id,
+                    "patient_reference": snapshot.patient_reference,
+                    "as_of": snapshot.as_of.isoformat(),
+                    "authority": snapshot.authority,
+                    "authorized": snapshot.authorized,
+                    "complete_for_rule": snapshot.complete_for_rule,
+                    "rule_id": evaluation.rule_id,
+                    "rule_version": evaluation.rule_version,
+                    "input_versions": [v.model_dump(mode="json") for v in evaluation.input_versions],
+                    "resource_count": len(snapshot.resources),
                 }
             ),
-            # I01 — persist the full canonical object, not only the lossy flag.
             result_json=json.dumps(
                 {
                     "rule_evaluation": rule_evaluation,
-                    "legacy_flag_status": None if legacy == "not_eligible" else legacy,
-                    "api_compatibility": api_compat,
-                    "flag_status": legacy,
-                    "factors": result.factors,
-                    "missing": result.missing,
+                    "legacy_flag_status": handoff.legacy_flag_status,
+                    "api_compatibility": handoff.api_compatibility,
+                    "flag_status": handoff.legacy_flag_status or "not_eligible",
+                    "factors": [f.model_dump() for f in factors],
+                    "missing": [m.model_dump() for m in missing],
+                    "input_snapshot": snapshot_dump,
                 }
             ),
             created_at=settings.demo_now,
@@ -147,14 +157,15 @@ def run_evaluation(
     )
 
     case_out = None
-    if result.flag_status in {"gap", "needs_review"}:
+    case_flag = CASE_OUTCOMES.get(evaluation.outcome)
+    if case_flag is not None:
         open_case = (
             db.query(Case)
             .filter(
                 Case.workspace_id == workspace_id,
                 Case.patient_id == patient_id,
-                Case.pathway == result.pathway,
-                Case.rule_id_version == result.rule_id_version,
+                Case.pathway == chosen,
+                Case.rule_id_version == evaluation.rule_id,
                 Case.stage != "closed",
             )
             .one_or_none()
@@ -162,18 +173,20 @@ def run_evaluation(
         if open_case is None:
             gap_id = f"gap-{uuid.uuid4().hex[:8]}"
             case_id = f"case-{uuid.uuid4().hex[:8]}"
-            gap = CareGap(
-                id=gap_id,
-                workspace_id=workspace_id,
-                patient_id=patient_id,
-                pathway=result.pathway,
-                rule_id_version=result.rule_id_version,
-                flag_status=result.flag_status,
-                factors_json=json.dumps(result.factors),
-                missing_json=json.dumps(result.missing),
-                uncertainty=result.uncertainty,
-                explanation=result.explanation,
-                suggested_review_action=result.suggested_review_action,
+            db.add(
+                CareGap(
+                    id=gap_id,
+                    workspace_id=workspace_id,
+                    patient_id=patient_id,
+                    pathway=chosen,
+                    rule_id_version=evaluation.rule_id,
+                    flag_status=case_flag,
+                    factors_json=json.dumps([f.model_dump() for f in factors]),
+                    missing_json=json.dumps([m.model_dump() for m in missing]),
+                    uncertainty=uncertainty,
+                    explanation=explanation,
+                    suggested_review_action=suggested,
+                )
             )
             case = Case(
                 id=case_id,
@@ -182,19 +195,18 @@ def run_evaluation(
                 patient_id=patient_id,
                 patient_label=patient.label,
                 age_band=patient.age_band,
-                pathway=result.pathway,
-                rule_id_version=result.rule_id_version,
-                flag_status=result.flag_status,
+                pathway=chosen,
+                rule_id_version=evaluation.rule_id,
+                flag_status=case_flag,
                 stage="identified",
                 disposition="active",
                 owner="Coordinator 1",
-                next_action=result.suggested_review_action,
-                due_time=None,
+                next_action=suggested,
+                due_time=None if evaluation.due_date is None else f"{evaluation.due_date.isoformat()}T09:00:00Z",
                 overdue=False,
                 revision=1,
-                eligible=True,
+                eligible=evaluation.outcome != "not_eligible",
             )
-            db.add(gap)
             db.add(case)
             db.add(
                 Event(
@@ -206,7 +218,7 @@ def run_evaluation(
                     action="rule_evaluation",
                     prior_state="",
                     new_state="identified/active",
-                    reason=result.explanation,
+                    reason=explanation,
                     request_id=eval_id,
                 )
             )
@@ -221,33 +233,34 @@ def run_evaluation(
                 )
                 .one()
             )
-            gap.flag_status = result.flag_status
-            gap.factors_json = json.dumps(result.factors)
-            gap.missing_json = json.dumps(result.missing)
-            gap.uncertainty = result.uncertainty
-            gap.explanation = result.explanation
-            gap.suggested_review_action = result.suggested_review_action
-            open_case.flag_status = result.flag_status
-            open_case.next_action = result.suggested_review_action
+            gap.flag_status = case_flag
+            gap.factors_json = json.dumps([f.model_dump() for f in factors])
+            gap.missing_json = json.dumps([m.model_dump() for m in missing])
+            gap.uncertainty = uncertainty
+            gap.explanation = explanation
+            gap.suggested_review_action = suggested
+            open_case.flag_status = case_flag
+            open_case.next_action = suggested
             open_case.revision += 1
             db.flush()
             case_out = case_to_out(db, open_case)
 
     db.commit()
+    legacy = handoff.legacy_flag_status or "not_eligible"
     return EvaluationResult(
         patient_id=patient_id,
-        pathway=result.pathway,  # type: ignore[arg-type]
-        rule_id_version=result.rule_id_version,
+        pathway=chosen,  # type: ignore[arg-type]
+        rule_id_version=evaluation.rule_id,
         flag_status=legacy,  # type: ignore[arg-type]
-        factors=result.factors,  # type: ignore[arg-type]
-        missing=result.missing,  # type: ignore[arg-type]
-        uncertainty=result.uncertainty,
-        suggested_review_action=result.suggested_review_action,
+        factors=factors,
+        missing=missing,
+        uncertainty=uncertainty,
+        suggested_review_action=suggested,
         case=case_out,
         evaluation_id=eval_id,
         rule_evaluation=rule_evaluation,
-        legacy_flag_status=None if legacy == "not_eligible" else legacy,
-        api_compatibility=api_compat,
+        legacy_flag_status=handoff.legacy_flag_status,
+        api_compatibility=handoff.api_compatibility,
     )
 
 
@@ -258,7 +271,6 @@ def latest_evaluation(
     patient_id: str,
     ctx: TrustedRequestContext | None = None,
 ) -> dict:
-    """I01 — authorized readback of the last persisted canonical evaluation."""
     if ctx is not None:
         authorize(
             db,
@@ -300,3 +312,49 @@ def latest_evaluation(
         "factors": stored.get("factors", []),
         "missing": stored.get("missing", []),
     }
+
+
+def list_evaluations(
+    db: Session,
+    *,
+    workspace_id: str,
+    patient_id: str,
+    ctx: TrustedRequestContext | None = None,
+) -> list[dict]:
+    if ctx is not None:
+        authorize(
+            db,
+            ctx,
+            action="evaluation.run",
+            resource_type="Patient",
+            resource_id=patient_id,
+            patient_id=patient_id,
+        )
+    rows = (
+        db.query(RuleEvaluation)
+        .filter(
+            RuleEvaluation.workspace_id == workspace_id,
+            RuleEvaluation.patient_id == patient_id,
+        )
+        .order_by(RuleEvaluation.pk.desc())
+        .all()
+    )
+    results = []
+    for row in rows:
+        stored = json.loads(row.result_json)
+        results.append(
+            {
+                "patient_id": patient_id,
+                "evaluation_id": row.id,
+                "pathway": row.pathway,
+                "rule_id_version": row.rule_id_version,
+                "created_at": row.created_at,
+                "rule_evaluation": stored.get("rule_evaluation"),
+                "legacy_flag_status": stored.get("legacy_flag_status"),
+                "api_compatibility": stored.get("api_compatibility"),
+                "flag_status": stored.get("flag_status"),
+            }
+        )
+    if ctx is not None:
+        db.commit()
+    return results

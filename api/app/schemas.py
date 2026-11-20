@@ -112,6 +112,18 @@ class CaseDetail(BaseModel):
     recall_date: str | None = None
     completion_evidence: CompletionEvidence | None = None
     referral_outcome: Literal["pending", "accepted", "rejected"] | None = None
+    caregiver_authority: Literal[
+        "verified_caregiver", "self", "unknown", "not_supplied"
+    ] | None = None
+    caregiver_relationship: str | None = None
+
+
+class CaseDocumentOut(BaseModel):
+    id: str
+    version: int
+    document_date: str
+    patient_id: str
+    case_id: str | None = None
 
 
 class CaseOut(CaseRow):

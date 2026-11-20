@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +9,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base, get_db
 from app.main import create_app
+from app import models as _models  # noqa: F401 — register metadata
+from app.models import Patient, Workspace
 from app.security.constants import POLICY_ADAPTER, POLICY_REVISION
+from app.security.context import build_trusted_context
 
 
 @pytest.fixture()
@@ -195,3 +199,50 @@ def test_relate_family_history_and_revocation(client: TestClient):
     )
     assert rev.status_code == 201
     assert rev.json()["active"] is True
+
+
+def test_revocation_of_session_principal_blocks_trusted_context(client: TestClient):
+    sid = _session(client)
+    rev = client.post(
+        "/api/v1/security/revocations",
+        headers=_headers(sid),
+        json={"principal_id": f"guest:{sid}", "reason_code": "demo_revoke"},
+    )
+    assert rev.status_code == 201
+    denied = client.get("/api/v1/cases", headers=_headers(sid))
+    assert denied.status_code == 403
+    assert denied.json()["code"] == "forbidden"
+
+
+def test_empty_patient_assignment_stays_empty():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    TestingSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    Base.metadata.create_all(bind=engine)
+    db = TestingSession()
+    try:
+        ws = Workspace(
+            id="guest-empty-scope",
+            created_at=datetime.now(timezone.utc),
+            role="coordinator",
+        )
+        db.add(ws)
+        db.commit()
+        ctx = build_trusted_context(db, workspace=ws, role="coordinator", request_id="req-empty")
+        assert ctx.patient_ids == ()
+        db.add(
+            Patient(
+                id="pat-only",
+                workspace_id=ws.id,
+                label="Only",
+                age_band="2–4 years",
+            )
+        )
+        db.commit()
+        ctx_after = build_trusted_context(db, workspace=ws, role="coordinator", request_id="req-one")
+        assert ctx_after.patient_ids == ("pat-only",)
+    finally:
+        db.close()

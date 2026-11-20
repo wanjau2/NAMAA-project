@@ -6,7 +6,8 @@ from typing import Any, Literal
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Case, Workspace
+from app.models import Patient, Workspace
+from app.security.revocation import is_revoked
 from app.security.constants import (
     APPROVED_MODEL_DESTINATIONS,
     PERMISSION_REVISION,
@@ -83,14 +84,15 @@ def build_trusted_context(
         "service",
     } else "coordinator"
 
-    cases = db.query(Case).filter(Case.workspace_id == workspace.id).all()
-    patient_ids = tuple(sorted({c.patient_id for c in cases}))
-    if patient_id and patient_id not in patient_ids:
-        # Explicit request for a patient outside workspace seed → empty assignment.
-        # PDP will deny patient-scoped actions.
-        assigned = ()
+    from app.models import Case
+
+    patients = db.query(Patient).filter(Patient.workspace_id == workspace.id).all()
+    patient_ids = tuple(sorted({p.id for p in patients}))
+    if patient_id is not None:
+        assigned = (patient_id,) if patient_id in patient_ids else ()
     else:
-        assigned = (patient_id,) if patient_id else patient_ids
+        assigned = patient_ids
+    cases = db.query(Case).filter(Case.workspace_id == workspace.id).all()
 
     relationships = tuple(
         {
@@ -103,16 +105,7 @@ def build_trusted_context(
         if not patient_id or c.patient_id == patient_id
     )
 
-    # Caregiver authority from patient seed (string status only).
-    from app.models import Patient
-
-    caregiver: dict[str, str] = {}
-    for p in (
-        db.query(Patient)
-        .filter(Patient.workspace_id == workspace.id)
-        .all()
-    ):
-        caregiver[p.id] = p.caregiver_authority
+    caregiver = {p.id: p.caregiver_authority for p in patients}
 
     purpose = purpose_of_use or _purpose_for_role(membership_role)
     if purpose not in PURPOSE_OF_USE:
@@ -129,6 +122,9 @@ def build_trusted_context(
     principal = user_id or (
         f"service:{SERVICE_NAME}" if user_type == "service" else f"guest:{workspace.id}"
     )
+    membership_active = not is_revoked(
+        db, workspace_id=workspace.id, principal_id=principal
+    )
 
     return TrustedRequestContext(
         request_id=request_id,
@@ -137,8 +133,8 @@ def build_trusted_context(
         service_id=SERVICE_NAME,
         workspace_id=workspace.id,
         membership_role=membership_role,
-        membership_active=True,
-        patient_ids=assigned if assigned else patient_ids,
+        membership_active=membership_active,
+        patient_ids=assigned,
         care_relationships=relationships,
         caregiver_authority=caregiver,
         purpose_of_use=purpose,

@@ -23,9 +23,10 @@ def _state_label(case: Case) -> str:
     return f"{case.stage}/{case.disposition}"
 
 
-def _payload_hash(request: ActionRequest) -> str:
+def _payload_hash(request: ActionRequest, *, case_id: str) -> str:
     blob = json.dumps(
         {
+            "case_id": case_id,
             "action": request.action,
             "expected_revision": request.expected_revision,
             "data": request.data,
@@ -109,9 +110,17 @@ def _apply_transition(case: Case, action: str, data: dict[str, Any]) -> None:
         case.due_time = f"{recall}T09:00:00Z"
         case.next_action = f"Recall on {recall}"
     elif action == "close_as_completed":
+        evidence_type = str(data["evidence_type"])
+        if evidence_type not in {"Encounter", "Procedure", "DiagnosticReport"}:
+            raise AppError(
+                code="validation_failed",
+                message="Completion requires Encounter, Procedure, or DiagnosticReport evidence.",
+                status_code=422,
+                field_errors={"evidence_type": "not_completion_evidence"},
+            )
         case.stage = "closed"
         case.disposition = "completed"
-        case.evidence_type = str(data["evidence_type"])
+        case.evidence_type = evidence_type
         case.evidence_reference = str(data["evidence_reference"])
         case.next_action = "None — closed with evidence"
         case.due_time = None
@@ -144,7 +153,7 @@ def apply_action(
 ) -> ActionResponse:
     settings = get_settings()
     now = settings.demo_now
-    payload_hash = _payload_hash(request)
+    payload_hash = _payload_hash(request, case_id=case.id)
 
     existing = (
         db.query(Command)
@@ -155,11 +164,19 @@ def apply_action(
         .one_or_none()
     )
     if existing is not None:
-        if existing.payload_hash != payload_hash:
+        if existing.payload_hash != payload_hash or existing.case_id != case.id:
             raise AppError(
                 code="idempotency_conflict",
-                message="This request_id was already used with a different payload.",
+                message="This request_id was already used with a different payload or target.",
                 status_code=409,
+                request_id=request.request_id,
+            )
+        spec = ACTIONS.get(request.action)
+        if spec is None or role != spec.role:
+            raise AppError(
+                code="forbidden_role",
+                message="Replay is not authorized for this role.",
+                status_code=403,
                 request_id=request.request_id,
             )
         return ActionResponse.model_validate_json(existing.response_json)
@@ -288,7 +305,7 @@ def apply_action(
         outbox = enqueue_outbox(
             db,
             workspace_id=workspace_id,
-            request_id=request.request_id,
+            request_id=f"case.{case.id}.{request.request_id}"[:64],
             action=request.action,
             bundle=bundle,
             case_id=case.id,

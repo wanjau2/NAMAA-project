@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import FhirResource
+from app.services.rule_snapshots import _compensated_or_revoked
 
 
 def _patient_linked(row: FhirResource, patient_id: str) -> bool:
@@ -19,7 +20,9 @@ def _patient_linked(row: FhirResource, patient_id: str) -> bool:
         return False
     link_field = "patient" if row.resource_type == "FamilyMemberHistory" else "subject"
     link = body.get(link_field)
-    return isinstance(link, dict) and link.get("reference") == f"Patient/{patient_id}"
+    if not (isinstance(link, dict) and link.get("reference") == f"Patient/{patient_id}"):
+        return False
+    return not _compensated_or_revoked(body)
 
 
 def _batch(
@@ -27,14 +30,15 @@ def _batch(
     workspace_id: str,
     patient_id: str,
     candidates: list[dict[str, Any]],
+    permission_revision: str = "permissions-v1",
+    generation_id: str | None = None,
 ) -> dict[str, Any]:
-    # Alfred RelateCandidateBatch — no envelope extras (I03/I14).
     return {
         "state": "current",
         "workspace_id": workspace_id,
         "patient_reference": f"Patient/{patient_id}",
-        "permission_revision": "permissions-v1",
-        "generation_id": f"rel-gen-{patient_id}",
+        "permission_revision": permission_revision,
+        "generation_id": generation_id or f"rel-gen-{patient_id}",
         "candidates": candidates,
     }
 
@@ -45,6 +49,8 @@ def family_history_candidates(
     workspace_id: str,
     patient_id: str,
     limit: int = 20,
+    permission_revision: str = "permissions-v1",
+    generation_id: str | None = None,
 ) -> dict[str, Any]:
     limit = max(1, min(int(limit or 20), 100))
     refs: list[dict[str, Any]] = []
@@ -68,7 +74,13 @@ def family_history_candidates(
         )
         if len(refs) >= limit:
             break
-    return _batch(workspace_id=workspace_id, patient_id=patient_id, candidates=refs)
+    return _batch(
+        workspace_id=workspace_id,
+        patient_id=patient_id,
+        candidates=refs,
+        permission_revision=permission_revision,
+        generation_id=generation_id,
+    )
 
 
 def care_plan_candidates(
@@ -77,6 +89,8 @@ def care_plan_candidates(
     workspace_id: str,
     patient_id: str,
     limit: int = 20,
+    permission_revision: str = "permissions-v1",
+    generation_id: str | None = None,
 ) -> dict[str, Any]:
     limit = max(1, min(int(limit or 20), 100))
     refs: list[dict[str, Any]] = []
@@ -100,4 +114,10 @@ def care_plan_candidates(
         )
         if len(refs) >= limit:
             break
-    return _batch(workspace_id=workspace_id, patient_id=patient_id, candidates=refs)
+    return _batch(
+        workspace_id=workspace_id,
+        patient_id=patient_id,
+        candidates=refs,
+        permission_revision=permission_revision,
+        generation_id=generation_id,
+    )

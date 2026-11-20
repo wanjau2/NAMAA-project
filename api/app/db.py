@@ -47,4 +47,7 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     from app import models  # noqa: F401
 
+    # Disposable synthetic demo: create missing tables. This does not migrate
+    # existing SQLite files after destructive column changes. Recreate the
+    # volume or run POST /api/v1/demo/reset for guest data.
     Base.metadata.create_all(bind=engine)

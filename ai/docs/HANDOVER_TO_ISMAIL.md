@@ -223,11 +223,8 @@ results do not mean “no family history / no broken handoff”.
 
 `BackendApiClient.family_history_resolution` / `care_plan_resolution` use
 `RelateResolver`. The older `*_context` helpers return `.items` only (empty
-when unknown — that is not evidence of absence). Supply a real
-`request_refresh` enqueue when you add a refresh route.
-
-**Current API gap:** `relate_hints` on verified-context are unused as a
-verification batch. Discovery remains hints only and must stay that way.
+when unknown — that is not evidence of absence). `request_refresh` POSTs
+`/api/v1/relate/refresh`. Discovery remains hints only and must stay that way.
 
 ---
 

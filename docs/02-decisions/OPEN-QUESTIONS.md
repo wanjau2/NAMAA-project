@@ -1,6 +1,6 @@
 # Open questions register
 
-Last updated: 2026-11-17
+Last updated: 2026-11-20
 
 Questions that must be answered before or at kickoff, because they change what gets built.
 The two reference plans disagree in places — that is expected (one is a three-day sprint plan,
@@ -18,9 +18,9 @@ decision. Recommendations below are suggestions, not settled calls.
 | Q7 | Where does the demo get hosted, if anywhere? | **Open** |
 | Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side. Verified live; see note below |
 | Q9 | Should the API return `available_actions` per case? | **Open — Mark → Ismail** |
-| Q10 | Are there proposal / fact-review endpoints this sprint? | **Half answered** — read path shipped; **no write endpoint** |
-| Q11 | How does a client find a case's source documents? | **Open — no listing endpoint** |
-| Q12 | Which rule-outcome vocabulary is authoritative? | **Open — three in play; Alfred's M0** |
+| Q10 | Are there proposal / fact-review endpoints this sprint? | **Resolved** — `GET/POST /api/v1/facts/{id}/review` live (synthetic stub FHIR) |
+| Q11 | How does a client find a case's source documents? | **Resolved** — `GET /api/v1/cases/{id}/documents` |
+| Q12 | Which rule-outcome vocabulary is authoritative? | **Resolved** — [D006](D006-outcome-contract.md): Alfred's four `rule_evaluation.outcome` names |
 
 ---
 

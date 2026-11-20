@@ -56,7 +56,7 @@ def get_trusted_context(
         is_service = True
         role = "service"
 
-    return build_trusted_context(
+    ctx = build_trusted_context(
         db,
         workspace=workspace,
         role=role,
@@ -64,3 +64,12 @@ def get_trusted_context(
         user_type="service" if is_service else "guest",
         purpose_of_use=x_namaa_purpose,
     )
+    if not ctx.membership_active:
+        raise AppError(
+            code="forbidden",
+            message="Principal has been revoked; processing and disclosure are blocked.",
+            status_code=403,
+            field_errors={"reason_code": "principal_revoked"},
+            request_id=ctx.request_id,
+        )
+    return ctx
