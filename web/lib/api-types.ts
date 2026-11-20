@@ -43,6 +43,7 @@ export type ActionId =
   | "record_referral_outcome"
   | "reassign_owner"
   | "defer_with_recall"
+  | "resume_pathway"
   | "close_as_completed"
   | "close_other"
   | "reopen";

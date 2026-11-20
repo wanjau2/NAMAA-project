@@ -134,7 +134,7 @@ def _guard_approval(db: Session, entry: OutboxEntry) -> None:
     """Serialize approval with case changes and reject obsolete care-plan writes.
 
     Ordinary progress (invitation/attendance) may precede a delayed approval write.
-    A later completion command or closure supersedes it, even after reopening.
+    A later completion command or close_other supersedes it, even after reopening.
     The no-op UPDATE holds the case write lock until this transaction commits.
     """
     command = db.query(Command).filter_by(
@@ -159,12 +159,13 @@ def _guard_approval(db: Session, entry: OutboxEntry) -> None:
     if locked.rowcount != 1:
         raise FhirConflictError("Approval superseded: case is closed or no longer exists.")
 
+    # close_other never queues FHIR, so do not require outbox_id. A later
+    # clinical closure must invalidate this write even after a reopen.
     newer = db.query(Command.pk).filter(
         Command.workspace_id == entry.workspace_id,
         Command.case_id == entry.case_id,
         Command.pk > command.pk,
-        Command.action.in_(["approve_pathway", "close_as_completed"]),
-        Command.outbox_id.is_not(None),
+        Command.action.in_(["approve_pathway", "close_as_completed", "close_other"]),
     ).first()
     if newer is not None:
         raise FhirConflictError("Approval superseded by a later care-plan command; review current state.")

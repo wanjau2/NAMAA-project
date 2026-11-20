@@ -116,6 +116,14 @@ test.describe("adult journey — Adult C, rejected referral stays owned", () => 
     await page.locator("form").getByRole("button", { name: "Reassign owner", exact: true }).click();
     await expect(page.getByText(/Recorded by the server/).first()).toBeVisible();
 
+    await setRole(page, "clinical_reviewer");
+    await expect(
+      page.getByRole("button", { name: /^Close as completed/ }),
+    ).not.toHaveAttribute("aria-disabled", "true");
+    await expect(
+      page.getByText(/referral was rejected and is still open/),
+    ).toHaveCount(0);
+
     // A refresh must not discard the guest workspace (sessionStorage-backed).
     await page.reload();
     await expect(page.getByText("Coordinator 3").first()).toBeVisible({

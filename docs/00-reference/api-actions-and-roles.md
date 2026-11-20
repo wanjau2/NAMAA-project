@@ -15,7 +15,8 @@
 | `record_referral_outcome` | coordinator | Rejection creates reassignment work |
 | `reassign_owner` | coordinator | Clears overdue flag |
 | `defer_with_recall` | coordinator | Disposition `deferred` |
-| `close_as_completed` | clinical_reviewer | Requires evidence + attestation |
+| `resume_pathway` | coordinator | Restores `active` from `deferred` or `unreachable` so booking can continue |
+| `close_as_completed` | clinical_reviewer | Requires evidence + attestation. Rejected referral blocks only while overdue |
 | `close_other` | clinical_reviewer | `clinically_closed_other` — not completed |
 | `reopen` | clinical_reviewer | Returns to `follow_up/active` |
 

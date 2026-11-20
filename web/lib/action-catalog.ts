@@ -260,6 +260,25 @@ export const ACTION_CATALOG: ActionSpec[] = [
     ],
   },
   {
+    id: "resume_pathway",
+    label: "Resume pathway",
+    role: "coordinator",
+    tone: "primary",
+    note:
+      "Restores an active pathway after deferral or failed contact. Not a completion. A recorded recall date is kept.",
+    displayWhen: (c) =>
+      c.stage !== "closed" &&
+      (c.disposition === "deferred" || c.disposition === "unreachable"),
+    fields: [
+      {
+        name: "reason",
+        label: "Reason for resuming",
+        kind: "textarea",
+        required: true,
+      },
+    ],
+  },
+  {
     id: "close_as_completed",
     label: "Close as completed",
     role: "clinical_reviewer",

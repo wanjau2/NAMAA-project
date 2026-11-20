@@ -20,6 +20,7 @@ VALID = {
     "record_referral_outcome": {"outcome": "accepted", "reason": "Confirmed"},
     "reassign_owner": {"owner": "Coordinator 2", "reason": "Cover"},
     "defer_with_recall": {"recall_date": "2026-12-01", "reason": "Recall"},
+    "resume_pathway": {"reason": "Reached by phone-assisted support"},
     "close_as_completed": {"evidence_type": "Encounter", "evidence_reference": "Encounter/a", "attestation": True},
     "close_other": {"reason": "Clinical review"},
     "reopen": {"reason": "New information"},

@@ -30,6 +30,21 @@ def _open(c: Case) -> bool:
     return c.stage != "closed"
 
 
+def _paused(c: Case) -> bool:
+    return c.stage != "closed" and c.disposition in {"deferred", "unreachable"}
+
+
+def _rejected_referral_blocks_completion(c: Case) -> str | None:
+    # Reassignment clears overdue (the open escalation). The rejected outcome
+    # stays on the case; it must not keep blocking after that handoff.
+    if c.stage == "follow_up" and c.referral_outcome == "rejected" and c.overdue:
+        return (
+            "The referral was rejected and is still open. Reassign it before "
+            "closing, or close with another reason."
+        )
+    return None
+
+
 ACTIONS: dict[str, ActionSpec] = {
     "record_contact_preference": ActionSpec(
         id="record_contact_preference",
@@ -84,6 +99,7 @@ ACTIONS: dict[str, ActionSpec] = {
     "book_appointment": ActionSpec(
         id="book_appointment",
         role="coordinator",
+        # Deferred/unreachable stay invited but paused; resume_pathway first.
         applies=lambda c: c.stage == "invited" and c.disposition == "active",
         fields=[
             FieldSpec("appointment_time", True, "date"),
@@ -126,15 +142,17 @@ ACTIONS: dict[str, ActionSpec] = {
             FieldSpec("reason", True, "textarea"),
         ],
     ),
+    "resume_pathway": ActionSpec(
+        id="resume_pathway",
+        role="coordinator",
+        applies=_paused,
+        fields=[FieldSpec("reason", True, "textarea")],
+    ),
     "close_as_completed": ActionSpec(
         id="close_as_completed",
         role="clinical_reviewer",
         applies=lambda c: c.stage in {"attended", "follow_up"},
-        precondition=lambda c: (
-            "The referral was rejected and is still open. Reassign it before closing, or close with another reason."
-            if c.stage == "follow_up" and c.referral_outcome == "rejected"
-            else None
-        ),
+        precondition=_rejected_referral_blocks_completion,
         fields=[
             FieldSpec("evidence_type", True, "select"),
             FieldSpec("evidence_reference", True, "text"),

@@ -103,6 +103,7 @@ ACTION_DATA = {
     "record_referral_outcome": ReferralData,
     "reassign_owner": OwnerData,
     "defer_with_recall": RecallData,
+    "resume_pathway": ReasonData,
     "close_as_completed": CompletionData,
     "close_other": ReasonData,
     "reopen": ReasonData,

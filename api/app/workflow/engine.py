@@ -27,6 +27,16 @@ def _state_label(case: Case) -> str:
     return f"{case.stage}/{case.disposition}"
 
 
+_RESUME_NEXT = {
+    "identified": "Resume — resolve review before inviting",
+    "reviewed": "Resume — invite using the recorded preference",
+    "invited": "Resume — book an appointment",
+    "booked": "Resume — confirm attendance after the appointment",
+    "attended": "Resume — record follow-up or close with evidence",
+    "follow_up": "Resume — record follow-up or close with evidence",
+}
+
+
 def _payload_hash(request: ActionRequest, *, case_id: str) -> str:
     blob = json.dumps(
         {
@@ -106,8 +116,17 @@ def _apply_transition(case: Case, action: str, data: dict[str, Any]) -> None:
             case.next_action = "Chase receiving service"
     elif action == "reassign_owner":
         case.owner = str(data["owner"])
-        case.next_action = "New owner to progress the case"
         case.overdue = False
+        if case.referral_outcome == "rejected":
+            case.next_action = (
+                "Rejected referral reassigned — new owner to progress or close with evidence"
+            )
+        else:
+            case.next_action = "New owner to progress the case"
+    elif action == "resume_pathway":
+        case.disposition = "active"
+        case.overdue = False
+        case.next_action = _RESUME_NEXT.get(case.stage, "Resume — determine next step")
     elif action == "defer_with_recall":
         recall = str(data["recall_date"])
         case.disposition = "deferred"

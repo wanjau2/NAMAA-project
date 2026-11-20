@@ -73,6 +73,17 @@ test("late responses from the previous role cannot restore case data", async ({ 
   await expect(page.getByText("Confirm attendance after the appointment", { exact: true })).toHaveCount(0);
 });
 
+test("unreachable cases resume before booking", async ({ page }) => {
+  await page.goto("/cases/case-0005");
+  await expect(page.getByRole("heading", { name: "Adult E (synthetic)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Book appointment/ })).toHaveCount(0);
+  await page.getByRole("button", { name: /^Resume pathway/ }).click();
+  await page.getByLabel("Reason for resuming").fill("Reached by phone-assisted support");
+  await page.locator("form").getByRole("button", { name: "Resume pathway", exact: true }).click();
+  await expect(page.getByText(/Recorded by the server/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Book appointment/ })).toBeVisible();
+});
+
 test("contact attempts are sent as an integer", async ({ page }) => {
   await page.goto("/cases/case-0005");
   await expect(page.getByRole("heading", { name: "Adult E (synthetic)" })).toBeVisible();
