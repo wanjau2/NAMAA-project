@@ -16,8 +16,8 @@ decision. Recommendations below are suggestions, not settled calls.
 | Q5 | Which API path convention is authoritative? | **Resolved** — [D003](D003-backend-stack-and-api.md): `/api/v1/...` |
 | Q6 | Do we have model hosting and GPU budget? | **Open — prerequisite** |
 | Q7 | Where does the demo get hosted, if anywhere? | **Open** |
-| Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side. Verified live; see note below |
-| Q9 | Should the API return `available_actions` per case? | **Open — Mark → Ismail** |
+| Q8 | Does the metrics API suppress small cells server-side? | **Resolved** — [D003](D003-backend-stack-and-api.md): yes, server-side. Reporting cohort publishes; see note below |
+| Q9 | Should the API return `available_actions` per case? | **Resolved** — `GET /api/v1/cases/{id}` returns `available_actions` |
 | Q10 | Are there proposal / fact-review endpoints this sprint? | **Resolved** — `GET/POST /api/v1/facts/{id}/review` live (synthetic stub FHIR) |
 | Q11 | How does a client find a case's source documents? | **Resolved** — `GET /api/v1/cases/{id}/documents` |
 | Q12 | Which rule-outcome vocabulary is authoritative? | **Resolved** — [D006](D006-outcome-contract.md): Alfred's four `rule_evaluation.outcome` names |
@@ -140,11 +140,12 @@ deciding Q8 the way [D003](D003-backend-stack-and-api.md) did, and `GET /api/v1/
 now suppresses server-side: verified on 2026-11-18, with suppressed cells returning
 `numerator: null, denominator: null, suppressed: true, reason: "small_cell", threshold: 10`.
 
-**Residual issue — not a suppression bug.** With the seeded cohort at 3 cases per pathway and a
-threshold of 10, **all 16 analytics cells return suppressed**, so the population view renders
-nothing but locked cells. The logic is right and the cohort is too small. The team needs to
-choose: a larger synthetic reporting cohort in the API seed, or a stated demonstration
-threshold. Until then `/metrics` stays on its local cohort fixture and is labelled as such.
+**Reporting cohort (2026-11-20).** Threshold stays ≥ 10. Guest seed now includes a labelled
+synthetic reporting cohort generated from cases and events, counted in
+`GET /api/v1/analytics/overview`, and **omitted from the coordinator worklist**. The six
+journey cases remain the operational demo. `/metrics` renders the live API release; it no
+longer uses a local fixture. Whole-release suppression is unchanged: shrinking the reporting
+rows re-locks the family.
 
 ## Q9 — Should the API return `available_actions` per case?
 
@@ -156,8 +157,10 @@ But it is duplicated knowledge, and the kind that drifts silently. If `GET /api/
 returned `available_actions: [{ id, permitted_role, blocked_reason }]`, the hints could be
 deleted and the panel would render exactly what the server permits.
 
-**Recommendation:** add it when there is slack. Low risk, removes a duplication. Until then
-`npm run verify:api` fails if the catalog and `/meta/actions` disagree on ids or roles.
+**Shipped:** `CaseOut.available_actions` is `{ id, permitted_role, blocked_reason }[]` for
+actions whose stage predicate applies. Preconditions and a pending FHIR completion fill
+`blocked_reason`. The action panel renders that list; `displayWhen` remains a fallback.
+`GET /api/v1/meta/actions` is still the catalog-drift check.
 
 ## Q10 — Are there proposal / fact-review endpoints this sprint?
 

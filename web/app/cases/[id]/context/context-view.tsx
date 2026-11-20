@@ -8,9 +8,9 @@
  * detail screen, beside the rule outcome and the action panel, would invite
  * exactly the conflation he is guarding against.
  *
- * Default state is the truth: no verified-context service exists yet. The
- * contract examples are available behind an explicit, labelled toggle so the
- * rendering can be reviewed before M2 lands.
+ * Live data uses Relate discovery then POST /api/v1/security/verified-context.
+ * Contract examples remain labelled examples of AssembledContext and are not
+ * mixed with verified records.
  */
 
 import { useState } from "react";
@@ -18,11 +18,13 @@ import Link from "next/link";
 import { ArrowLeft, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextPanel, type ContextState } from "@/components/context-panel";
-import { useCase } from "@/lib/case-store";
+import { useCase, useCaseStore } from "@/lib/case-store";
+import { useDemoSession } from "@/lib/demo-session";
 import {
   ALFRED_CONTEXT_EXAMPLE,
   EMPTY_CONTEXT_EXAMPLE,
 } from "@/lib/context-example";
+import { useVerifiedContext } from "@/lib/use-verified-context";
 
 type Mode = "live" | "example" | "example_empty";
 
@@ -33,20 +35,33 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 
 export function ContextView({ id }: { id: string }) {
-  const { case: row } = useCase(id);
+  const { role, sessionEpoch } = useDemoSession();
+  const { sessionId } = useCaseStore();
+  const { case: row, error } = useCase(id);
   const [mode, setMode] = useState<Mode>("live");
+  const live = useVerifiedContext(
+    row?.patient_id,
+    sessionId,
+    role,
+    sessionEpoch,
+    Boolean(row) || Boolean(error),
+    Boolean(error) && !row,
+  );
 
   const state: ContextState =
-    mode === "live"
-      ? { kind: "unavailable" }
-      : {
+    mode === "example"
+      ? {
           kind: "loaded",
-          context:
-            mode === "example"
-              ? ALFRED_CONTEXT_EXAMPLE
-              : EMPTY_CONTEXT_EXAMPLE,
+          context: ALFRED_CONTEXT_EXAMPLE,
           provenance: "Contract example — not backend data",
-        };
+        }
+      : mode === "example_empty"
+        ? {
+            kind: "loaded",
+            context: EMPTY_CONTEXT_EXAMPLE,
+            provenance: "Contract example — not backend data",
+          }
+        : liveToPanel(live);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
@@ -102,8 +117,25 @@ export function ContextView({ id }: { id: string }) {
       </div>
 
       <div className="mt-4">
-        <ContextPanel state={state} />
+        <ContextPanel state={state} onRefresh={live.refresh} />
       </div>
     </div>
   );
+}
+
+function liveToPanel(
+  live: ReturnType<typeof useVerifiedContext>,
+): ContextState {
+  if (live.kind === "loading") return { kind: "loading" };
+  if (live.kind === "unavailable") return { kind: "no_patient" };
+  if (live.kind === "denied") return { kind: "denied", outcome: live.outcome };
+  if (live.kind === "failed") return { kind: "failed", outcome: live.outcome };
+  return {
+    kind: "verified",
+    variant: live.kind,
+    context: live.context,
+    family: live.family,
+    carePlans: live.carePlans,
+    relateFailed: live.relateFailed,
+  };
 }

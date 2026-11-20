@@ -15,6 +15,7 @@ import {
   hasBlockingIssue,
 } from "../lib/contracts.ts";
 import {
+  buildCorrection,
   buildReviewCommand,
   normalizeProposal,
 } from "../lib/contracts.ts";
@@ -26,6 +27,12 @@ import {
   describeSecurityOutcome,
   leaksExistence,
 } from "../lib/security-states.ts";
+import {
+  interpretExtractionJob,
+  isUsableExtractionFrame,
+} from "../lib/extraction-recovery.ts";
+import { hintsFromRelate } from "../lib/relate.ts";
+import type { ExtractionJobOut } from "../lib/api-types.ts";
 
 let pass = 0;
 let fail = 0;
@@ -91,7 +98,7 @@ check(
 );
 check(
   "and every one of them is named in `missing`",
-  ["source_sha256", "issues", "relationship", "version"].every((f) =>
+  ["source_sha256", "issues", "relationship", "version", "model"].every((f) =>
     adapted.missing.includes(f as never),
   ),
 );
@@ -101,13 +108,11 @@ check(
 );
 
 check(
-  "an offline fixture is marked simulated",
-  adapted.proposal.model?.simulated === true,
-);
-check(
-  "a live inference mode would NOT be marked simulated",
-  fromApiProposal(api, { revision: "r1", inferenceMode: "live" }).proposal.model
-    ?.simulated === false,
+  "a job-level revision is not turned into a fabricated model identity",
+  fromApiProposal(api, {
+    revision: "offline-fixture-v1",
+    inferenceMode: "offline_fixture",
+  }).proposal.model === null,
 );
 check(
   "with no model identity the field is null rather than fabricated",
@@ -235,11 +240,51 @@ check(
   "nested: version, source hash and issues are present, so nothing is missing",
   fromNested.proposal.version === 1 &&
     fromNested.proposal.source_sha256 !== null &&
-    fromNested.missing.length === 0,
+    fromNested.missing.length === 0 &&
+    fromNested.malformed.length === 0,
 );
 check(
   "nested: model identity survives",
   fromNested.proposal.model?.simulated === true,
+);
+
+const noSubject = {
+  ...nestedPayload,
+  fact: { ...nestedPayload.fact, subject: undefined },
+};
+const stripped = normalizeProposal(noSubject);
+check(
+  "a missing nested subject is not defaulted to patient",
+  stripped.proposal.fact.subject === null,
+);
+check(
+  "a missing nested subject is listed as malformed",
+  stripped.malformed.includes("fact.subject"),
+);
+
+const correction = buildCorrection(fromNested.proposal.fact, {
+  value_text: "The patient attended a well-child visit on 2026-09-01.",
+  subject: "patient",
+  assertion: "present",
+  effective_date: "2026-09-01",
+  relationship: null,
+});
+check(
+  "a correction keeps the original excerpt and a valid Observation mapping",
+  correction !== null &&
+    correction.excerpt === fromNested.proposal.fact.excerpt &&
+    correction.proposed_resource_type === "Observation" &&
+    correction.relationship === null,
+);
+check(
+  "a family-member correction maps to FamilyMemberHistory",
+  buildCorrection(fromNested.proposal.fact, {
+    value_text: fromNested.proposal.fact.value_text,
+    subject: "family_member",
+    assertion: "present",
+    effective_date: "",
+    relationship: "sibling",
+  })?.proposed_resource_type === "FamilyMemberHistory",
 );
 
 const fromFlat = normalizeProposal(api);
@@ -326,6 +371,8 @@ for (const op of [
   "extraction_stream",
   "proposal_disclose",
   "fact_review",
+  "evaluation_run",
+  "context_retrieve",
 ] as const) {
   check(
     `${op}: 403 and 404 are indistinguishable to the user`,
@@ -362,6 +409,95 @@ check(
 check(
   "a transport failure states that nothing was changed",
   /nothing was changed/i.test(describeSecurityOutcome(0, "fact_review").body),
+);
+
+/* ---------------------------------------------- extraction recovery (M07) */
+
+function job(overrides: Partial<ExtractionJobOut>): ExtractionJobOut {
+  return {
+    job_id: "job-1",
+    document_id: "doc-1",
+    document_version: 1,
+    state: "running",
+    progress_percent: 40,
+    message: "Extracting…",
+    elapsed_ms: 12000,
+    timeout_ms: 90000,
+    model_revision: "offline-fixture-v1",
+    prompt_version: "v1",
+    error_code: null,
+    error_message: null,
+    synthetic: true,
+    inference_mode: "offline_fixture",
+    proposals: [],
+    ...overrides,
+  };
+}
+
+check(
+  "a running job with zero proposals is still running, not empty",
+  interpretExtractionJob(job({ state: "running", proposals: [] })).kind ===
+    "running",
+);
+const succeededEmpty = interpretExtractionJob(
+  job({ state: "succeeded", proposals: [] }),
+);
+check(
+  "only succeeded with zero proposals is extraction-empty",
+  succeededEmpty.kind === "succeeded" && succeededEmpty.empty,
+);
+check(
+  "a failed job is failed even with no proposals",
+  interpretExtractionJob(job({ state: "failed", proposals: [] })).kind ===
+    "failed",
+);
+check(
+  "timed_out is distinct from failed and from empty",
+  interpretExtractionJob(job({ state: "timed_out", proposals: [] })).kind ===
+    "timed_out",
+);
+check(
+  "cancelled is distinct from failed and from empty",
+  interpretExtractionJob(job({ state: "cancelled", proposals: [] })).kind ===
+    "cancelled",
+);
+const timedOut = interpretExtractionJob(job({ state: "timed_out" }));
+check(
+  "a timeout message is not a no-gap finding",
+  timedOut.kind === "timed_out" &&
+    /not a finding of no care gap/i.test(timedOut.message),
+);
+check(
+  "keepalive and comment frames are not usable extraction events",
+  !isUsableExtractionFrame("") &&
+    !isUsableExtractionFrame(": keepalive") &&
+    !isUsableExtractionFrame("{not json") &&
+    !isUsableExtractionFrame('{"progress_percent":10}'),
+);
+check(
+  "a progress payload with state is usable",
+  isUsableExtractionFrame('{"state":"running","progress_percent":10}'),
+);
+
+const hints = hintsFromRelate({
+  state: "current",
+  workspace_id: "ws",
+  patient_reference: "Patient/p",
+  permission_revision: "permissions-v1",
+  generation_id: "g1",
+  candidates: [
+    {
+      patient_reference: "Patient/p",
+      supporting_references: ["FamilyMemberHistory/fh-1"],
+      candidate_kind: "family_history",
+    },
+  ],
+});
+check(
+  "Relate supporting references become resource/id hints, not assembled items",
+  hints.length === 1 &&
+    hints[0].resource_type === "FamilyMemberHistory" &&
+    hints[0].logical_id === "fh-1",
 );
 
 console.log(`\n${pass} passed, ${fail} failed`);

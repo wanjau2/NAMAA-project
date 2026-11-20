@@ -2,12 +2,9 @@
  * Alfred's canonical AssembledContext example, copied verbatim from
  * ai/examples/assembled-context.json.
  *
- * It exists so the context panel can be reviewed against the real contract
- * before any backend serves one. It is NOT backend data and is never shown
- * without saying so — the panel's default state is "no verified-context
- * service is available", which is the truth today.
- *
- * Delete this once M2 lands and the panel reads from the API.
+ * It exists so the assembled-context rendering can be reviewed against the
+ * contract. It is NOT backend data and is never shown without saying so.
+ * Live data uses verified-context records, which are a different shape.
  */
 
 import type { AssembledContext } from "@/lib/contracts";

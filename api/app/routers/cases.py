@@ -23,7 +23,9 @@ def list_cases(
     db: Session = Depends(get_db),
 ) -> list[CaseRow]:
     authorize(db, ctx, action="case.read", resource_type="Bundle", resource_id="cases")
-    q = db.query(Case).filter(Case.workspace_id == ctx.workspace_id)
+    q = db.query(Case).filter(
+        Case.workspace_id == ctx.workspace_id, Case.worklist.is_(True)
+    )
     if pathway:
         q = q.filter(Case.pathway == pathway)
     if stage:

@@ -8,7 +8,11 @@ follow-up.
 > **Synthetic demonstration only.** No real patient data, no live messaging, no live bookings,
 > no production EHR integration, no clinically validated rules. Not for clinical use.
 
-**Status:** backend demo API in progress (FastAPI + SQLite). Frontend runs on mocks until F4.
+**Status:** the UI talks to the FastAPI demo API. Guest sessions, workflow, evaluations,
+extraction SSE, fact review, and analytics are live against SQLite + a stub FHIR store.
+Population counts are server-suppressed (`n < 10`, whole-release). A labelled reporting
+cohort makes the funnel publishable; the coordinator worklist stays the six journey cases.
+There is no production IdP, live HAPI, or live MedGemma.
 
 ## Start here
 

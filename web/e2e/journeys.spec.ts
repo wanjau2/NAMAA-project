@@ -98,12 +98,12 @@ test.describe("adult journey — Adult C, rejected referral stays owned", () => 
     await expect(page.getByRole("heading", { name: "Adult C (synthetic)" })).toBeVisible();
     await expect(page.getByText("Overdue").first()).toBeVisible();
 
-    // Reviewer cannot complete while the referral is rejected.
+    // Reviewer cannot complete while the referral is rejected. The action
+    // stays offered and blocked; the form is not opened.
     await setRole(page, "clinical_reviewer");
-    await page.getByRole("button", { name: /^Close as completed/ }).click();
-    await page.getByLabel("Evidence reference").fill("Procedure/proc-synthetic-03");
-    await page.getByLabel(/I authorize closure/).check();
-    await page.locator("form").getByRole("button", { name: "Close as completed", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: /^Close as completed/ }),
+    ).toHaveAttribute("aria-disabled", "true");
     await expect(
       page.getByText(/referral was rejected and is still open/),
     ).toBeVisible();
@@ -134,13 +134,13 @@ test.describe("missing information blocks the pathway", () => {
       page.getByRole("heading", { name: "Missing & unverified information" }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Suggested pathway" }),
+      page.getByRole("heading", { name: /Suggested pathway/ }),
     ).toBeVisible();
 
     await setRole(page, "clinical_reviewer");
-    await page.getByRole("button", { name: /^Approve pathway/ }).click();
-    await page.getByLabel(/I have reviewed the contributing records/).check();
-    await page.locator("form").getByRole("button", { name: "Approve pathway", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: /^Approve pathway/ }),
+    ).toHaveAttribute("aria-disabled", "true");
     await expect(
       page.getByText(/unknown is not the same as up to date/),
     ).toBeVisible();
@@ -153,7 +153,7 @@ test.describe("source review", () => {
   }) => {
     await page.goto("/cases/case-0001/review");
     await expect(page.getByRole("heading", { name: "Source review" })).toBeVisible();
-    await expect(page.getByText(/not persisted/)).toBeVisible();
+    await expect(page.getByText(/gateway stub/i)).toBeVisible();
 
     // SSE-driven extraction completes and proposals render.
     await expect(page.getByRole("heading", { name: /Proposed facts/ })).toBeVisible({
@@ -193,11 +193,10 @@ test.describe("population view", () => {
       page.getByText(/Declined, deferred and unreachable people remain in this denominator/).first(),
     ).toBeVisible();
 
-    // Live API panel reports server-side suppression.
     await expect(page.getByRole("heading", { name: "Live API analytics" })).toBeVisible();
-    await expect(page.getByText(/cells suppressed/).first()).toBeVisible({
+    await expect(page.getByText(/GET \/api\/v1\/analytics\/overview/).first()).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.getByText(/Suppressed \(n < 10\)/).first()).toBeVisible();
+    await expect(page.getByText(/local cohort fixture/)).toHaveCount(0);
   });
 });

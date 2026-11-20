@@ -584,6 +584,7 @@ SEED_EVENTS = [
         "action": "record_attendance",
         "prior_state": "booked/active",
         "new_state": "attended/active",
+        "outcome": "attended",
     },
     {
         "id": "evt-0006-a",

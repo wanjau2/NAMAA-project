@@ -168,7 +168,7 @@ def test_case_documents_and_segments_exist():
         assert detail.json()["detail"]["caregiver_authority"] == "verified_caregiver"
         segments = client.get("/api/v1/analytics/segments", headers=_hdr(sid, "coordinator"))
         assert segments.status_code == 200
-        assert segments.json()["suppressed"] is True
+        assert segments.json()["suppressed"] is False
         overview = client.get("/api/v1/analytics/overview", headers=_hdr(sid, "coordinator"))
         assert overview.status_code == 200
-        assert overview.json()["pathways"][0]["eligible"]["suppressed"] is True
+        assert overview.json()["pathways"][0]["eligible"]["suppressed"] is False

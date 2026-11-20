@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from sqlalchemy import or_, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -17,7 +18,9 @@ from app.fhir import (
     apply_transaction_bundle,
     compensate_uncertain,
 )
-from app.models import OutboxEntry
+from app.models import Case, Command, Event, OutboxEntry
+from app.errors import AppError
+from app.services.completion import validate_completion_evidence
 
 
 def _utcnow() -> datetime:
@@ -78,34 +81,53 @@ def build_evidence_bundle(
     evidence_reference: str,
     disposition: str,
 ) -> dict[str, Any]:
-    logical = evidence_reference.split("/")[-1] if "/" in evidence_reference else evidence_reference
+    # Record coordination completion without creating or overwriting the evidence.
     return {
-        "resourceType": "Bundle",
-        "type": "transaction",
-        "entry": [
-            {
-                "request": {"method": "PUT", "url": f"{evidence_type}/{logical}"},
-                "resource": {
-                    "resourceType": evidence_type,
-                    "id": logical,
-                    "status": "finished" if evidence_type == "Encounter" else "completed",
-                    "subject": {"reference": f"Patient/{patient_id}"},
-                    "meta": {
-                        "tag": [
-                            {"system": "https://namaa.example/fhir", "code": "synthetic"},
-                            {"system": "https://namaa.example/fhir", "code": disposition},
-                        ]
-                    },
-                    "extension": [
-                        {
-                            "url": "https://namaa.example/fhir/StructureDefinition/case-id",
-                            "valueString": case_id,
-                        }
-                    ],
-                },
-            }
-        ],
+        "resourceType": "Bundle", "type": "transaction",
+        "entry": [{
+            "request": {"method": "PUT", "url": f"CarePlan/cp-{case_id}"},
+            "resource": {
+                "resourceType": "CarePlan", "id": f"cp-{case_id}",
+                "status": "completed", "intent": "plan",
+                "subject": {"reference": f"Patient/{patient_id}"},
+                "supportingInfo": [{"reference": evidence_reference}],
+                "meta": {"tag": [{"system": "https://namaa.example/fhir", "code": "synthetic"}]},
+            },
+        }],
     }
+
+
+def _finalize_completion(db: Session, entry: OutboxEntry, now: str) -> None:
+    command = db.query(Command).filter_by(
+        workspace_id=entry.workspace_id, outbox_id=entry.id,
+        action="close_as_completed",
+    ).one_or_none()
+    if command is None:
+        raise FhirConflictError("Completion command is missing.")
+    snapshot = json.loads(command.response_json)["case"]
+    case = db.query(Case).filter_by(workspace_id=entry.workspace_id, id=entry.case_id).one()
+    try:
+        validate_completion_evidence(db, workspace_id=entry.workspace_id,
+                                     patient_id=case.patient_id, evidence_type=case.evidence_type,
+                                     evidence_reference=case.evidence_reference)
+    except AppError as exc:
+        raise FhirConflictError(exc.message) from exc
+    changed = db.execute(update(Case).where(
+        Case.pk == case.pk, Case.revision == snapshot["revision"],
+        Case.stage == snapshot["stage"], Case.disposition == snapshot["disposition"],
+    ).values(stage="closed", disposition="completed", revision=Case.revision + 1,
+             next_action="None — closed with evidence", due_time=None, overdue=False)
+      .execution_options(synchronize_session=False))
+    if changed.rowcount != 1:
+        raise FhirConflictError("Case changed while completion was pending; review again.")
+    db.refresh(case)
+    db.add(Event(
+        id=f"evt-{uuid.uuid4().hex[:12]}", workspace_id=entry.workspace_id,
+        case_id=case.id, timestamp=now, actor_role="system", action="completion_committed",
+        prior_state=f"{snapshot['stage']}/{snapshot['disposition']}",
+        new_state="closed/completed", evidence_reference=case.evidence_reference,
+        request_id=command.request_id,
+    ))
 
 
 def claim_due_entries(db: Session, *, worker_id: str, limit: int = 10) -> list[OutboxEntry]:
@@ -114,35 +136,27 @@ def claim_due_entries(db: Session, *, worker_id: str, limit: int = 10) -> list[O
     now_s = _iso(now)
     lease_until = _iso(now + timedelta(seconds=settings.outbox_lease_seconds))
 
-    candidates = (
-        db.query(OutboxEntry)
-        .filter(OutboxEntry.state.in_(["pending", "processing", "compensating"]))
-        .order_by(OutboxEntry.pk.asc())
-        .limit(limit * 3)
-        .all()
+    available = (
+        OutboxEntry.state.in_(["pending", "processing", "compensating"]),
+        or_(OutboxEntry.next_attempt_at.is_(None), OutboxEntry.next_attempt_at <= now_s),
+        or_(OutboxEntry.lease_until.is_(None), OutboxEntry.lease_until <= now_s),
     )
+    candidates = db.query(OutboxEntry).filter(*available).order_by(OutboxEntry.pk.asc()).limit(limit).all()
     claimed: list[OutboxEntry] = []
     for entry in candidates:
-        if len(claimed) >= limit:
-            break
-        due = entry.next_attempt_at is None or entry.next_attempt_at <= now_s
-        lease_expired = entry.lease_until is None or entry.lease_until <= now_s
-        if entry.state == "pending" and due:
-            pass
-        elif entry.state in {"processing", "compensating"} and lease_expired and due:
-            pass
-        else:
-            continue
-        entry.state = "compensating" if entry.state == "compensating" else "processing"
-        entry.lease_owner = worker_id
-        entry.lease_until = lease_until
-        entry.updated_at = now_s
-        claimed.append(entry)
+        changed = db.execute(update(OutboxEntry).where(
+            OutboxEntry.pk == entry.pk, *available,
+        ).values(state="compensating" if entry.compensation_reason else "processing",
+                 lease_owner=worker_id, lease_until=lease_until, updated_at=now_s)
+          .execution_options(synchronize_session=False))
+        if changed.rowcount == 1:
+            db.refresh(entry)
+            claimed.append(entry)
     db.flush()
     return claimed
 
 
-def process_entry(db: Session, entry: OutboxEntry) -> OutboxEntry:
+def _process_entry(db: Session, entry: OutboxEntry) -> OutboxEntry:
     settings = get_settings()
     now = _iso(_utcnow())
     entry.attempts += 1
@@ -165,13 +179,15 @@ def process_entry(db: Session, entry: OutboxEntry) -> OutboxEntry:
             db.flush()
             return entry
 
-        result = apply_transaction_bundle(
-            db,
-            workspace_id=entry.workspace_id,
-            request_id=entry.request_id,
-            bundle=bundle,
-            now=now,
-        )
+        # Keep the case transition, FHIR stub write, and completion event atomic.
+        # A failed/uncertain write rolls back the transition before recording retry state.
+        with db.begin_nested():
+            if entry.action == "close_as_completed":
+                _finalize_completion(db, entry, now)
+            result = apply_transaction_bundle(
+                db, workspace_id=entry.workspace_id, request_id=entry.request_id,
+                bundle=bundle, now=now,
+            )
         entry.state = "committed"
         entry.result_json = json.dumps(result.__dict__)
         entry.lease_owner = None
@@ -212,6 +228,17 @@ def process_entry(db: Session, entry: OutboxEntry) -> OutboxEntry:
             entry.lease_until = None
         db.flush()
         return entry
+
+
+def process_entry(db: Session, entry: OutboxEntry) -> OutboxEntry:
+    if entry.state in {"committed", "compensated", "dead_lettered"}:
+        return entry
+    result = _process_entry(db, entry)
+    db.query(Command).filter_by(workspace_id=entry.workspace_id, outbox_id=entry.id).update(
+        {"saga_state": "fhir_" + result.state}, synchronize_session="fetch"
+    )
+    db.flush()
+    return result
 
 
 def retry_dead_letter(db: Session, *, workspace_id: str, outbox_id: str) -> OutboxEntry:

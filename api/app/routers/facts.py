@@ -51,7 +51,16 @@ def get_proposal(
         patient_id=proposal.patient_id,
     )
     db.commit()
-    return proposal_to_alfred(proposal)
+    payload = proposal_to_alfred(proposal)
+    payload["review_state"] = proposal.review_state
+    payload["reviewer_reference"] = proposal.reviewer_reference
+    payload["review_reason"] = proposal.review_reason
+    payload["reviewed_at"] = proposal.reviewed_at
+    payload["notice"] = (
+        "SYNTHETIC DEMO — proposal is journaled in the application store; "
+        "review commit uses the FHIR gateway stub until HAPI is connected."
+    )
+    return payload
 
 
 @router.post("/{proposal_id}/review")

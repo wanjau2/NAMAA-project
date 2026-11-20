@@ -94,6 +94,7 @@ class Case(Base):
     evidence_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     evidence_reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
     eligible: Mapped[bool] = mapped_column(Boolean, default=True)
+    worklist: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class Event(Base):
@@ -111,6 +112,20 @@ class Event(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence_reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class AppointmentBooking(Base):
+    """Append-only booking details bound to the action event and guest workspace."""
+    __tablename__ = "appointment_bookings"
+    __table_args__ = (UniqueConstraint("workspace_id", "event_id", name="uq_booking_event"),)
+
+    pk: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    case_id: Mapped[str] = mapped_column(String(64), index=True)
+    event_id: Mapped[str] = mapped_column(String(64), index=True)
+    appointment_time: Mapped[str] = mapped_column(String(10))
+    location: Mapped[str] = mapped_column(String(128))
 
 
 class Command(Base):

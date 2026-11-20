@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.workflow.actions import ACTION_ROLES, ACTIONS
+from app.workflow.validation import ACTION_DATA
 
 router = APIRouter(prefix="/api/v1/meta", tags=["meta"])
 
@@ -14,6 +15,7 @@ def list_actions() -> dict:
                 "id": spec.id,
                 "role": spec.role,
                 "required_fields": [f.name for f in spec.fields if f.required],
+                "data_schema": ACTION_DATA[spec.id].model_json_schema(),
             }
             for spec in ACTIONS.values()
         ],

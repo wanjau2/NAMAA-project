@@ -57,12 +57,9 @@ test("demonstration walkthrough", async ({ page }) => {
 
   // Approval is blocked while information is missing.
   await setRole(page, "clinical_reviewer");
-  await page.getByRole("button", { name: /^Approve pathway/ }).click();
-  await page.getByLabel(/I have reviewed the contributing records/).check();
-  await page
-    .locator("form")
-    .getByRole("button", { name: "Approve pathway", exact: true })
-    .click();
+  await expect(
+    page.getByRole("button", { name: /^Approve pathway/ }),
+  ).toHaveAttribute("aria-disabled", "true");
   await expect(
     page.getByText(/unknown is not the same as up to date/),
   ).toBeVisible();
@@ -145,13 +142,9 @@ test("demonstration walkthrough", async ({ page }) => {
   await shot(page, "12-adult-overdue", true);
 
   await setRole(page, "clinical_reviewer");
-  await page.getByRole("button", { name: /^Close as completed/ }).click();
-  await page.getByLabel("Evidence reference").fill("Procedure/proc-synthetic-03");
-  await page.getByLabel(/I authorize closure/).check();
-  await page
-    .locator("form")
-    .getByRole("button", { name: "Close as completed", exact: true })
-    .click();
+  await expect(
+    page.getByRole("button", { name: /^Close as completed/ }),
+  ).toHaveAttribute("aria-disabled", "true");
   await expect(
     page.getByText(/referral was rejected and is still open/),
   ).toBeVisible();
@@ -175,7 +168,7 @@ test("demonstration walkthrough", async ({ page }) => {
   await page.goto("/metrics");
   await expect(page.getByText(/Synthetic Demo Metrics/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Live API analytics" })).toBeVisible();
-  await expect(page.getByText(/cells suppressed/).first()).toBeVisible({
+  await expect(page.getByText(/GET \/api\/v1\/analytics\/overview/).first()).toBeVisible({
     timeout: 20_000,
   });
   await beat(page, 2200);

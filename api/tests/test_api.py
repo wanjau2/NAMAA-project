@@ -9,6 +9,8 @@ from sqlalchemy.pool import StaticPool
 from app.config import get_settings
 from app.db import Base, get_db
 from app.main import create_app
+from app.models import Case
+from app.services.analytics import _funnel_counts
 from app.services.extractions import advance_job, claim_queued_jobs
 from app.services.outbox import claim_due_entries, process_entry
 
@@ -125,6 +127,77 @@ def test_stale_revision_and_idempotency(client: TestClient):
     assert stale.json()["code"] == "stale_revision"
 
 
+def test_did_not_attend_is_not_counted_as_attendance(client: TestClient):
+    sid = _session(client)
+    case_body = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    res = client.post(
+        "/api/v1/cases/case-0002/actions",
+        headers=_headers(sid),
+        json={
+            "action": "record_attendance",
+            "expected_revision": case_body["revision"],
+            "request_id": str(uuid.uuid4()),
+            "data": {"attended": "did_not_attend"},
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["case"]["stage"] == "booked"
+    assert res.json()["event"]["outcome"] == "did_not_attend"
+    detail = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    attend_events = [
+        event for event in detail["detail"]["events"] if event["action"] == "record_attendance"
+    ]
+    assert attend_events[-1]["outcome"] == "did_not_attend"
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        row = db.query(Case).filter_by(workspace_id=sid, id="case-0002").one()
+        assert _funnel_counts(db, sid, [row])["attended"] == 0
+    finally:
+        db.close()
+
+
+def test_mismatched_evidence_does_not_complete_before_fhir(client: TestClient):
+    sid = _session(client)
+    case_body = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    attend = client.post(
+        "/api/v1/cases/case-0002/actions",
+        headers=_headers(sid),
+        json={
+            "action": "record_attendance",
+            "expected_revision": case_body["revision"],
+            "request_id": str(uuid.uuid4()),
+            "data": {"attended": "attended"},
+        },
+    )
+    assert attend.status_code == 200
+    closed = client.post(
+        "/api/v1/cases/case-0002/actions",
+        headers=_headers(sid, "clinical_reviewer"),
+        json={
+            "action": "close_as_completed",
+            "expected_revision": attend.json()["case"]["revision"],
+            "request_id": str(uuid.uuid4()),
+            "data": {
+                "evidence_type": "Encounter",
+                "evidence_reference": "Procedure/nonexistent",
+                "attestation": True,
+            },
+        },
+    )
+    assert closed.status_code == 422
+    detail = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    assert detail["stage"] == "attended"
+    assert detail["disposition"] == "active"
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        row = db.query(Case).filter_by(workspace_id=sid, id="case-0002").one()
+        counts = _funnel_counts(db, sid, [row])
+        assert counts["attended"] == 1
+        assert counts["completed"] == 0
+    finally:
+        db.close()
+
+
 def test_invalid_completion_does_not_complete(client: TestClient):
     sid = _session(client)
     case = client.get("/api/v1/cases/case-0003", headers=_headers(sid)).json()
@@ -176,12 +249,45 @@ def test_needs_review_blocks_approve(client: TestClient):
     assert res.json()["code"] == "precondition_failed"
 
 
-def test_analytics_suppresses_small_cells(client: TestClient):
+def test_missing_role_is_rejected(client: TestClient):
     sid = _session(client)
+    res = client.get("/api/v1/cases", headers={"X-Namaa-Session": sid})
+    assert res.status_code == 400
+    assert res.json()["code"] == "invalid_role"
+
+
+def test_analytics_publishes_reporting_cohort(client: TestClient):
+    sid = _session(client)
+    res = client.get(
+        "/api/v1/analytics/overview",
+        headers=_headers(sid, "population_analyst"),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["threshold"] >= 10
+    assert "reporting cohort" in body["notice"]
+    for pathway in body["pathways"]:
+        assert pathway["completed"]["suppressed"] is False
+        assert pathway["completed"]["numerator"] >= 10
+        assert pathway["completed"]["denominator"] >= 40
+        assert pathway["eligible"]["suppressed"] is False
+        assert pathway["eligible"]["numerator"] >= 40
+
+
+def test_journey_only_cohort_is_release_suppressed(client: TestClient):
+    sid = _session(client)
+    db = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        db.query(Case).filter_by(workspace_id=sid, worklist=False).delete()
+        db.commit()
+    finally:
+        db.close()
     res = client.get("/api/v1/analytics/overview", headers=_headers(sid))
     assert res.status_code == 200
     for pathway in res.json()["pathways"]:
         assert pathway["completed"]["suppressed"] is True
+        assert pathway["completed"]["numerator"] is None
+        assert pathway["completed"]["denominator"] is None
 
 
 def test_extraction_sse_reaches_terminal(client: TestClient):
@@ -250,16 +356,26 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
             "request_id": close_id,
             "data": {
                 "evidence_type": "Encounter",
-                "evidence_reference": "Encounter/enc-test-01",
+                "evidence_reference": "Encounter/enc-synthetic-02",
                 "attestation": True,
             },
         },
     )
     assert closed.status_code == 200
+    pending_case = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    assert pending_case["stage"] == "attended"
+    assert pending_case["disposition"] == "active"
+    assert pending_case["completion_status"] == "pending"
+    db_pending = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        row = db_pending.query(Case).filter_by(workspace_id=sid, id="case-0002").one()
+        assert _funnel_counts(db_pending, sid, [row])["completed"] == 0
+    finally:
+        db_pending.close()
 
     pending = client.get("/api/v1/ops/outbox", headers=_headers(sid))
     assert pending.status_code == 200
-    assert any(close_id in r["request_id"] for r in pending.json())
+    assert any(r["case_id"] == "case-0002" for r in pending.json())
 
     db = client.app.state.session_factory()  # type: ignore[attr-defined]
     try:
@@ -277,7 +393,17 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
         headers=_headers(sid),
         params={"state": "committed"},
     )
-    assert any(close_id in r["request_id"] for r in committed.json())
+    assert any(r["case_id"] == "case-0002" for r in committed.json())
+    done = client.get("/api/v1/cases/case-0002", headers=_headers(sid)).json()
+    assert done["stage"] == "closed"
+    assert done["disposition"] == "completed"
+    assert done["completion_status"] == "committed"
+    db_done = client.app.state.session_factory()  # type: ignore[attr-defined]
+    try:
+        row = db_done.query(Case).filter_by(workspace_id=sid, id="case-0002").one()
+        assert _funnel_counts(db_done, sid, [row])["completed"] == 1
+    finally:
+        db_done.close()
 
     # Force a dead-letter via injected failures, then retry.
     monkeypatch.setenv("NAMAA_FHIR_INJECT_FAILURE_RATE", "1.0")
@@ -306,7 +432,7 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
             "request_id": req,
             "data": {
                 "evidence_type": "Encounter",
-                "evidence_reference": "Encounter/enc-dlq-01",
+                "evidence_reference": "Encounter/enc-synthetic-06",
                 "attestation": True,
             },
         },
@@ -333,7 +459,7 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
         params={"state": "dead_lettered"},
     )
     assert dlq.status_code == 200
-    dead = [r for r in dlq.json() if req in r["request_id"]]
+    dead = [r for r in dlq.json() if r["case_id"] == "case-0006"]
     assert dead, dlq.json()
 
     monkeypatch.setenv("NAMAA_FHIR_INJECT_FAILURE_RATE", "0.0")
@@ -361,4 +487,4 @@ def test_outbox_commits_evidence_and_retries_dead_letter(client: TestClient, mon
         headers=_headers(sid),
         params={"state": "committed"},
     )
-    assert any(req in r["request_id"] for r in ok.json())
+    assert any(r["case_id"] == "case-0006" for r in ok.json())

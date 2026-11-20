@@ -29,7 +29,9 @@ export type SecurityOperation =
   | "note_retrieve"
   | "extraction_stream"
   | "proposal_disclose"
-  | "fact_review";
+  | "fact_review"
+  | "evaluation_run"
+  | "context_retrieve";
 
 export type SecurityOutcome = {
   state: SecurityState;
@@ -46,6 +48,8 @@ const OPERATION_NOUN: Record<SecurityOperation, string> = {
   extraction_stream: "this extraction",
   proposal_disclose: "these proposals",
   fact_review: "this review",
+  evaluation_run: "this evaluation",
+  context_retrieve: "this retrieved context",
 };
 
 /**
@@ -75,7 +79,10 @@ export function describeSecurityOutcome(
       body: `${capitalise(noun)} is not available to you here. This response is the same whether the record does not exist or is outside your authorization, so nothing about other workspaces can be inferred from it.`,
       action: null,
       caveat:
-        operation === "proposal_disclose" || operation === "note_retrieve"
+        operation === "proposal_disclose" ||
+        operation === "note_retrieve" ||
+        operation === "evaluation_run" ||
+        operation === "context_retrieve"
           ? "This is an access outcome, not a clinical finding. It says nothing about what the record contains."
           : null,
     };
@@ -120,9 +127,13 @@ export function describeSecurityOutcome(
         : `The server returned an error (${status}). Nothing was changed.`,
     action: "Try again.",
     caveat:
-      operation === "extraction_stream" || operation === "proposal_disclose"
+        operation === "extraction_stream" || operation === "proposal_disclose"
         ? "A failed extraction is not a finding of no care gap. The note remains unreviewed."
-        : null,
+        : operation === "evaluation_run"
+          ? "A failed evaluation is not a finding of no care gap and does not change workflow stage."
+          : operation === "context_retrieve"
+            ? "A failed retrieval is not evidence that no records exist."
+            : null,
   };
 }
 

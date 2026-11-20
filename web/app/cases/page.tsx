@@ -273,7 +273,7 @@ export default function WorklistPage() {
   );
 }
 
-export function ApiDown({
+function ApiDown({
   message,
   onRetry,
 }: {

@@ -71,7 +71,13 @@ class MissingItem(BaseModel):
     consequence: str
 
 
+class BookingOut(BaseModel):
+    appointment_time: str
+    location: str
+
+
 class EventOut(BaseModel):
+    booking: BookingOut | None = None
     id: str
     case_id: str
     timestamp: str
@@ -82,6 +88,7 @@ class EventOut(BaseModel):
     reason: str | None = None
     evidence_reference: str | None = None
     request_id: str | None = None
+    outcome: str | None = None
 
 
 class CaseRow(BaseModel):
@@ -100,9 +107,11 @@ class CaseRow(BaseModel):
     due_time: str | None
     overdue: bool
     revision: int
+    completion_status: str | None = None
 
 
 class CaseDetail(BaseModel):
+    booking: BookingOut | None = None
     explanation: str
     factors: list[SourceFact]
     missing: list[MissingItem]
@@ -126,14 +135,21 @@ class CaseDocumentOut(BaseModel):
     case_id: str | None = None
 
 
+class AvailableAction(BaseModel):
+    id: ActionId
+    permitted_role: Role
+    blocked_reason: str | None = None
+
+
 class CaseOut(CaseRow):
     detail: CaseDetail
+    available_actions: list[AvailableAction] = Field(default_factory=list)
 
 
 class ActionRequest(BaseModel):
     action: ActionId
-    expected_revision: int
-    request_id: str
+    expected_revision: int = Field(strict=True, gt=0)
+    request_id: str = Field(strict=True, min_length=1, max_length=64, pattern=r"\S")
     data: dict[str, Any] = Field(default_factory=dict)
 
 

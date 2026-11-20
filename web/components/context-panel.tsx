@@ -1,18 +1,14 @@
 "use client";
 
 /**
- * Assembled-context panel (Alfred's M3; contract: AssembledContext).
+ * Retrieved-context panel.
  *
- * Deliberately separate from review decisions and rule results. Retrieved
- * context is material a human may read; it is not a finding, not a permission
- * and not an eligibility decision, and this panel must never let it look like
- * one.
+ * Live data is POST /api/v1/security/verified-context (`records`) plus Relate
+ * discovery hints. That is not Alfred AssembledContext (query, tiers, items).
+ * Contract examples stay on the assembled shape and are labelled as examples.
  *
- * The three rules that shape everything here:
- *  - `exhaustive` is always false, so absence of an item is never evidence of
- *    absence. The notice saying so is not dismissible.
- *  - An empty result is rendered as UNKNOWN, never as "nothing found".
- *  - Completeness and the checked scope travel with every result.
+ * Absence of a record is never evidence of absence. Relate candidates never
+ * authorize access, imply caregiver authority, or establish eligibility.
  */
 
 import {
@@ -21,6 +17,7 @@ import {
   Info,
   Layers,
   Lock,
+  RotateCcw,
   ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,15 +26,55 @@ import {
   COMPLETENESS_DISPLAY,
   TIER_LABELS,
   type AssembledContext,
+  type Completeness,
   type ContextItem,
 } from "@/lib/contracts";
+import type {
+  RelateBatch,
+  VerifiedContext,
+  VerifiedContextRecord,
+} from "@/lib/api-types";
+import { relateCandidateCount } from "@/lib/relate";
+import type { SecurityOutcome } from "@/lib/security-states";
 
 export type ContextState =
-  /** No verified-context service exists yet (M2 not delivered). */
   | { kind: "unavailable" }
-  | { kind: "loaded"; context: AssembledContext; provenance: string };
+  | { kind: "loading" }
+  | { kind: "denied"; outcome: SecurityOutcome }
+  | { kind: "failed"; outcome: SecurityOutcome }
+  | { kind: "no_patient" }
+  | { kind: "loaded"; context: AssembledContext; provenance: string }
+  | {
+      kind: "verified";
+      variant: "live" | "empty" | "stale" | "expired";
+      context: VerifiedContext;
+      family: RelateBatch | null;
+      carePlans: RelateBatch | null;
+      relateFailed: boolean;
+    };
 
-export function ContextPanel({ state }: { state: ContextState }) {
+export function ContextPanel({
+  state,
+  onRefresh,
+}: {
+  state: ContextState;
+  onRefresh?: () => void;
+}) {
+  if (state.kind === "loading") {
+    return (
+      <section
+        className="rounded-lg border border-border bg-surface p-5"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <h2 className="text-lg text-ink">Verified context</h2>
+        <p className="mt-3 text-sm text-ink-muted">
+          Retrieving authorized records for this patient…
+        </p>
+      </section>
+    );
+  }
+
   if (state.kind === "unavailable") {
     return (
       <section className="rounded-lg border border-border bg-surface p-5">
@@ -61,7 +98,70 @@ export function ContextPanel({ state }: { state: ContextState }) {
     );
   }
 
-  const { context, provenance } = state;
+  if (state.kind === "no_patient") {
+    return (
+      <section className="rounded-lg border border-border bg-surface p-5">
+        <h2 className="text-lg text-ink">Verified context</h2>
+        <p className="mt-3 text-sm text-ink">
+          No patient is bound to this case, so verified context cannot be
+          requested.
+        </p>
+        <p className="mt-2 text-xs text-ink-muted">
+          That is not a finding that no records exist.
+        </p>
+      </section>
+    );
+  }
+
+  if (state.kind === "denied" || state.kind === "failed") {
+    return (
+      <section className="rounded-lg border border-status-overdue bg-status-overdue-bg p-5">
+        <h2 className="text-lg text-ink">Verified context</h2>
+        <p className="mt-3 flex items-start gap-2 text-sm font-semibold text-status-overdue">
+          <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>{state.outcome.title}</span>
+        </p>
+        <p className="mt-2 text-sm text-ink">{state.outcome.body}</p>
+        {state.outcome.caveat ? (
+          <p className="mt-2 text-xs text-ink-muted">{state.outcome.caveat}</p>
+        ) : null}
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="mt-3 inline-flex items-center gap-1.5 rounded border border-status-overdue px-2 py-1 text-xs font-semibold text-status-overdue"
+          >
+            <RotateCcw aria-hidden="true" className="size-3" />
+            Retry
+          </button>
+        ) : null}
+      </section>
+    );
+  }
+
+  if (state.kind === "verified") {
+    return (
+      <VerifiedRecordsPanel
+        variant={state.variant}
+        context={state.context}
+        family={state.family}
+        carePlans={state.carePlans}
+        relateFailed={state.relateFailed}
+        onRefresh={onRefresh}
+      />
+    );
+  }
+
+  return <AssembledExamplePanel context={state.context} provenance={state.provenance} />;
+}
+
+function AssembledExamplePanel({
+  context,
+  provenance,
+}: {
+  context: AssembledContext;
+  provenance: string;
+}) {
   const completeness = COMPLETENESS_DISPLAY[context.completeness];
   const empty = context.state === "empty_unknown" || context.items.length === 0;
 
@@ -80,7 +180,6 @@ export function ContextPanel({ state }: { state: ContextState }) {
         </p>
       </div>
 
-      {/* Completeness and checked scope travel with every result. */}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div className="rounded-md border border-border bg-canvas p-3">
           <p className="text-xs font-medium text-ink-muted">Completeness</p>
@@ -99,7 +198,6 @@ export function ContextPanel({ state }: { state: ContextState }) {
         </div>
       </div>
 
-      {/* Not dismissible: the context is never a complete view. */}
       <p className="mt-3 flex items-start gap-1.5 rounded-md border border-status-review bg-status-review-bg p-2 text-xs text-status-review">
         <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
         <span>
@@ -143,8 +241,217 @@ export function ContextPanel({ state }: { state: ContextState }) {
   );
 }
 
+function VerifiedRecordsPanel({
+  variant,
+  context,
+  family,
+  carePlans,
+  relateFailed,
+  onRefresh,
+}: {
+  variant: "live" | "empty" | "stale" | "expired";
+  context: VerifiedContext;
+  family: RelateBatch | null;
+  carePlans: RelateBatch | null;
+  relateFailed: boolean;
+  onRefresh?: () => void;
+}) {
+  const completeness = completenessDisplay(context.completeness);
+  const records = context.records ?? [];
+  const empty = variant === "empty" || records.length === 0;
+
+  return (
+    <section className="rounded-lg border border-border bg-surface p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg text-ink">Verified context</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Authorized source records for a human to read. Not assembled-context
+            metadata, not a finding, not a permission, and not an eligibility
+            decision.
+          </p>
+        </div>
+        {onRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+          >
+            <RotateCcw aria-hidden="true" className="size-3.5" />
+            Refresh
+          </button>
+        ) : null}
+      </div>
+
+      {variant === "expired" ? (
+        <p className="mt-3 rounded-md border border-status-overdue bg-status-overdue-bg p-2 text-sm text-status-overdue">
+          This verification has expired. It is not current. Refresh to obtain a
+          new verification; do not treat these records as still verified.
+        </p>
+      ) : null}
+      {variant === "stale" ? (
+        <p className="mt-3 rounded-md border border-status-review bg-status-review-bg p-2 text-sm text-status-review">
+          This verification is stale relative to the current generation. It is
+          not a current authorization to read these records as up to date.
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="rounded-md border border-border bg-canvas p-3">
+          <p className="text-xs font-medium text-ink-muted">Completeness</p>
+          <p className="mt-1 text-sm font-semibold text-ink">
+            {completeness.label}
+          </p>
+          <p className="mt-1 text-xs text-ink-muted">{completeness.meaning}</p>
+        </div>
+        <div className="rounded-md border border-border bg-canvas p-3">
+          <p className="text-xs font-medium text-ink-muted">Checked scope</p>
+          <p className="mt-1 text-sm text-ink">{context.checked_scope}</p>
+          <p className="mt-1 font-mono-tech text-xs text-ink-muted">
+            generation {context.generation_id} · permissions{" "}
+            {context.permission_revision}
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-3 flex items-start gap-1.5 rounded-md border border-status-review bg-status-review-bg p-2 text-xs text-status-review">
+        <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+        <span>
+          This retrieval is <strong>not exhaustive</strong>
+          {context.exhaustive ? " (the server field does not change that)" : ""}
+          , and absence of a record here is <strong>not</strong> evidence that
+          it does not exist
+          {context.absence_claims_allowed
+            ? " — absence claims are still not made here"
+            : ""}
+          .
+        </span>
+      </p>
+
+      <p className="mt-2 font-mono-tech text-xs text-ink-muted">
+        verified {context.verified_at} · expires {context.expires_at} · adapter{" "}
+        {context.policy_adapter}
+        {context.production_authorization ? "" : " · not production-authorized"}
+      </p>
+      {context.notice ? (
+        <p className="mt-2 text-xs text-ink-muted">{context.notice}</p>
+      ) : null}
+
+      <RelateHints
+        family={family}
+        carePlans={carePlans}
+        relateFailed={relateFailed}
+      />
+
+      <p className="mt-4 text-sm text-ink-muted">
+        No query, tier or assembled-item metadata is invented for this
+        response.
+        {!empty ? (
+          <>
+            {" "}
+            <span className="tabular font-medium text-ink">
+              {records.length}
+            </span>{" "}
+            verified record{records.length === 1 ? "" : "s"}.
+          </>
+        ) : null}
+      </p>
+
+      {empty ? (
+        <div className="mt-4 rounded-lg border border-border bg-subtle p-6">
+          <p className="flex items-center gap-2 text-base font-semibold text-ink">
+            <CircleSlash aria-hidden="true" className="size-4" />
+            Unknown — nothing was returned
+          </p>
+          <p className="mt-1 text-sm text-ink-muted">
+            No authorized record was returned inside the checked scope. That is
+            an empty result, not a finding of absence.
+          </p>
+        </div>
+      ) : (
+        <>
+          <ul className="mt-3 space-y-3">
+            {records.map((record, index) => (
+              <li
+                key={`${record.source.reference}:${record.source.version}:${index}`}
+              >
+                <VerifiedRecordCard record={record} />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+function RelateHints({
+  family,
+  carePlans,
+  relateFailed,
+}: {
+  family: RelateBatch | null;
+  carePlans: RelateBatch | null;
+  relateFailed: boolean;
+}) {
+  const count = relateCandidateCount(family, carePlans);
+  return (
+    <div className="mt-4 rounded-md border border-dashed border-border bg-canvas p-3">
+      <p className="text-sm font-semibold text-ink">Relate discovery</p>
+      <p className="mt-1 text-xs text-ink-muted">
+        Graph-derived candidates are hints only. They do not authorize access,
+        imply caregiver authority, or establish eligibility.
+      </p>
+      {relateFailed ? (
+        <p className="mt-2 text-xs text-ink-muted">
+          Relate discovery was not available. Verified records below were still
+          requested without treating missing hints as permission.
+        </p>
+      ) : (
+        <p className="mt-2 text-xs text-ink-muted">
+          <span className="tabular font-medium text-ink">{count}</span>{" "}
+          candidate{count === 1 ? "" : "s"} · family history{" "}
+          {family?.candidates?.length ?? 0} · care plans{" "}
+          {carePlans?.candidates?.length ?? 0}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function VerifiedRecordCard({ record }: { record: VerifiedContextRecord }) {
+  return (
+    <article className="rounded-md border border-border bg-canvas p-3">
+      <p className="font-mono-tech text-sm text-ink">
+        {record.source.reference}
+      </p>
+      <p className="mt-2 text-sm text-ink">{record.text}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        <Marker
+          on={record.authorized}
+          onLabel="Authorized"
+          offLabel="Not authorized"
+        />
+        <Marker
+          on={record.source_verified}
+          onLabel="Source verified"
+          offLabel="Source not verified"
+        />
+        <Marker
+          on={record.reviewed}
+          onLabel="Reviewed"
+          offLabel="Not reviewed by a clinician"
+        />
+      </div>
+      <p className="mt-2 font-mono-tech text-xs text-ink-muted">
+        version {record.source.version} · updated {record.source_last_updated} ·
+        verified {record.verified_at} · {record.patient_reference}
+      </p>
+    </article>
+  );
+}
+
 function ContextItemCard({ item }: { item: ContextItem }) {
-  // Offsets are code points; an unverifiable span is stated, never guessed.
   const trace = traceability(item.text, {
     offset_start: item.offset_start,
     offset_end: item.offset_end,
@@ -224,4 +531,15 @@ function Marker({
       {on ? onLabel : offLabel}
     </span>
   );
+}
+
+function completenessDisplay(value: string): { label: string; meaning: string } {
+  if (value in COMPLETENESS_DISPLAY) {
+    return COMPLETENESS_DISPLAY[value as Completeness];
+  }
+  return {
+    label: value || "Unknown",
+    meaning:
+      "The extent of what was checked is not known. Nothing here supports a statement about what is absent.",
+  };
 }

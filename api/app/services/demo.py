@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import uuid
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.models import (
+    AppointmentBooking,
     AuditEvent,
     CareGap,
     Case,
@@ -26,6 +28,7 @@ from app.models import (
 )
 from app.seed import SEED_CASES, SEED_EVENTS, SEED_GAPS, SEED_OBSERVATIONS, SEED_PATIENTS
 from app.services.extraction_fixtures import SEED_DOCUMENTS
+from app.services.reporting_cohort import load_reporting_cohort
 
 
 def ensure_workspace(db: Session, workspace_id: str | None = None) -> Workspace:
@@ -49,6 +52,7 @@ def ensure_workspace(db: Session, workspace_id: str | None = None) -> Workspace:
 
 def wipe_workspace_data(db: Session, workspace_id: str) -> None:
     for model in (
+        AppointmentBooking,
         AuditEvent,
         ReviewCommandJournal,
         PrincipalRevocation,
@@ -142,8 +146,23 @@ def load_seed(db: Session, workspace_id: str) -> int:
                 evidence_type=case.get("evidence_type"),
                 evidence_reference=case.get("evidence_reference"),
                 eligible=case.get("eligible", True),
+                worklist=case.get("worklist", True),
             )
         )
+
+    for case_id in ("case-0002", "case-0006"):
+        seed = next(c for c in SEED_CASES if c["id"] == case_id)
+        logical_id = "enc-synthetic-" + case_id[-2:]
+        db.add(FhirResource(
+            workspace_id=workspace_id, resource_type="Encounter", logical_id=logical_id,
+            version_id=1, request_id="seed-evidence", updated_at="2026-11-17T09:00:00Z",
+            body_json=json.dumps({
+                "resourceType": "Encounter", "id": logical_id, "status": "finished",
+                "class": {"system": "http://terminology.hl7.org/CodeSystem/v3-ActCode", "code": "AMB"},
+                "subject": {"reference": f"Patient/{seed['patient_id']}"},
+                "meta": {"tag": [{"system": "https://namaa.example/fhir", "code": "synthetic"}]},
+            }),
+        ))
 
     for event in SEED_EVENTS:
         db.add(
@@ -159,6 +178,7 @@ def load_seed(db: Session, workspace_id: str) -> int:
                 reason=event.get("reason"),
                 evidence_reference=event.get("evidence_reference"),
                 request_id=event.get("request_id"),
+                outcome=event.get("outcome"),
             )
         )
 
@@ -175,6 +195,7 @@ def load_seed(db: Session, workspace_id: str) -> int:
             )
         )
 
+    load_reporting_cohort(db, workspace_id)
     db.flush()
     return len(SEED_CASES)
 

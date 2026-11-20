@@ -25,8 +25,9 @@ import { cn } from "@/lib/utils";
 import { useDemoSession } from "@/lib/demo-session";
 import { useCaseStore } from "@/lib/case-store";
 import {
-  ACTION_CATALOG,
   ROLE_WORDS,
+  blockedReason,
+  displayableActions,
   type ActionSpec,
   type FieldSpec,
 } from "@/lib/action-catalog";
@@ -51,10 +52,8 @@ export function ActionPanel({
   // so the row unmounts and any message inside it would vanish with it.
   const [lastOutcome, setLastOutcome] = useState<string | null>(null);
 
-  // Display hints only — the server decides what is actually valid. Actions
-  // belonging to another role stay visible so the boundary is legible.
   const applicable = useMemo(
-    () => ACTION_CATALOG.filter((spec) => spec.displayWhen(caseState)),
+    () => displayableActions(caseState),
     [caseState],
   );
 
@@ -66,9 +65,9 @@ export function ActionPanel({
         <span className="font-mono-tech">
           {caseState.stage}/{caseState.disposition}
         </span>{" "}
-        at <span className="font-mono-tech">rev {caseState.revision}</span>. The
-        server validates every transition and records the event; this list is a
-        display hint and the server may still refuse an action.
+        at <span className="font-mono-tech">rev {caseState.revision}</span>. This
+        list is <span className="font-mono-tech">available_actions</span> from
+        the server. The server still validates every submit.
       </p>
 
       {lastOutcome ? (
@@ -127,12 +126,10 @@ function ActionRow({
   onChanged?: () => void;
   onOutcome: (message: string) => void;
 }) {
-  // Role is the only gate the client applies, and only to avoid offering a
-  // control that is certain to be refused. Preconditions are the server's:
-  // it answers `precondition_failed` with the reason, which the form shows.
+  const serverBlock = blockedReason(caseState, spec.id);
   const permitted = role === spec.role;
   const reasonId = `gate-${spec.id}`;
-  const canOpen = permitted;
+  const canOpen = permitted && !serverBlock;
 
   return (
     <div
@@ -179,7 +176,9 @@ function ActionRow({
         >
           <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            {`Requires the ${ROLE_WORDS[spec.role]} role. Switch role in the simulation bar to demonstrate this step.`}
+            {!permitted
+              ? `Requires the ${ROLE_WORDS[spec.role]} role. Switch role in the simulation bar to demonstrate this step.`
+              : serverBlock}
           </span>
         </p>
       ) : null}
@@ -244,7 +243,7 @@ function ActionForm({
       action: spec.id,
       expected_revision: openedAtRevision,
       request_id: requestId,
-      data: values,
+      data: actionPayload(spec, values),
     };
     const result = await submit(caseState.id, request);
     setPending(false);
@@ -356,7 +355,7 @@ function ActionForm({
     action: spec.id,
     expected_revision: openedAtRevision,
     request_id: requestId,
-    data: values,
+    data: actionPayload(spec, values),
   },
   null,
   2,
@@ -369,6 +368,14 @@ function ActionForm({
       </details>
     </form>
   );
+}
+
+function actionPayload(spec: ActionSpec, values: Record<string, string | boolean>) {
+  return Object.fromEntries(spec.fields.map((field) => {
+    const value = values[field.name];
+    return [field.name, field.kind === "number" && typeof value === "string" && value.trim()
+      ? Number(value) : value];
+  }));
 }
 
 function FieldInput({

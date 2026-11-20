@@ -5,7 +5,8 @@
  * stop on terminal states. Status GET is a fallback only — do not hammer it.
  *
  * Headers: browsers cannot set custom headers on EventSource. Pass the guest
- * session as a query param (`session`) until cookie-based sessions land.
+ * session as `session` and the simulated role as `role` until cookie sessions
+ * land.
  */
 
 export type ExtractionState =
@@ -50,8 +51,10 @@ export type SubscribeExtractionOptions = {
   apiBaseUrl: string;
   jobId: string;
   sessionId: string;
+  role: string;
   onEvent: (event: ExtractionProgressEvent) => void;
   onError?: (error: Event) => void;
+  onMalformed?: (raw: string) => void;
 };
 
 /**
@@ -64,30 +67,46 @@ export function subscribeExtractionProgress(
   const url = new URL(
     `${options.apiBaseUrl.replace(/\/$/, "")}/api/v1/extractions/${options.jobId}/events`,
   );
-  // Temporary until cookie sessions: SSE cannot send X-Namaa-Session.
+  // Temporary until cookie sessions: SSE cannot send custom headers.
   url.searchParams.set("session", options.sessionId);
+  url.searchParams.set("role", options.role);
 
   const source = new EventSource(url.toString());
+  let closed = false;
 
   const handle = (raw: MessageEvent) => {
+    if (closed) return;
+    const text = String(raw.data ?? "");
+    const trimmed = text.trim();
+    if (!trimmed || trimmed.startsWith(":")) return;
     try {
-      const data = JSON.parse(String(raw.data)) as ExtractionProgressEvent;
+      const data = JSON.parse(trimmed) as ExtractionProgressEvent;
+      if (typeof data.state !== "string") {
+        options.onMalformed?.(text);
+        return;
+      }
       options.onEvent(data);
       if (isTerminalExtraction(data.state)) {
+        closed = true;
         source.close();
       }
     } catch {
-      // Ignore malformed frames; keepalives are comments.
+      options.onMalformed?.(text);
     }
   };
 
   source.addEventListener("progress", handle);
   source.addEventListener("terminal", handle);
+  source.onmessage = handle;
   source.onerror = (err) => {
+    if (closed) return;
     options.onError?.(err);
   };
 
-  return () => source.close();
+  return () => {
+    closed = true;
+    source.close();
+  };
 }
 
 /** Format the elapsed line required by the UI theme (e.g. Extracting… 12s (90s timeout)). */

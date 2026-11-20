@@ -75,7 +75,13 @@ export type SourceFact = {
 
 export type MissingItem = { label: string; consequence: string };
 
+export type Booking = {
+  appointment_time: string;
+  location: string;
+};
+
 export type EventOut = {
+  booking?: Booking | null;
   id: string;
   case_id: string;
   timestamp: string;
@@ -86,6 +92,7 @@ export type EventOut = {
   reason: string | null;
   evidence_reference: string | null;
   request_id: string | null;
+  outcome: string | null;
 };
 
 export type CaseRow = {
@@ -104,9 +111,17 @@ export type CaseRow = {
   due_time: string | null;
   overdue: boolean;
   revision: number;
+  completion_status?: string | null;
 };
 
+export type CaregiverAuthority =
+  | "verified_caregiver"
+  | "self"
+  | "unknown"
+  | "not_supplied";
+
 export type CaseDetail = {
+  booking?: Booking | null;
   explanation: string;
   factors: SourceFact[];
   missing: MissingItem[];
@@ -116,9 +131,20 @@ export type CaseDetail = {
   recall_date: string | null;
   completion_evidence: CompletionEvidence | null;
   referral_outcome: "pending" | "accepted" | "rejected" | null;
+  caregiver_authority?: CaregiverAuthority | null;
+  caregiver_relationship?: string | null;
 };
 
-export type CaseOut = CaseRow & { detail: CaseDetail };
+export type AvailableAction = {
+  id: ActionId;
+  permitted_role: Role;
+  blocked_reason: string | null;
+};
+
+export type CaseOut = CaseRow & {
+  detail: CaseDetail;
+  available_actions: AvailableAction[];
+};
 
 /** The mutation envelope. Every field is required by the server. */
 export type ActionRequest = {
@@ -214,28 +240,60 @@ export type ReviewState = "proposed" | "accepted" | "corrected" | "rejected";
 export type Assertion = "present" | "absent" | "uncertain" | "historical";
 export type ProposalSubject = "patient" | "family_member";
 
-export type ApiProposal = {
-  id: string;
+export type NestedProposalFact = {
   concept: string;
   value_text: string;
   subject: ProposalSubject;
   assertion: Assertion;
   effective_date: string | null;
+  excerpt: string;
   proposed_resource_type: string;
+  relationship: string | null;
+};
+
+export type NestedProposalModel = {
+  model_id: string;
+  model_revision: string;
+  prompt_version: string;
+  simulated: boolean;
+};
+
+export type NestedProposalIssue = {
+  code: string;
+  severity: "block" | "review";
+  message: string;
+};
+
+/**
+ * Extraction and GET-fact wire shape (Alfred nested contract, Ismail I4).
+ * Review state on GET is `review_state`; extraction snapshots stay `proposed`.
+ */
+export type ApiProposal = {
+  id: string;
+  version: number;
+  state: "proposed" | ReviewState;
+  workspace_id?: string;
+  patient_reference?: string;
   source_document_id: string;
-  source_document_version: number;
+  source_document_version: string;
+  source_sha256: string;
+  fact: NestedProposalFact;
   /**
-   * Exact supporting excerpt. Offsets are Unicode CODE POINTS
+   * Exact supporting excerpt lives on `fact`. Offsets are Unicode CODE POINTS
    * (ai/docs/CONTRACTS.md), not JavaScript string indices — compare them with
    * lib/text-offsets.ts. Null means the source match failed or was ambiguous,
    * and nothing may be highlighted.
    */
-  excerpt: string;
   offset_start: number | null;
   offset_end: number | null;
-  offset_unit?: "unicode_code_points";
-  /** Server-side review state. Currently always "proposed": no write endpoint. */
-  review_state: ReviewState;
+  offset_unit: "unicode_code_points";
+  issues: NestedProposalIssue[];
+  model: NestedProposalModel;
+  review_state?: ReviewState;
+  reviewer_reference?: string | null;
+  review_reason?: string | null;
+  reviewed_at?: string | null;
+  notice?: string | null;
 };
 
 export type ExtractionAccepted = {
@@ -275,6 +333,123 @@ export type DocumentOut = {
   text: string;
   policy_adapter: string;
   production_authorization: boolean;
+};
+
+/** GET /api/v1/cases/{id}/documents — listing has no note text. */
+export type CaseDocumentOut = {
+  id: string;
+  version: number;
+  document_date: string;
+  patient_id: string;
+  case_id: string | null;
+};
+
+export const CAREGIVER_AUTHORITY_LABELS: Record<CaregiverAuthority, string> = {
+  verified_caregiver: "Verified caregiver (synthetic record)",
+  self: "Self — no caregiver required",
+  unknown: "Unknown — not established",
+  not_supplied: "Not supplied",
+};
+
+/* ---------------------------------------------------------------------------
+   Canonical evaluations (D006) and verified context (Relate + records).
+   --------------------------------------------------------------------------- */
+
+export type ResourceVersionRef = {
+  reference: string;
+  version: string;
+};
+
+export type CanonicalRuleEvaluation = {
+  patient_reference: string;
+  as_of: string;
+  rule_id: string;
+  rule_version: string;
+  outcome: string;
+  input_versions: ResourceVersionRef[];
+  contributing_factors: string[];
+  missing_information: string[];
+  due_date: string | null;
+  simulated: boolean;
+  synthetic_rule: boolean;
+};
+
+export type EvaluationResult = {
+  patient_id: string;
+  pathway: Pathway;
+  rule_id_version: string;
+  flag_status: string;
+  factors: SourceFact[];
+  missing: MissingItem[];
+  uncertainty?: string;
+  suggested_review_action?: string;
+  /** Present on POST; omitted on GET latest. Explicit null means no case opened. */
+  case?: CaseOut | null;
+  evaluation_id: string;
+  created_at?: string;
+  rule_evaluation: CanonicalRuleEvaluation | null;
+  legacy_flag_status: string | null;
+  api_compatibility: string | null;
+  notice?: string;
+  input_snapshot?: Record<string, unknown>;
+};
+
+export type EvaluationRequest = {
+  pathway?: Pathway | null;
+};
+
+export type RelateCandidate = {
+  patient_reference: string;
+  supporting_references: string[];
+  candidate_kind: string;
+};
+
+export type RelateBatch = {
+  state: string;
+  workspace_id: string;
+  patient_reference: string;
+  permission_revision: string;
+  generation_id: string;
+  candidates: RelateCandidate[];
+};
+
+export type RelateHint = {
+  resource_type: string;
+  logical_id: string;
+};
+
+export type VerifiedContextRecord = {
+  source: ResourceVersionRef;
+  patient_reference: string;
+  source_last_updated: string;
+  verified_at: string;
+  authorized: boolean;
+  source_verified: boolean;
+  reviewed: boolean;
+  text: string;
+};
+
+export type VerifiedContext = {
+  workspace_id: string;
+  patient_reference: string;
+  generation_id: string;
+  mapping_version: string;
+  permission_revision: string;
+  built_at: string;
+  verified_at: string;
+  expires_at: string;
+  state: string;
+  authorized: boolean;
+  source_verified: boolean;
+  completeness: string;
+  checked_scope: string;
+  records: VerifiedContextRecord[];
+  exhaustive: boolean;
+  absence_claims_allowed: boolean;
+  source_versions: Record<string, string>;
+  policy_adapter: string;
+  production_authorization: boolean;
+  notice: string;
 };
 
 export const ASSERTION_LABELS: Record<Assertion, string> = {

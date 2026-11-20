@@ -98,7 +98,45 @@ function toStructured(error: unknown): { error: StructuredError; status: number 
 }
 
 export function CaseStoreProvider({ children }: { children: ReactNode }) {
+  const { role, sessionEpoch } = useDemoSession();
+  const sessionPromise = useRef<Promise<string> | null>(null);
+  const ensureSession = useCallback(() => {
+    if (!sessionPromise.current) {
+      const stored = readStoredSession();
+      sessionPromise.current = (stored
+        ? Promise.resolve(stored)
+        : api.createSession().then((session) => session.session_id)
+      ).then((id) => {
+        storeSession(id);
+        return id;
+      }).catch((error) => {
+        sessionPromise.current = null;
+        throw error;
+      });
+    }
+    return sessionPromise.current;
+  }, []);
+
+  // Changing roles unmounts all case/source caches before the new role renders.
+  // The guest workspace stays the same, including when browser storage is blocked.
+  return (
+    <RoleCaseStoreProvider key={`${role}:${sessionEpoch}`} ensureSession={ensureSession}>
+      {children}
+    </RoleCaseStoreProvider>
+  );
+}
+
+function RoleCaseStoreProvider({ children, ensureSession }: {
+  children: ReactNode;
+  ensureSession: () => Promise<string>;
+}) {
   const { role } = useDemoSession();
+  const requestController = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    requestController.current = controller;
+    return () => controller.abort();
+  }, []);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
@@ -116,12 +154,14 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef<Set<string>>(new Set());
 
   const fetchRows = useCallback(async (session: string) => {
+    const signal = requestController.current?.signal;
     setRowsLoading(true);
     setRowsError(null);
     try {
-      const data = await api.listCases(session);
-      setRows(data);
+      const data = await api.listCases(session, role, signal);
+      if (!signal?.aborted) setRows(data);
     } catch (caught) {
+      if (signal?.aborted) return;
       const { error } = toStructured(caught);
       setRowsError(error);
       if (error.code === "api_unreachable") {
@@ -129,20 +169,16 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
         setConnectionMessage(error.message);
       }
     } finally {
-      setRowsLoading(false);
+      if (!signal?.aborted) setRowsLoading(false);
     }
-  }, []);
+  }, [role]);
 
   // Create the guest session once, then load the worklist.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Reuse this tab's workspace across reloads; the API provisions an
-        // unknown-but-well-formed session id on first use.
-        const existing = readStoredSession();
-        const sessionId =
-          existing ?? (await api.createSession()).session_id;
+        const sessionId = await ensureSession();
         if (cancelled) return;
         storeSession(sessionId);
         setSessionId(sessionId);
@@ -159,23 +195,31 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [fetchRows]);
+  }, [fetchRows, ensureSession]);
 
   const loadCase = useCallback(
     (id: string) => {
       if (!sessionId || inFlight.current.has(id)) return;
+      const signal = requestController.current?.signal;
       inFlight.current.add(id);
       setCaseLoadingIds((prev) => ({ ...prev, [id]: true }));
       (async () => {
         try {
-          const data = await api.getCase(sessionId, id);
+          const data = await api.getCase(sessionId, role, id, signal);
+          if (signal?.aborted) return;
           setCases((prev) => ({ ...prev, [id]: data }));
+          setRows((prev) =>
+            prev.map((row) =>
+              row.id === id ? { ...row, ...stripDetail(data) } : row,
+            ),
+          );
           setCaseErrors((prev) => {
             const next = { ...prev };
             delete next[id];
             return next;
           });
         } catch (caught) {
+          if (signal?.aborted) return;
           const { error } = toStructured(caught);
           setCaseErrors((prev) => ({ ...prev, [id]: error }));
         } finally {
@@ -184,7 +228,7 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
         }
       })();
     },
-    [sessionId],
+    [sessionId, role],
   );
 
   const submit = useCallback(
@@ -226,7 +270,7 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
   const resetDemo = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await api.resetSession(sessionId);
+      await api.resetSession(sessionId, role);
       setCases({});
       setCaseErrors({});
       await fetchRows(sessionId);
@@ -234,7 +278,7 @@ export function CaseStoreProvider({ children }: { children: ReactNode }) {
       const { error } = toStructured(caught);
       setRowsError(error);
     }
-  }, [sessionId, fetchRows]);
+  }, [sessionId, role, fetchRows]);
 
   const value = useMemo<CaseStoreValue>(
     () => ({
@@ -324,6 +368,16 @@ export function useCase(id: string) {
   useEffect(() => {
     if (status === "ready" && !data) loadCase(id);
   }, [status, data, id, loadCase]);
+
+  // Completion is asynchronous: refresh until the server reports a terminal write state.
+  const completionPending = ["pending", "processing", "compensating"].includes(
+    data?.completion_status ?? "",
+  );
+  useEffect(() => {
+    if (!completionPending) return;
+    const timer = setInterval(() => loadCase(id), 1000);
+    return () => clearInterval(timer);
+  }, [completionPending, id, loadCase]);
 
   return {
     case: data,

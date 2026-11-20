@@ -27,6 +27,7 @@ def _make_engine():
         def _sqlite_pragma(dbapi_connection, _connection_record):  # noqa: ANN001
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=5000")
             cursor.close()
 
     return engine
@@ -44,10 +45,30 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _ensure_sqlite_columns() -> None:
+    """Add columns create_all will not attach to an existing demo file."""
+    if not str(engine.url).startswith("sqlite"):
+        return
+    patches = {
+        "cases": [("worklist", "BOOLEAN NOT NULL DEFAULT 1")],
+        "events": [("outcome", "VARCHAR(64)")],
+    }
+    with engine.begin() as conn:
+        for table, columns in patches.items():
+            existing = {
+                row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")
+            }
+            if not existing:
+                continue
+            for name, ddl in columns:
+                if name not in existing:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+
+
 def init_db() -> None:
     from app import models  # noqa: F401
 
-    # Disposable synthetic demo: create missing tables. This does not migrate
-    # existing SQLite files after destructive column changes. Recreate the
-    # volume or run POST /api/v1/demo/reset for guest data.
+    # Disposable synthetic demo: create missing tables and additive columns.
+    # Destructive reshapes still need a new SQLite file or a guest reset.
     Base.metadata.create_all(bind=engine)
+    _ensure_sqlite_columns()

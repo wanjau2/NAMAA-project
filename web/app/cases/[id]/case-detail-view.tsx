@@ -8,7 +8,8 @@
  * visual weight, because an absent record means incomplete information, never
  * low risk.
  *
- * Everything shown here comes from `GET /api/v1/cases/{id}`. The action panel
+ * Workflow stage/disposition come from `GET /api/v1/cases/{id}`. The rule
+ * outcome comes from the patient evaluation resource. The action panel
  * submits to the server and renders the server's answer; it never advances a
  * stage locally.
  */
@@ -17,28 +18,50 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { AlertOctagon, ArrowLeft, RotateCcw } from "lucide-react";
 import { StatusBadge, StatusCard } from "@/components/status-badge";
-import { RuleOutcomeBadge, RuleOutcomeCard } from "@/components/rule-outcome";
+import { RuleOutcomeBadge } from "@/components/rule-outcome";
+import { CanonicalEvaluationPanel } from "@/components/canonical-evaluation";
 import { resolveOutcome } from "@/lib/rule-outcomes";
 import { ActionPanel } from "@/components/action-panel";
 import { useCase, useCaseStore } from "@/lib/case-store";
+import { useDemoSession } from "@/lib/demo-session";
+import { usePatientEvaluation } from "@/lib/use-patient-evaluation";
 import {
+  CAREGIVER_AUTHORITY_LABELS,
   DISPOSITION_LABELS,
   PATHWAY_LABELS,
   STAGE_LABELS,
+  type CaregiverAuthority,
 } from "@/lib/api-types";
-import { candidateDocumentIds } from "@/lib/source-documents";
 
 export function CaseDetailView({ id }: { id: string }) {
   const { case: row, loading, error, reload } = useCase(id);
-  const { status, connectionMessage } = useCaseStore();
+  const { status, connectionMessage, sessionId, loadCase } = useCaseStore();
+  const { role, sessionEpoch } = useDemoSession();
+  const evaluation = usePatientEvaluation(
+    row?.patient_id,
+    row?.pathway,
+    sessionId,
+    role,
+    sessionEpoch,
+  );
+  const returnedCaseId =
+    evaluation.status === "ready" && evaluation.ranNow
+      ? evaluation.result.case?.id ?? null
+      : null;
+  const evaluationId =
+    evaluation.status === "ready" ? evaluation.result.evaluation_id : null;
 
-  // Offer source review when the case cites a document. Whether an accessible
-  // note actually exists is decided by the API on that screen.
-  const hasSource = row ? candidateDocumentIds(row).length > 0 : false;
+  // Source review decides whether a note is actually available. This link does
+  // not claim that a document exists.
 
   useEffect(() => {
     if (row) document.title = `${row.patient_label} — Namaa`;
   }, [row]);
+
+  useEffect(() => {
+    if (!returnedCaseId) return;
+    loadCase(id);
+  }, [returnedCaseId, evaluationId, loadCase, id]);
 
   if (status === "unreachable") {
     return (
@@ -85,9 +108,11 @@ export function CaseDetailView({ id }: { id: string }) {
   }
 
   const detail = row.detail;
-  // All four rule outcomes are shown as themselves. Previously a `gap` case
-  // displayed no outcome at all, and `not_eligible` had nowhere to appear.
-  const outcome = resolveOutcome(row.flag_status);
+  const outcome =
+    evaluation.status === "ready" && evaluation.result.rule_evaluation
+      ? resolveOutcome(evaluation.result.rule_evaluation.outcome)
+      : null;
+  const headerOutcome = outcome ?? resolveOutcome(row.flag_status);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -111,7 +136,15 @@ export function CaseDetailView({ id }: { id: string }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <RuleOutcomeBadge outcome={outcome.outcome} />
+            <RuleOutcomeBadge outcome={headerOutcome.outcome} />
+            {!outcome ? (
+              <span className="text-xs text-ink-muted">
+                Worklist flag{" "}
+                <span className="font-mono-tech">{row.flag_status}</span>
+                {" "}
+                — not the canonical evaluation
+              </span>
+            ) : null}
             {row.overdue ? <StatusBadge state="overdue" label="Overdue" /> : null}
             {row.disposition === "completed" ? (
               <StatusBadge
@@ -132,6 +165,8 @@ export function CaseDetailView({ id }: { id: string }) {
             value={DISPOSITION_LABELS[row.disposition]}
           />
           <Meta label="Owner" value={row.owner} />
+          <Meta label="Appointment date" value={detail.booking?.appointment_time ?? "Not recorded"} />
+          <Meta label="Appointment location" value={detail.booking?.location ?? "Not recorded"} />
           <Meta
             label="Due"
             value={row.due_time ? row.due_time.replace("T", " ") : "—"}
@@ -145,8 +180,20 @@ export function CaseDetailView({ id }: { id: string }) {
                 : "Not recorded"
             }
           />
-          <Meta label="Caregiver authority" value="Verified (synthetic)" />
+          <Meta
+            label="Caregiver authority"
+            value={authorityLabel(detail.caregiver_authority)}
+          />
+          <Meta
+            label="Caregiver relationship"
+            value={detail.caregiver_relationship || "Not supplied"}
+          />
         </dl>
+
+        <p className="mt-2 text-xs text-ink-muted">
+          Caregiver relationship is not authorization. Authority is the server
+          field above, not inferred from relationship or contact preference.
+        </p>
 
         <p className="mt-3 text-sm text-ink">
           <span className="font-medium text-ink-muted">Next action: </span>
@@ -178,15 +225,21 @@ export function CaseDetailView({ id }: { id: string }) {
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-5">
-          {/* The rule result, with its limitation, kept separate from the
-              explanation below it and from any review decision. */}
-          <RuleOutcomeCard resolution={outcome} />
+          <CanonicalEvaluationPanel
+            state={evaluation}
+            onRetry={evaluation.reevaluate}
+          />
 
-          {/* Equal-weight pair: recommendation and uncertainty, same size. */}
+          {/* Equal-weight pair: recommendation and uncertainty, same size.
+              This is the case record, not the canonical evaluation. */}
           <div className="grid gap-4 md:grid-cols-2">
             <StatusCard
-              state={row.flag_status === "needs_review" ? "review" : "verified"}
-              title="Suggested pathway"
+              state={
+                headerOutcome.outcome === "needs_review"
+                  ? "review"
+                  : "verified"
+              }
+              title="Suggested pathway (case record)"
             >
               <p>{detail.explanation}</p>
               <p className="mt-3 text-sm">
@@ -222,14 +275,12 @@ export function CaseDetailView({ id }: { id: string }) {
                 </p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
-                {hasSource ? (
-                  <Link
-                    href={`/cases/${id}/review`}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
-                  >
-                    Review source facts
-                  </Link>
-                ) : null}
+                <Link
+                  href={`/cases/${id}/review`}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+                >
+                  Review source facts
+                </Link>
                 <Link
                   href={`/cases/${id}/context`}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
@@ -291,6 +342,7 @@ export function CaseDetailView({ id }: { id: string }) {
                     Actor:{" "}
                     <span className="font-mono-tech">{event.actor_role}</span>
                     {event.reason ? ` · ${event.reason}` : ""}
+                    {event.booking ? ` · Appointment ${event.booking.appointment_time} at ${event.booking.location}` : ""}
                     {event.evidence_reference
                       ? ` · evidence ${event.evidence_reference}`
                       : ""}
@@ -364,10 +416,10 @@ function Problem({
 }) {
   return (
     <div className="rounded-lg border border-status-overdue bg-status-overdue-bg p-4">
-      <p className="flex items-start gap-2 text-sm font-semibold text-status-overdue">
+      <h2 className="flex items-start gap-2 text-sm font-semibold text-status-overdue">
         <AlertOctagon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <span>{title}</span>
-      </p>
+      </h2>
       <p className="mt-2 text-sm text-ink">
         {body} {code ? <span className="font-mono-tech">[{code}]</span> : null}
       </p>
@@ -382,6 +434,11 @@ function Problem({
       </button>
     </div>
   );
+}
+
+function authorityLabel(value: CaregiverAuthority | null | undefined): string {
+  if (!value) return CAREGIVER_AUTHORITY_LABELS.not_supplied;
+  return CAREGIVER_AUTHORITY_LABELS[value] ?? CAREGIVER_AUTHORITY_LABELS.unknown;
 }
 
 function Meta({

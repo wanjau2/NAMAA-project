@@ -1,24 +1,50 @@
 import { expect, test } from "@playwright/test";
+import { setRole } from "./helpers";
 
 /**
  * The retrieved-context view (Alfred's M3 rendering rules).
  *
- * The claims under test are absence claims: an empty result must read as
- * unknown, a missing service must not read as a finding, and the
- * non-exhaustive notice must always be present.
+ * Live data is verified-context records plus Relate hints. Contract examples
+ * stay labelled. Absence of a record is never a finding of absence.
  */
 
-test("with no backend service, absence of context is not a finding", async ({
+test("live backend retrieves verified records without inventing assembled metadata", async ({
   page,
 }) => {
   await page.goto("/cases/case-0001/context");
   await expect(page.getByRole("heading", { name: "Retrieved context" })).toBeVisible();
-
+  await expect(page.getByRole("heading", { name: "Verified context" })).toBeVisible({
+    timeout: 20_000,
+  });
   await expect(
     page.getByText("No verified-context service is available"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText(/not exhaustive/).first(),
   ).toBeVisible();
   await expect(
-    page.getByText(/absence of a service, not a finding that no records exist/i),
+    page.getByText(/absence of a record here is not evidence/i),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/do not authorize access, imply caregiver authority, or establish eligibility/),
+  ).toBeVisible();
+  await expect(page.getByText(/No query, tier or assembled-item metadata/)).toBeVisible();
+  await expect(page.getByText("Partial", { exact: true })).toBeVisible();
+});
+
+test("a denied context retrieve is an access outcome, not a finding of no records", async ({
+  page,
+}) => {
+  await page.goto("/cases/case-0001/context");
+  await expect(page.getByRole("heading", { name: "Verified context" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await setRole(page, "population_analyst");
+  await expect(page.getByText("Not available in this session")).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(
+    page.getByText(/not a clinical finding/i),
   ).toBeVisible();
 });
 
@@ -71,41 +97,49 @@ test("an empty result renders as unknown, never as nothing found", async ({
   await expect(page.getByText("Unknown", { exact: true }).first()).toBeVisible();
 });
 
-test("the review screen states that issues are not reported by this API", async ({
+test("the review screen shows nested issues, source hash and simulated model identity", async ({
   page,
 }) => {
   await page.goto("/cases/case-0001/review");
   await expect(page.getByRole("heading", { name: /Proposed facts/ })).toBeVisible({
     timeout: 30_000,
   });
+  await expect(page.getByText(/\[missing_date\]/).first()).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(
-    page.getByText(/means not reported, not “none found”/i).first(),
-  ).toBeVisible({ timeout: 30_000 });
+    page.getByText(/means not reported, not “none found”/i),
+  ).toHaveCount(0);
   await expect(page.getByText(/source hash/).first()).toBeVisible();
-  // exact: otherwise it matches the simulation bar's "Simulated role" label.
   await expect(
     page.getByText("simulated", { exact: true }).first(),
   ).toBeVisible();
 });
 
-test("a review decision says plainly that it did not persist", async ({ page }) => {
+test("a review decision is journaled and labelled as a stub FHIR commit", async ({
+  page,
+}) => {
   await page.goto("/cases/case-0001/review");
   await expect(page.getByRole("heading", { name: /Proposed facts/ })).toBeVisible({
     timeout: 30_000,
   });
+  await setRole(page, "clinical_reviewer");
+  await expect(page.getByRole("heading", { name: /Proposed facts/ })).toBeVisible({
+    timeout: 30_000,
+  });
 
-  // Switch to the reviewer role so the controls are live.
-  const toggle = page.getByRole("button", { name: "Session" });
-  if (await toggle.isVisible().catch(() => false)) await toggle.click();
-  await page.getByLabel("Simulated role").last().selectOption("clinical_reviewer");
+  const firstCard = page.locator("article").first();
+  await expect(firstCard.getByRole("checkbox").first()).toBeVisible();
+  for (const box of await firstCard.getByRole("checkbox").all()) {
+    await box.check();
+  }
+  await firstCard.getByRole("button", { name: "Accept" }).click();
 
-  await page.getByRole("button", { name: "Accept" }).first().click();
-
-  // The client attempts the real endpoint and reports exactly why it failed.
   await expect(
-    page.getByText(/no fact-review endpoint yet|Not sent:/i).first(),
+    page.getByText(/Recorded in this synthetic workspace/).first(),
   ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/not a HAPI commit/i).first()).toBeVisible();
   await expect(
-    page.getByText(/not an authorization receipt|will not invent one/i).first(),
+    page.getByText(/Accepted by reviewer/).first(),
   ).toBeVisible();
 });

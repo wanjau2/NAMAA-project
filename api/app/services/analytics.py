@@ -4,8 +4,10 @@ from sqlalchemy.orm import Session
 
 from app.ai_runtime import ensure_namaa_ai
 from app.config import get_settings
+from app.errors import AppError
 from app.models import Case, Event
 from app.schemas import AnalyticsOverview, MetricCell, PathwayMetrics
+from app.services.completion import validate_completion_evidence
 
 ensure_namaa_ai()
 
@@ -57,17 +59,17 @@ def _case_ids_with_action(
 ) -> set[str]:
     if not case_ids:
         return set()
-    rows = (
+    query = (
         db.query(Event.case_id)
         .filter(
             Event.workspace_id == workspace_id,
             Event.case_id.in_(case_ids),
             Event.action == action,
         )
-        .distinct()
-        .all()
     )
-    return {row[0] for row in rows}
+    if action == "record_attendance":
+        query = query.filter(Event.outcome == "attended")
+    return {row[0] for row in query.distinct().all()}
 
 
 def _funnel_counts(
@@ -78,11 +80,21 @@ def _funnel_counts(
     booked = _case_ids_with_action(db, workspace_id, ids, EVENT_ACTIONS["booked"])
     attended = _case_ids_with_action(db, workspace_id, ids, EVENT_ACTIONS["attended"])
     follow_up = _case_ids_with_action(db, workspace_id, ids, EVENT_ACTIONS["follow-up"])
-    completed = {
-        c.id
-        for c in cohort
-        if c.disposition == "completed" and c.evidence_type in COMPLETION_EVIDENCE
-    }
+    completed = set()
+    for c in cohort:
+        if c.disposition != "completed" or c.evidence_type not in COMPLETION_EVIDENCE:
+            continue
+        try:
+            validate_completion_evidence(
+                db,
+                workspace_id=workspace_id,
+                patient_id=c.patient_id,
+                evidence_type=c.evidence_type,
+                evidence_reference=c.evidence_reference,
+            )
+        except AppError:
+            continue
+        completed.add(c.id)
     declined = {c.id for c in cohort if c.disposition == "declined"}
     unreachable = {c.id for c in cohort if c.disposition == "unreachable"}
     return {
@@ -154,7 +166,8 @@ def build_overview(db: Session, workspace_id: str) -> AnalyticsOverview:
         notice=(
             "All figures are synthetic demo data. "
             "Eligible is a denominator, not a self-complement cell. "
-            "One suppress_population() family feeds overview and segments."
+            "One suppress_population() family feeds overview and segments. "
+            "Counts include a labelled reporting cohort that is not on the coordinator worklist."
         ),
     )
 

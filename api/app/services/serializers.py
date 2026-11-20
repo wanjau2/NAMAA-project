@@ -4,8 +4,9 @@ import json
 
 from sqlalchemy.orm import Session
 
-from app.models import CareGap, Case, Event, Patient
+from app.models import AppointmentBooking, CareGap, Case, Command, Event, OutboxEntry, Patient
 from app.schemas import (
+    BookingOut,
     CaseDetail,
     CaseOut,
     CompletionEvidence,
@@ -16,8 +17,15 @@ from app.schemas import (
 )
 
 
-def event_to_out(event: Event) -> EventOut:
+def booking_to_out(booking: AppointmentBooking | None) -> BookingOut | None:
+    if booking is None:
+        return None
+    return BookingOut(appointment_time=booking.appointment_time, location=booking.location)
+
+
+def event_to_out(event: Event, *, booking: AppointmentBooking | None = None) -> EventOut:
     return EventOut(
+        booking=booking_to_out(booking),
         id=event.id,
         case_id=event.case_id,
         timestamp=event.timestamp,
@@ -28,6 +36,7 @@ def event_to_out(event: Event) -> EventOut:
         reason=event.reason,
         evidence_reference=event.evidence_reference,
         request_id=event.request_id,
+        outcome=event.outcome,
     )
 
 
@@ -74,12 +83,18 @@ def case_to_out(db: Session, case: Case) -> CaseOut:
     if authority not in {"verified_caregiver", "self", "unknown", "not_supplied"}:
         authority = "unknown"
 
+    bookings = db.query(AppointmentBooking).filter_by(
+        workspace_id=case.workspace_id, case_id=case.id
+    ).order_by(AppointmentBooking.pk.asc()).all()
+    by_event = {booking.event_id: booking for booking in bookings}
+
     detail = CaseDetail(
         explanation=gap.explanation if gap else "",
         factors=factors,
         missing=missing,
         suggested_review_action=gap.suggested_review_action if gap else "",
-        events=[event_to_out(e) for e in events],
+        events=[event_to_out(e, booking=by_event.get(e.id)) for e in events],
+        booking=booking_to_out(bookings[-1] if bookings else None),
         contact_preference=contact,
         recall_date=case.recall_date,
         completion_evidence=evidence,
@@ -87,6 +102,23 @@ def case_to_out(db: Session, case: Case) -> CaseOut:
         caregiver_authority=authority,  # type: ignore[arg-type]
         caregiver_relationship=None,
     )
+
+    completion_status = None
+    next_action = case.next_action
+    latest = db.query(Command, OutboxEntry).join(
+        OutboxEntry, Command.outbox_id == OutboxEntry.id
+    ).filter(Command.workspace_id == case.workspace_id, Command.case_id == case.id,
+             OutboxEntry.workspace_id == case.workspace_id,
+             Command.action == "close_as_completed").order_by(Command.pk.desc()).first()
+    if latest:
+        command, entry = latest
+        snapshot = json.loads(command.response_json)["case"]
+        if snapshot["revision"] == case.revision:
+            completion_status = entry.state
+            if entry.state in {"dead_lettered", "compensated"}:
+                next_action = "Completion was not persisted — review evidence or retry the failed write"
+        elif case.disposition == "completed" and entry.state == "committed":
+            completion_status = "committed"
 
     return CaseOut(
         id=case.id,
@@ -100,9 +132,17 @@ def case_to_out(db: Session, case: Case) -> CaseOut:
         stage=case.stage,  # type: ignore[arg-type]
         disposition=case.disposition,  # type: ignore[arg-type]
         owner=case.owner,
-        next_action=case.next_action,
+        next_action=next_action,
+        completion_status=completion_status,
         due_time=case.due_time,
         overdue=case.overdue,
         revision=case.revision,
         detail=detail,
+        available_actions=_available_actions(db, case),
     )
+
+
+def _available_actions(db: Session, case: Case):
+    from app.workflow.availability import available_actions_for
+
+    return available_actions_for(db, case)

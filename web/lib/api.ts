@@ -15,15 +15,21 @@ import type {
   ActionRequest,
   ActionResponse,
   AnalyticsOverview,
+  ApiProposal,
+  CaseDocumentOut,
   CaseOut,
   CaseRow,
   DemoResetOut,
   DemoSessionOut,
   DocumentOut,
+  EvaluationRequest,
+  EvaluationResult,
   ExtractionAccepted,
   ExtractionJobOut,
+  RelateBatch,
   Role,
   StructuredError,
+  VerifiedContext,
 } from "@/lib/api-types";
 
 export const API_BASE =
@@ -127,15 +133,16 @@ export const api = {
   createSession: () =>
     request<DemoSessionOut>("/api/v1/demo/sessions", { method: "POST" }),
 
-  resetSession: (session: string) =>
-    request<DemoResetOut>("/api/v1/demo/reset", { method: "POST", session }),
+  resetSession: (session: string, role: Role) =>
+    request<DemoResetOut>("/api/v1/demo/reset", { method: "POST", session, role }),
 
-  listCases: (session: string, signal?: AbortSignal) =>
-    request<CaseRow[]>("/api/v1/cases", { session, signal }),
+  listCases: (session: string, role: Role, signal?: AbortSignal) =>
+    request<CaseRow[]>("/api/v1/cases", { session, role, signal }),
 
-  getCase: (session: string, id: string, signal?: AbortSignal) =>
+  getCase: (session: string, role: Role, id: string, signal?: AbortSignal) =>
     request<CaseOut>(`/api/v1/cases/${encodeURIComponent(id)}`, {
       session,
+      role,
       signal,
     }),
 
@@ -162,6 +169,29 @@ export const api = {
       { session, role, signal },
     ),
 
+  listCaseDocuments: (
+    session: string,
+    role: Role,
+    caseId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<CaseDocumentOut[]>(
+      `/api/v1/cases/${encodeURIComponent(caseId)}/documents`,
+      { session, role, signal },
+    ),
+
+  getFact: (
+    session: string,
+    role: Role,
+    proposalId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<ApiProposal>(`/api/v1/facts/${encodeURIComponent(proposalId)}`, {
+      session,
+      role,
+      signal,
+    }),
+
   startExtraction: (session: string, role: Role, documentId: string) =>
     request<ExtractionAccepted>(
       `/api/v1/documents/${encodeURIComponent(documentId)}/extractions`,
@@ -181,7 +211,6 @@ export const api = {
 
   /**
    * POST /api/v1/facts/{id}/review — Ismail I5 (synthetic; FHIR commit still stub).
-   * 404/405 means the route is absent; other 4xx are real refusals / validation.
    */
   reviewFact: (
     session: string,
@@ -194,9 +223,72 @@ export const api = {
       { method: "POST", session, role, body: command },
     ),
 
-  analyticsOverview: (session: string, signal?: AbortSignal) =>
+  analyticsOverview: (session: string, role: Role, signal?: AbortSignal) =>
     request<AnalyticsOverview>("/api/v1/analytics/overview", {
       session,
+      role,
+      signal,
+    }),
+
+  evaluatePatient: (
+    session: string,
+    role: Role,
+    patientId: string,
+    body: EvaluationRequest = {},
+  ) =>
+    request<EvaluationResult>(
+      `/api/v1/patients/${encodeURIComponent(patientId)}/evaluations`,
+      { method: "POST", session, role, body },
+    ),
+
+  getLatestEvaluation: (
+    session: string,
+    role: Role,
+    patientId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<EvaluationResult>(
+      `/api/v1/patients/${encodeURIComponent(patientId)}/evaluations/latest`,
+      { session, role, signal },
+    ),
+
+  getRelateFamilyHistory: (
+    session: string,
+    role: Role,
+    patientId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<RelateBatch>(
+      `/api/v1/relate/family-history?patient_id=${encodeURIComponent(patientId)}`,
+      { session, role, signal },
+    ),
+
+  getRelateCarePlans: (
+    session: string,
+    role: Role,
+    patientId: string,
+    signal?: AbortSignal,
+  ) =>
+    request<RelateBatch>(
+      `/api/v1/relate/care-plans?patient_id=${encodeURIComponent(patientId)}`,
+      { session, role, signal },
+    ),
+
+  postVerifiedContext: (
+    session: string,
+    role: Role,
+    body: {
+      patient_id: string;
+      generation_id?: string | null;
+      relate_hints?: Array<{ resource_type: string; logical_id: string }>;
+    },
+    signal?: AbortSignal,
+  ) =>
+    request<VerifiedContext>("/api/v1/security/verified-context", {
+      method: "POST",
+      session,
+      role,
+      body,
       signal,
     }),
 };
@@ -207,4 +299,22 @@ export function newRequestId(): string {
     return crypto.randomUUID();
   }
   return `req-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+
+/** HTTP status for security copy. 0 means the API was not reached. */
+export function errorHttpStatus(error: unknown): number {
+  if (error instanceof ApiError) return error.status;
+  if (error instanceof ApiUnreachableError) return 0;
+  return 0;
+}
+
+export function errorCode(error: unknown): string {
+  if (error instanceof ApiError) return error.code;
+  if (error instanceof ApiUnreachableError) return "api_unreachable";
+  return "unexpected_error";
+}
+
+export function errorFieldErrors(error: unknown): Record<string, string> {
+  if (error instanceof ApiError) return error.fieldErrors;
+  return {};
 }

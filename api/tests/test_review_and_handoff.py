@@ -89,6 +89,11 @@ def test_alfred_shaped_proposal_and_review_accept(client: TestClient):
     again = client.post(f"/api/v1/facts/{prop_id}/review", headers=_hdr(sid), json=body)
     assert again.status_code == 200
     assert again.json()["state"] == "accepted"
+    readback = client.get(f"/api/v1/facts/{prop_id}", headers=_hdr(sid))
+    assert readback.status_code == 200, readback.text
+    assert readback.json()["review_state"] == "accepted"
+    assert readback.json()["reviewer_reference"] == "Practitioner/demo-reviewer"
+    assert readback.json()["version"] == 2
 
 
 def test_review_requires_clinical_role(client: TestClient):

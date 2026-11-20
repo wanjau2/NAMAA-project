@@ -22,4 +22,4 @@
 Headers:
 
 - `X-Namaa-Session` — guest workspace id (required)
-- `X-Namaa-Role` — simulated role for the action (default `coordinator`)
+- `X-Namaa-Role` — simulated role (required; `coordinator` | `clinical_reviewer` | `population_analyst`). EventSource may pass `role` as a query param. Missing role is `400 invalid_role`.

@@ -29,16 +29,34 @@ def get_workspace_id(
 
 def get_role(
     x_namaa_role: str | None = Header(default=None, alias="X-Namaa-Role"),
+    role: str | None = Query(
+        default=None,
+        description="Simulated role for EventSource (cannot set custom headers).",
+    ),
+    x_namaa_service_token: str | None = Header(
+        default=None, alias="X-Namaa-Service-Token"
+    ),
 ) -> str:
-    role = x_namaa_role or "coordinator"
+    chosen = x_namaa_role or role
     allowed = {"coordinator", "clinical_reviewer", "population_analyst"}
-    if role not in allowed:
+    if x_namaa_service_token and not chosen:
+        return "service"
+    if not chosen:
         raise AppError(
             code="invalid_role",
-            message=f"Unknown simulated role '{role}'.",
+            message=(
+                "Missing X-Namaa-Role header (or role query param for SSE). "
+                "Do not assume coordinator."
+            ),
             status_code=400,
         )
-    return role
+    if chosen not in allowed:
+        raise AppError(
+            code="invalid_role",
+            message=f"Unknown simulated role '{chosen}'.",
+            status_code=400,
+        )
+    return chosen
 
 
 def require_workspace(

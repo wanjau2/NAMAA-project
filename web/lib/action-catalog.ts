@@ -11,11 +11,8 @@
  * `GET /api/v1/meta/actions`, so drift between this file and the API is
  * detectable (see scripts/verify-api-contract.ts).
  *
- * `displayWhen` is a DISPLAY HINT, not a rule. It keeps the panel from offering
- * obviously irrelevant actions. The server decides what is actually valid and
- * answers `invalid_transition` if this hint is wrong, which the UI surfaces.
- * Ideally the API would return `available_actions` per case and even this hint
- * would go — raised as Q9.
+ * `displayWhen` is a fallback if a payload has no `available_actions`. The
+ * case detail now publishes the server list; the panel renders that.
  */
 
 import type { ActionId, CaseOut, Role, Stage } from "@/lib/api-types";
@@ -328,7 +325,18 @@ export const ACTION_CATALOG: ActionSpec[] = [
 ];
 
 export function displayableActions(c: CaseOut): ActionSpec[] {
+  if (c.available_actions != null) {
+    const allowed = new Set(c.available_actions.map((item) => item.id));
+    return ACTION_CATALOG.filter((spec) => allowed.has(spec.id));
+  }
   return ACTION_CATALOG.filter((spec) => spec.displayWhen(c));
+}
+
+export function blockedReason(c: CaseOut, actionId: ActionId): string | null {
+  return (
+    c.available_actions?.find((item) => item.id === actionId)?.blocked_reason ??
+    null
+  );
 }
 
 export const ROLE_WORDS: Record<Role, string> = {

@@ -5,15 +5,19 @@ import json
 import uuid
 from typing import Any
 
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.errors import AppError
-from app.models import Case, Command, Event
+from app.models import AppointmentBooking, Case, Command, Event, OutboxEntry
 from app.schemas import ActionRequest, ActionResponse
+from app.services.completion import validate_completion_evidence
 from app.services.outbox import build_evidence_bundle, enqueue_outbox
 from app.services.serializers import case_to_out, event_to_out
 from app.workflow.actions import ACTIONS
+from app.workflow.validation import validate_action_data
 
 # Actions that cross the application DB ↔ FHIR boundary (D004 outbox).
 FHIR_OUTBOX_ACTIONS = {"close_as_completed", "approve_pathway"}
@@ -118,13 +122,10 @@ def _apply_transition(case: Case, action: str, data: dict[str, Any]) -> None:
                 status_code=422,
                 field_errors={"evidence_type": "not_completion_evidence"},
             )
-        case.stage = "closed"
-        case.disposition = "completed"
+        # The outbox worker closes the case only after the FHIR commit.
         case.evidence_type = evidence_type
         case.evidence_reference = str(data["evidence_reference"])
-        case.next_action = "None — closed with evidence"
-        case.due_time = None
-        case.overdue = False
+        case.next_action = "Completion pending FHIR persistence"
     elif action == "close_other":
         case.stage = "closed"
         case.disposition = "clinically_closed_other"
@@ -143,7 +144,7 @@ def _apply_transition(case: Case, action: str, data: dict[str, Any]) -> None:
         )
 
 
-def apply_action(
+def _apply_action(
     db: Session,
     *,
     workspace_id: str,
@@ -198,17 +199,14 @@ def apply_action(
             request_id=request.request_id,
         )
 
-    if request.expected_revision != case.revision:
-        raise AppError(
-            code="stale_revision",
-            message=(
-                f"This case changed since the form was opened "
-                f"(expected revision {request.expected_revision}, current {case.revision}). "
-                "Reload the latest state — your entries are preserved."
-            ),
-            status_code=409,
-            request_id=request.request_id,
-        )
+    pending = db.query(OutboxEntry).filter(
+        OutboxEntry.workspace_id == workspace_id, OutboxEntry.case_id == case.id,
+        OutboxEntry.action == "close_as_completed",
+        OutboxEntry.state.in_(["pending", "processing", "compensating"]),
+    ).first()
+    if pending:
+        raise AppError(code="completion_pending", message="Completion is awaiting FHIR persistence.",
+                       status_code=409, request_id=request.request_id)
 
     if not spec.applies(case):
         raise AppError(
@@ -229,14 +227,47 @@ def apply_action(
 
     _validate_fields(spec, request.data, request.request_id)
 
+    data = validate_action_data(request.action, request.data, request.request_id)
+    if request.action == "close_as_completed":
+        validate_completion_evidence(
+            db,
+            workspace_id=workspace_id,
+            patient_id=case.patient_id,
+            evidence_type=data.get("evidence_type"),
+            evidence_reference=data.get("evidence_reference"),
+        )
+
+    # Compare-and-swap in the database. Do not trust the previously loaded revision.
+    claimed = db.execute(
+        update(Case)
+        .where(
+            Case.pk == case.pk,
+            Case.workspace_id == workspace_id,
+            Case.revision == request.expected_revision,
+        )
+        .values(revision=Case.revision + 1)
+        .execution_options(synchronize_session=False)
+    )
+    if claimed.rowcount != 1:
+        raise AppError(
+            code="stale_revision",
+            message=(
+                f"This case changed since the form was opened "
+                f"(expected revision {request.expected_revision}). "
+                "Reload the latest state — your entries are preserved."
+            ),
+            status_code=409,
+            request_id=request.request_id,
+        )
+    db.refresh(case)
+
     prior = _state_label(case)
-    _apply_transition(case, request.action, request.data)
-    case.revision += 1
+    _apply_transition(case, request.action, data)
     new_state = _state_label(case)
 
-    reason = request.data.get("reason")
+    reason = data.get("reason")
     reason_str = reason.strip() if isinstance(reason, str) and reason.strip() else None
-    evidence_ref = request.data.get("evidence_reference")
+    evidence_ref = data.get("evidence_reference")
     evidence_str = (
         evidence_ref.strip()
         if isinstance(evidence_ref, str) and evidence_ref.strip()
@@ -255,11 +286,22 @@ def apply_action(
         reason=reason_str,
         evidence_reference=evidence_str,
         request_id=request.request_id,
+        outcome=data.get("attended") if request.action == "record_attendance" else None,
     )
     db.add(event)
+    booking = None
+    if request.action == "book_appointment":
+        booking = AppointmentBooking(
+            workspace_id=workspace_id, case_id=case.id, event_id=event.id,
+            appointment_time=data["appointment_time"], location=data["location"],
+        )
+        db.add(booking)
     db.flush()
 
-    response = ActionResponse(case=case_to_out(db, case), event=event_to_out(event))
+    response = ActionResponse(case=case_to_out(db, case), event=event_to_out(event, booking=booking))
+
+    if request.action == "close_as_completed":
+        response.case.completion_status = "pending"
 
     outbox_id = None
     saga_state = "app_committed"
@@ -268,9 +310,9 @@ def apply_action(
             bundle = build_evidence_bundle(
                 case_id=case.id,
                 patient_id=case.patient_id,
-                evidence_type=str(request.data.get("evidence_type") or case.evidence_type),
+                evidence_type=str(data.get("evidence_type") or case.evidence_type),
                 evidence_reference=str(
-                    request.data.get("evidence_reference") or case.evidence_reference
+                    data.get("evidence_reference") or case.evidence_reference
                 ),
                 disposition="completed",
             )
@@ -305,7 +347,9 @@ def apply_action(
         outbox = enqueue_outbox(
             db,
             workspace_id=workspace_id,
-            request_id=f"case.{case.id}.{request.request_id}"[:64],
+            request_id="case." + hashlib.sha256(
+                f"{case.id}:{request.request_id}".encode()
+            ).hexdigest()[:59],
             action=request.action,
             bundle=bundle,
             case_id=case.id,
@@ -330,3 +374,31 @@ def apply_action(
     db.commit()
     db.refresh(case)
     return response
+
+
+def apply_action(
+    db: Session,
+    *,
+    workspace_id: str,
+    case: Case,
+    request: ActionRequest,
+    role: str,
+) -> ActionResponse:
+    try:
+        return _apply_action(db, workspace_id=workspace_id, case=case, request=request, role=role)
+    except Exception as exc:
+        # Release the revision reservation and discard all partial effects.
+        db.rollback()
+        db.expire(case)
+        retryable = isinstance(exc, IntegrityError) or (
+            isinstance(exc, AppError) and exc.code == "stale_revision"
+        )
+        if retryable:
+            # A concurrent identical request may have committed while we waited.
+            existing = db.query(Command).filter_by(
+                workspace_id=workspace_id, request_id=request.request_id
+            ).one_or_none()
+            if existing is not None:
+                return _apply_action(db, workspace_id=workspace_id, case=case,
+                                     request=request, role=role)
+        raise

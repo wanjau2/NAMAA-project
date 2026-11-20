@@ -4,6 +4,7 @@ import json
 import uuid
 from datetime import date
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.ai_runtime import ensure_namaa_ai
@@ -239,11 +240,26 @@ def run_evaluation(
             gap.uncertainty = uncertainty
             gap.explanation = explanation
             gap.suggested_review_action = suggested
-            open_case.flag_status = case_flag
-            open_case.next_action = suggested
-            open_case.revision += 1
-            db.flush()
-            case_out = case_to_out(db, open_case)
+            claimed = db.execute(
+                update(Case)
+                .where(
+                    Case.pk == open_case.pk,
+                    Case.workspace_id == workspace_id,
+                    Case.stage != "closed",
+                )
+                .values(
+                    flag_status=case_flag,
+                    next_action=suggested,
+                    revision=Case.revision + 1,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if claimed.rowcount != 1:
+                case_out = None
+            else:
+                db.refresh(open_case)
+                db.flush()
+                case_out = case_to_out(db, open_case)
 
     db.commit()
     legacy = handoff.legacy_flag_status or "not_eligible"

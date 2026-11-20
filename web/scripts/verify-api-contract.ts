@@ -61,12 +61,21 @@ let session = "";
 
 async function call(
   path: string,
-  init: { method?: string; body?: unknown; role?: string; noSession?: boolean } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    role?: string;
+    noSession?: boolean;
+    omitRole?: boolean;
+  } = {},
 ): Promise<{ status: number; json: Json }> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
   if (!init.noSession && session) headers["X-Namaa-Session"] = session;
   if (init.role) headers["X-Namaa-Role"] = init.role;
+  else if (!init.noSession && session && init.omitRole !== true) {
+    headers["X-Namaa-Role"] = "coordinator";
+  }
 
   const response = await fetch(`${BASE}${path}`, {
     method: init.method ?? "GET",
@@ -140,6 +149,21 @@ async function main() {
       Array.isArray(detail.json.detail?.factors) &&
       Array.isArray(detail.json.detail?.missing) &&
       Array.isArray(detail.json.detail?.events),
+  );
+  const booked = await call("/api/v1/cases/case-0002");
+  const available = new Set(
+    (booked.json.available_actions ?? []).map((a: Json) => a.id),
+  );
+  check(
+    "case-0002 publishes record_attendance in available_actions",
+    available.has("record_attendance") && !available.has("book_appointment"),
+    `got ${[...available].join(",")}`,
+  );
+  const noRole = await call("/api/v1/cases", { omitRole: true });
+  check(
+    "a call without X-Namaa-Role is rejected",
+    noRole.status === 400 && noRole.json.code === "invalid_role",
+    `got ${noRole.status}/${noRole.json.code}`,
   );
 
   // --- catalog drift against the server's own published contract ---
@@ -583,11 +607,14 @@ async function main() {
       .every((c: Json) => Boolean(c.reason) && typeof c.threshold === "number"),
   );
   const suppressed = cells.filter((c: Json) => c.suppressed).length;
+  const published = cells.filter((c: Json) => !c.suppressed);
+  check(
+    "reporting cohort publishes at least one unsuppressed cell",
+    published.length > 0,
+    `${suppressed}/${cells.length} suppressed`,
+  );
   console.log(
-    `NOTE  ${suppressed}/${cells.length} analytics cells suppressed at this seed size` +
-      (suppressed === cells.length
-        ? " — nothing is publishable; the reporting cohort is smaller than the threshold"
-        : ""),
+    `NOTE  ${suppressed}/${cells.length} analytics cells suppressed at this seed size`,
   );
 
   // --- reset restores the seed for this session only ---
