@@ -91,3 +91,22 @@ role-less `<span>`. Both fixed (`role="status"`, text hidden below 640px).
   requires the fact-review endpoint that does not exist (Q10). The child journey is therefore
   demonstrated from `case-0002` at `booked`.
 - Arabic UI copy — only the toggle, `dir` mirroring and bidi isolation are verified (Q2).
+
+---
+
+# Addendum — 2026-11-20
+
+The **36/36** result above is the 18 November suite. Do not rewrite it to match later counts.
+
+Since then:
+
+- `npm run verify:contrast` computes badge/brand ratios from `web/app/globals.css` and records
+  `prefers-reduced-motion` in that file.
+- Accessibility coverage adds current-page `aria-current`, the reset `alertdialog`, reduced-motion
+  skeleton, inspector claims (no HAPI / no `CarePlan/` version inference), and denied `outbox.read`.
+- RTL still requires the English **Unreviewed demo translation** badge. Chrome labels may switch
+  to unreviewed Arabic; the worklist heading stays English (Q2).
+- CORS on ports other than 3000 and the standalone `npm start` path were addressed in M14. The
+  environment findings in this file are historical.
+- Q10 review persist and Q11 document listing now exist; the child-pathway note above is
+  historical. Journeys still start the attended path from `case-0002` at `booked`.

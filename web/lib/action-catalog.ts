@@ -11,8 +11,10 @@
  * `GET /api/v1/meta/actions`, so drift between this file and the API is
  * detectable (see scripts/verify-api-contract.ts).
  *
- * `displayWhen` is a fallback if a payload has no `available_actions`. The
- * case detail now publishes the server list; the panel renders that.
+ * `displayWhen` is a last-resort display hint when `available_actions` is
+ * absent from the payload. Live case detail always publishes the server list;
+ * the panel renders that list and never invents authorization from these
+ * predicates.
  */
 
 import type { ActionId, CaseOut, Role, Stage } from "@/lib/api-types";
@@ -325,7 +327,7 @@ export const ACTION_CATALOG: ActionSpec[] = [
 ];
 
 export function displayableActions(c: CaseOut): ActionSpec[] {
-  if (c.available_actions != null) {
+  if (Array.isArray(c.available_actions)) {
     const allowed = new Set(c.available_actions.map((item) => item.id));
     return ACTION_CATALOG.filter((spec) => allowed.has(spec.id));
   }

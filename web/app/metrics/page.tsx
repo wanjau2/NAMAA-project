@@ -3,9 +3,10 @@
 /**
  * Population dashboard (theme §5, work plan F5, design specification §10).
  *
- * Funnel and disposition counts are the live API release. This session's
+ * Funnel, dispositions and segments are the live API release. This session's
  * worklist activity is reported separately so a dashboard does not invent a
- * projection refresh.
+ * projection refresh. Timeliness cards are labelled design examples — they
+ * are not in the analytics API.
  */
 
 import { useMemo } from "react";
@@ -14,6 +15,12 @@ import { ApiAnalyticsPanel } from "@/components/api-analytics-panel";
 import { useCaseStore } from "@/lib/case-store";
 import { useDemoSession } from "@/lib/demo-session";
 import { sessionActivity } from "@/lib/metrics";
+
+const TIMELINESS_EXAMPLES = [
+  "Median time to invitation",
+  "Median time to attendance",
+  "Overdue task rate",
+] as const;
 
 export default function MetricsPage() {
   const { rows } = useCaseStore();
@@ -53,12 +60,34 @@ export default function MetricsPage() {
         <ApiAnalyticsPanel />
       </div>
 
-      <section className="mt-6 rounded-lg border border-border bg-surface p-5">
-        <h2 className="text-lg text-ink">This session</h2>
+      <section className="mt-6 rounded-lg border border-dashed border-border bg-surface p-5">
+        <h2 className="text-lg text-ink">Timeliness</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Actions taken in this guest session are reported separately until the
-          next projection refresh. A dashboard that folds them in silently would
-          imply a refresh that did not happen.
+          Design example — not in this API. Not computed from this worklist and
+          not a live metric. These views wait on an equivalent API aggregate.
+        </p>
+        <ul className="mt-4 divide-y divide-border rounded-md border border-border">
+          {TIMELINESS_EXAMPLES.map((label) => (
+            <li
+              key={label}
+              className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+            >
+              <span className="text-ink">{label}</span>
+              <span className="font-mono-tech text-xs text-ink-muted">
+                Not published
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-border bg-surface p-5">
+        <h2 className="text-lg text-ink">This worklist session</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Operational counts from the six-case coordinator worklist in this
+          guest session. They are not the population publication family, are
+          not small-cell suppressed, and must not be folded into the live
+          funnel as if a projection refresh happened.
         </p>
         <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Stat

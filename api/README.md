@@ -36,6 +36,12 @@ uvicorn app.main:app --reload --port 8000
 - OpenAPI: <http://127.0.0.1:8000/docs>
 - Actions catalog: <http://127.0.0.1:8000/api/v1/meta/actions>
 
+CORS: `NAMAA_CORS_ORIGINS` must list every browser origin that will call this
+API (scheme, host, and port). The default is
+`http://localhost:3000,http://127.0.0.1:3000`. The web client bakes
+`NEXT_PUBLIC_API_BASE_URL` at `next build` time; that URL must be reachable
+from the browser, not only from inside Docker.
+
 ## Guest session
 
 1. `POST /api/v1/demo/sessions` → `{ "session_id": "guest-..." }`

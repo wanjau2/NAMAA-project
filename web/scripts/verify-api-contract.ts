@@ -12,27 +12,20 @@
  */
 
 import { ACTION_CATALOG } from "../lib/action-catalog.ts";
+import { sliceCodePoints } from "../lib/text-offsets.ts";
 
 const BASE = process.env.NAMAA_API_BASE ?? "http://127.0.0.1:8000";
 
+const CANONICAL_OUTCOMES = [
+  "gap_identified",
+  "no_gap_identified_in_available_data",
+  "needs_review",
+  "not_eligible",
+] as const;
+
 let pass = 0;
 let fail = 0;
-let pending = 0;
 
-/**
- * A capability the team has agreed but the API does not implement yet.
- * Reported loudly, but it does NOT fail the suite: this is a readiness gate,
- * not a regression. When it flips to PASS the frontend is already wired.
- */
-function readiness(name: string, implemented: boolean, note: string) {
-  if (implemented) {
-    pass++;
-    console.log(`PASS  ${name}`);
-  } else {
-    pending++;
-    console.log(`PENDING  ${name} — ${note}`);
-  }
-}
 function check(name: string, condition: boolean, detail = "") {
   if (condition) {
     pass++;
@@ -67,13 +60,15 @@ async function call(
     role?: string;
     noSession?: boolean;
     omitRole?: boolean;
+    session?: string;
   } = {},
 ): Promise<{ status: number; json: Json }> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
-  if (!init.noSession && session) headers["X-Namaa-Session"] = session;
+  const sid = init.session ?? session;
+  if (!init.noSession && sid) headers["X-Namaa-Session"] = sid;
   if (init.role) headers["X-Namaa-Role"] = init.role;
-  else if (!init.noSession && session && init.omitRole !== true) {
+  else if (!init.noSession && sid && init.omitRole !== true) {
     headers["X-Namaa-Role"] = "coordinator";
   }
 
@@ -98,6 +93,95 @@ function action(
   data: Record<string, unknown> = {},
 ) {
   return { action: id, expected_revision, request_id, data };
+}
+
+function issueCodes(p: Json): string[] {
+  return (Array.isArray(p.issues) ? p.issues : []).map((i: Json) =>
+    String(i.code),
+  );
+}
+
+function excerptMatchesNote(note: string, p: Json): boolean {
+  const start = p.offset_start;
+  const end = p.offset_end;
+  if (typeof start !== "number" || typeof end !== "number") return false;
+  return sliceCodePoints(note, start, end) === proposalExcerpt(p);
+}
+
+function nestedFact(p: Json): Json | null {
+  return p?.fact && typeof p.fact === "object" ? (p.fact as Json) : null;
+}
+
+function reviewBody(
+  proposal: Json,
+  action: "accept" | "correct" | "reject",
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    request_id: extra.request_id ?? `rev-${action}-${proposal.id}`,
+    proposal_id: proposal.id,
+    expected_proposal_version: extra.expected_proposal_version ?? proposal.version,
+    action,
+    reviewer_reference: "Practitioner/demo-reviewer",
+    reason:
+      extra.reason ??
+      "Synthetic reviewer decision for the API contract check.",
+    correction: extra.correction ?? null,
+    acknowledged_issues: extra.acknowledged_issues ?? issueCodes(proposal),
+  };
+}
+
+async function readSseTerminal(jobId: string, sid: string): Promise<Json | null> {
+  const url =
+    `${BASE}/api/v1/extractions/${encodeURIComponent(jobId)}/events` +
+    `?session=${encodeURIComponent(sid)}&role=clinical_reviewer`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 20_000);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "text/event-stream",
+        "X-Namaa-Session": sid,
+        "X-Namaa-Role": "clinical_reviewer",
+      },
+      signal: ac.signal,
+    });
+    if (!res.ok || !res.body) return { __http: res.status };
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop() ?? "";
+      for (const block of parts) {
+        const dataLine = block
+          .split("\n")
+          .find((line) => line.startsWith("data:"));
+        if (!dataLine) continue;
+        let payload: Json = {};
+        try {
+          payload = JSON.parse(dataLine.slice(5).trim()) as Json;
+        } catch {
+          return { __malformed: true, raw: dataLine };
+        }
+        if (
+          ["succeeded", "failed", "cancelled", "timed_out"].includes(
+            payload.state,
+          )
+        ) {
+          return payload;
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function main() {
@@ -132,6 +216,15 @@ async function main() {
     "session response carries the synthetic notice",
     String(created.json.notice).includes("NOT FOR CLINICAL USE"),
   );
+  const isolated = await call("/api/v1/demo/sessions", {
+    method: "POST",
+    noSession: true,
+  });
+  const session2 = String(isolated.json.session_id ?? "");
+  check(
+    "a second guest session is created for isolation checks",
+    isolated.status === 200 && Boolean(session2) && session2 !== session,
+  );
 
   // --- seed ---
   const list = await call("/api/v1/cases");
@@ -150,6 +243,21 @@ async function main() {
       Array.isArray(detail.json.detail?.missing) &&
       Array.isArray(detail.json.detail?.events),
   );
+  check(
+    "case detail publishes available_actions from the server",
+    Array.isArray(detail.json.available_actions) &&
+      detail.json.available_actions.every(
+        (a: Json) => typeof a.id === "string" && typeof a.permitted_role === "string",
+      ),
+  );
+  const listedDocs = await call("/api/v1/cases/case-0001/documents");
+  check(
+    "case-0001 document listing is authoritative (no client fallback map)",
+    listedDocs.status === 200 &&
+      Array.isArray(listedDocs.json) &&
+      listedDocs.json.some((d: Json) => d.id === "doc-synthetic-11"),
+    `status ${listedDocs.status}`,
+  );
   const booked = await call("/api/v1/cases/case-0002");
   const available = new Set(
     (booked.json.available_actions ?? []).map((a: Json) => a.id),
@@ -158,6 +266,34 @@ async function main() {
     "case-0002 publishes record_attendance in available_actions",
     available.has("record_attendance") && !available.has("book_appointment"),
     `got ${[...available].join(",")}`,
+  );
+  const audit = await call("/api/v1/audit/events");
+  check(
+    "coordinator can list audit events",
+    audit.status === 200 && Array.isArray(audit.json),
+    `status ${audit.status}`,
+  );
+  const outbox = await call("/api/v1/ops/outbox");
+  check(
+    "coordinator can list the stub FHIR outbox",
+    outbox.status === 200 && Array.isArray(outbox.json),
+    `status ${outbox.status}`,
+  );
+  const reviewerOutbox = await call("/api/v1/ops/outbox", {
+    role: "clinical_reviewer",
+  });
+  check(
+    "clinical reviewer is denied outbox.read",
+    reviewerOutbox.status === 403,
+    `status ${reviewerOutbox.status}`,
+  );
+  const reviewerAudit = await call("/api/v1/audit/events", {
+    role: "clinical_reviewer",
+  });
+  check(
+    "clinical reviewer can list audit events",
+    reviewerAudit.status === 200 && Array.isArray(reviewerAudit.json),
+    `status ${reviewerAudit.status}`,
   );
   const noRole = await call("/api/v1/cases", { omitRole: true });
   check(
@@ -327,20 +463,42 @@ async function main() {
     method: "POST",
     role: "clinical_reviewer",
     body: action("close_as_completed", 5, "c-complete", {
-      evidence_type: "Procedure",
-      evidence_reference: "Procedure/proc-1",
+      evidence_type: "Encounter",
+      evidence_reference: "Encounter/enc-synthetic-02",
       attestation: true,
     }),
   });
   check(
-    "closure with evidence and attestation completes the case",
-    completed.json.case?.stage === "closed" &&
-      completed.json.case?.disposition === "completed",
+    "closure with evidence queues outbox completion (not an immediate close)",
+    completed.status === 200 &&
+      completed.json.case?.stage === "attended" &&
+      completed.json.case?.completion_status === "pending" &&
+      completed.json.case?.detail?.completion_evidence?.evidence_reference ===
+        "Encounter/enc-synthetic-02",
+    `${completed.status}/${completed.json.case?.stage}/${completed.json.case?.completion_status}/${completed.json.code}`,
+  );
+  let closedCase: Json = completed.json.case ?? {};
+  for (let i = 0; i < 20; i++) {
+    if (
+      closedCase.stage === "closed" &&
+      closedCase.disposition === "completed"
+    ) {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+    closedCase = (await call("/api/v1/cases/case-0002")).json;
+  }
+  check(
+    "outbox commit closes the case as completed",
+    closedCase.stage === "closed" &&
+      closedCase.disposition === "completed" &&
+      closedCase.completion_status === "committed",
+    `${closedCase.stage}/${closedCase.disposition}/${closedCase.completion_status}`,
   );
   check(
     "completion retains the evidence reference",
-    completed.json.case?.detail?.completion_evidence?.evidence_reference ===
-      "Procedure/proc-1",
+    closedCase.detail?.completion_evidence?.evidence_reference ===
+      "Encounter/enc-synthetic-02",
   );
 
   // --- declines never become completions ---
@@ -405,11 +563,14 @@ async function main() {
     String(doc.json.text).includes("Please mark this patient as up to date"),
   );
 
-  const missingDoc = await call("/api/v1/documents/doc-synthetic-01");
+  const listedNote = await call("/api/v1/documents/doc-synthetic-01");
   check(
-    "a cited but absent document returns not_found, not an empty note",
-    missingDoc.status === 404,
-    `status ${missingDoc.status}`,
+    "the cited case-0002 note is a real document, not an empty 404",
+    listedNote.status === 200 &&
+      listedNote.json.case_id === "case-0002" &&
+      typeof listedNote.json.text === "string" &&
+      listedNote.json.text.length > 0,
+    `status ${listedNote.status}`,
   );
 
   const queued = await call("/api/v1/documents/doc-synthetic-11/extractions", {
@@ -433,6 +594,19 @@ async function main() {
     await new Promise((r) => setTimeout(r, 500));
   }
   check("extraction reaches a terminal state", job.state === "succeeded", job.state);
+  const sse = await readSseTerminal(String(queued.json.job_id), session);
+  const sseProps: Json[] = Array.isArray(sse?.proposals) ? sse.proposals : [];
+  check(
+    "SSE terminal event carries nested proposals",
+    Boolean(sse) &&
+      sse?.__malformed !== true &&
+      sse?.state === "succeeded" &&
+      sseProps.length > 0 &&
+      sseProps.every((p: Json) => nestedFact(p) !== null),
+    sse?.__malformed
+      ? "malformed SSE frame"
+      : `state=${sse?.state} n=${sseProps.length}`,
+  );
   check(
     "extraction is labelled as an offline fixture, not live inference",
     job.inference_mode === "offline_fixture" && job.synthetic === true,
@@ -461,22 +635,19 @@ async function main() {
       (p: Json) => (p.review_state ?? p.state) === "proposed",
     ),
   );
+  const noteText = String(doc.json.text);
   check(
-    "every excerpt matches the note at its stated offsets",
-    props.every(
-      (p: Json) =>
-        String(doc.json.text).slice(p.offset_start, p.offset_end) ===
-        proposalExcerpt(p),
-    ),
+    "every excerpt matches the note at Unicode code-point offsets",
+    props.every((p: Json) => excerptMatchesNote(noteText, p)),
     JSON.stringify(
-      props
-        .filter(
-          (p: Json) =>
-            String(doc.json.text).slice(p.offset_start, p.offset_end) !==
-            proposalExcerpt(p),
-        )
-        .map((p: Json) => p.id),
+      props.filter((p: Json) => !excerptMatchesNote(noteText, p)).map((p: Json) => p.id),
     ),
+  );
+  const astral = "A😀B";
+  check(
+    "code-point slice diverges from UTF-16 String.slice on an astral character",
+    sliceCodePoints(astral, 1, 2) === "😀" && astral.slice(1, 2) !== "😀",
+    `cp=${sliceCodePoints(astral, 1, 2)} utf16=${astral.slice(1, 2)}`,
   );
   check(
     "no proposal is derived from the instruction-like sentence",
@@ -519,62 +690,325 @@ async function main() {
     adultDoc.json.case_id === "case-0003",
   );
 
-
-  // --- readiness: agreed capabilities (flip PENDING→PASS when API ships them) ---
-  const nestedShape = props.length > 0 && typeof props[0].fact === "object";
-  readiness(
+  // --- nested proposal contract (required, not a readiness probe) ---
+  check(
     "proposals use the nested `fact` contract",
-    nestedShape,
-    "proposals are still flat; the UI reads both shapes (lib/contracts.ts normalizeProposal)",
+    props.length > 0 && nestedFact(props[0]) !== null,
+    props[0] ? "fact missing" : "no proposals",
   );
-  readiness(
+  check(
     "proposals carry an integer concurrency version",
     props.length > 0 && typeof props[0].version === "number",
-    "no version is supplied, so a review command cannot be built without inventing one",
   );
-  readiness(
-    "proposals carry validation issues",
+  check(
+    "proposals carry validation issues as an array (empty is not 'none found')",
     props.length > 0 && Array.isArray(props[0].issues),
-    "issues are not reported; an empty list must not read as 'none found'",
   );
-  readiness(
+  check(
     "proposals carry a source hash binding them to an exact note",
-    props.length > 0 && typeof props[0].source_sha256 === "string",
-    "source_sha256 is absent",
+    props.length > 0 &&
+      typeof props[0].source_sha256 === "string" &&
+      /^[a-f0-9]{64}$/.test(String(props[0].source_sha256)),
+  );
+  check(
+    "malformed nested proposals fail the suite rather than a readiness gate",
+    props.every(
+      (p: Json) =>
+        nestedFact(p) !== null &&
+        typeof p.version === "number" &&
+        Array.isArray(p.issues) &&
+        typeof p.source_sha256 === "string",
+    ),
   );
 
-  const reviewProbe = await call(
-    `/api/v1/facts/${props[0]?.id ?? "unknown"}/review`,
-    {
+  const first = props[0];
+  const second = props[1];
+  const firstIssues = issueCodes(first);
+  check(
+    "at least one child proposal carries a review-severity issue to acknowledge",
+    firstIssues.length > 0,
+    JSON.stringify(first?.issues ?? null),
+  );
+
+  const unacked = await call(`/api/v1/facts/${first.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(first, "accept", {
+      request_id: "rev-unacked",
+      acknowledged_issues: [],
+    }),
+  });
+  check(
+    "unacknowledged review-severity issues are refused",
+    unacked.status === 422 &&
+      (unacked.json.code === "validation_failed" ||
+        String(unacked.json.message ?? "").includes("review_issues_not_acknowledged")),
+    `${unacked.status}/${unacked.json.code}`,
+  );
+
+  const acceptId = "rev-accept-persist";
+  const accepted = await call(`/api/v1/facts/${first.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(first, "accept", { request_id: acceptId }),
+  });
+  check(
+    "accept persists with nested fact and stub FHIR gateway",
+    accepted.status === 200 &&
+      accepted.json.state === "accepted" &&
+      accepted.json.fhir_gateway === "stub" &&
+      typeof accepted.json.resulting_proposal_version === "number",
+    `${accepted.status}/${accepted.json.state}/${accepted.json.code}`,
+  );
+
+  const acceptReplay = await call(`/api/v1/facts/${first.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(first, "accept", { request_id: acceptId }),
+  });
+  check(
+    "lost-response replay of the same review request_id returns the first result",
+    acceptReplay.status === 200 &&
+      acceptReplay.json.state === "accepted" &&
+      acceptReplay.json.resulting_proposal_version ===
+        accepted.json.resulting_proposal_version,
+    `${acceptReplay.status}/${acceptReplay.json.state}`,
+  );
+
+  const acceptConflict = await call(`/api/v1/facts/${first.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(first, "accept", {
+      request_id: acceptId,
+      reason: "Different payload for the same request_id must conflict.",
+    }),
+  });
+  check(
+    "a review request_id reused with a different payload is rejected",
+    acceptConflict.status === 409 &&
+      acceptConflict.json.code === "idempotency_conflict",
+    `${acceptConflict.status}/${acceptConflict.json.code}`,
+  );
+
+  const staleReview = await call(`/api/v1/facts/${first.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(first, "accept", {
+      request_id: "rev-stale-version",
+      expected_proposal_version: 1,
+    }),
+  });
+  check(
+    "a stale proposal version is refused",
+    staleReview.status === 409 && staleReview.json.code === "stale_revision",
+    `${staleReview.status}/${staleReview.json.code}`,
+  );
+
+  const acceptRead = await call(`/api/v1/facts/${first.id}`, {
+    role: "clinical_reviewer",
+  });
+  check(
+    "GET fact readback shows accepted state and bumped version",
+    acceptRead.status === 200 &&
+      acceptRead.json.review_state === "accepted" &&
+      acceptRead.json.version === accepted.json.resulting_proposal_version &&
+      nestedFact(acceptRead.json) !== null,
+    `${acceptRead.status}/${acceptRead.json.review_state}/v${acceptRead.json.version}`,
+  );
+
+  const rejected = await call(`/api/v1/facts/${second.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(second, "reject", { request_id: "rev-reject-persist" }),
+  });
+  check(
+    "reject persists",
+    rejected.status === 200 && rejected.json.state === "rejected",
+    `${rejected.status}/${rejected.json.state}/${rejected.json.code}`,
+  );
+  const rejectRead = await call(`/api/v1/facts/${second.id}`, {
+    role: "clinical_reviewer",
+  });
+  check(
+    "GET fact readback shows rejected state",
+    rejectRead.status === 200 && rejectRead.json.review_state === "rejected",
+    `${rejectRead.status}/${rejectRead.json.review_state}`,
+  );
+
+  const family = adultProps.find(
+    (p: Json) => nestedFact(p)?.subject === "family_member",
+  );
+  const screening = adultProps.find(
+    (p: Json) => nestedFact(p)?.subject === "patient",
+  );
+  check("adult extraction produced a family-member proposal", Boolean(family));
+  const familyFact = nestedFact(family ?? {});
+  const corrected = await call(`/api/v1/facts/${family?.id}/review`, {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: reviewBody(family ?? {}, "correct", {
+      request_id: "rev-correct-persist",
+      correction: familyFact
+        ? {
+            concept: familyFact.concept,
+            value_text: "a sibling was diagnosed with bowel cancer",
+            subject: familyFact.subject,
+            assertion: familyFact.assertion,
+            effective_date: familyFact.effective_date ?? null,
+            excerpt: familyFact.excerpt,
+            proposed_resource_type: familyFact.proposed_resource_type,
+            relationship: familyFact.relationship ?? "sibling",
+          }
+        : null,
+    }),
+  });
+  check(
+    "correct persists a replacement fact",
+    corrected.status === 200 &&
+      corrected.json.state === "corrected" &&
+      corrected.json.fhir_gateway === "stub",
+    `${corrected.status}/${corrected.json.state}/${corrected.json.code}`,
+  );
+  const correctRead = await call(`/api/v1/facts/${family?.id}`, {
+    role: "clinical_reviewer",
+  });
+  check(
+    "GET fact readback shows the corrected value",
+    correctRead.status === 200 &&
+      correctRead.json.review_state === "corrected" &&
+      nestedFact(correctRead.json)?.value_text ===
+        "a sibling was diagnosed with bowel cancer",
+    `${correctRead.status}/${correctRead.json.review_state}/${nestedFact(correctRead.json)?.value_text}`,
+  );
+
+  const coordinatorReview = await call(`/api/v1/facts/${screening?.id}/review`, {
+    method: "POST",
+    role: "coordinator",
+    body: reviewBody(screening ?? {}, "reject", {
+      request_id: "rev-coordinator-forbidden",
+    }),
+  });
+  check(
+    "coordinator cannot apply review",
+    coordinatorReview.status === 403,
+    `${coordinatorReview.status}/${coordinatorReview.json.code}`,
+  );
+
+  // --- four canonical outcomes, including case: null ---
+  const noLatest = await call(
+    "/api/v1/patients/pat-synthetic-11/evaluations/latest",
+    { role: "clinical_reviewer" },
+  );
+  check(
+    "GET latest evaluation is 404 when none is stored",
+    noLatest.status === 404,
+    `${noLatest.status}`,
+  );
+
+  const expectedEvals: Record<
+    string,
+    { outcome: (typeof CANONICAL_OUTCOMES)[number]; caseNull: boolean }
+  > = {
+    "pat-synthetic-11": { outcome: "needs_review", caseNull: false },
+    "pat-synthetic-12": { outcome: "gap_identified", caseNull: false },
+    "pat-synthetic-13": {
+      outcome: "no_gap_identified_in_available_data",
+      caseNull: true,
+    },
+    "pat-synthetic-32": { outcome: "not_eligible", caseNull: true },
+  };
+  for (const [patientId, expect] of Object.entries(expectedEvals)) {
+    const posted = await call(`/api/v1/patients/${patientId}/evaluations`, {
       method: "POST",
       role: "clinical_reviewer",
-      body: {
-        request_id: "probe",
-        proposal_id: props[0]?.id ?? "unknown",
-        expected_proposal_version: 1,
-        action: "accept",
-        reviewer_reference: "Practitioner/demo-reviewer",
-        reason: "readiness probe",
-        correction: null,
-        acknowledged_issues: [],
-      },
-    },
+      body: {},
+    });
+    const outcome = posted.json.rule_evaluation?.outcome;
+    check(
+      `${patientId} returns canonical outcome ${expect.outcome}`,
+      posted.status === 200 &&
+        outcome === expect.outcome &&
+        CANONICAL_OUTCOMES.includes(outcome),
+      `status=${posted.status} outcome=${outcome} flag=${posted.json.flag_status}`,
+    );
+    check(
+      `${patientId} case is ${expect.caseNull ? "null" : "present"}`,
+      expect.caseNull ? posted.json.case === null : posted.json.case != null,
+      `case=${posted.json.case === null ? "null" : typeof posted.json.case}`,
+    );
+    const latest = await call(
+      `/api/v1/patients/${patientId}/evaluations/latest`,
+      { role: "clinical_reviewer" },
+    );
+    check(
+      `${patientId} latest evaluation readback matches`,
+      latest.status === 200 &&
+        latest.json.rule_evaluation?.outcome === expect.outcome,
+      `${latest.status}/${latest.json.rule_evaluation?.outcome}`,
+    );
+  }
+
+  // --- verified context: records, not AssembledContext ---
+  const verified = await call("/api/v1/security/verified-context", {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: { patient_id: "pat-synthetic-11" },
+  });
+  check(
+    "verified-context returns records with scope and expiry",
+    verified.status === 200 &&
+      Array.isArray(verified.json.records) &&
+      verified.json.exhaustive === false &&
+      verified.json.absence_claims_allowed === false &&
+      typeof verified.json.expires_at === "string" &&
+      typeof verified.json.checked_scope === "string" &&
+      verified.json.authorized === true,
+    `${verified.status} exhaustive=${verified.json.exhaustive}`,
   );
-  readiness(
-    "POST /api/v1/facts/{id}/review exists",
-    reviewProbe.status !== 404 && reviewProbe.status !== 405,
-    `returns ${reviewProbe.status}; review decisions cannot persist (Q10)`,
+  check(
+    "verified-context does not invent AssembledContext items/query/tiers",
+    !Array.isArray(verified.json.items) &&
+      verified.json.query == null &&
+      verified.json.tiers == null,
+  );
+  const staleContext = await call("/api/v1/security/verified-context", {
+    method: "POST",
+    role: "clinical_reviewer",
+    body: {
+      patient_id: "pat-synthetic-11",
+      generation_id: "not-the-current-generation",
+    },
+  });
+  check(
+    "a mismatched generation_id is marked stale, not current",
+    staleContext.status === 200 && staleContext.json.state === "stale",
+    `${staleContext.status}/${staleContext.json.state}`,
   );
 
-  const evalProbe = await call("/api/v1/patients/pat-synthetic-11/evaluations", {
-    method: "POST",
-    body: {},
-  });
-  readiness(
-    "evaluations expose a four-value rule outcome",
-    typeof evalProbe.json.outcome === "string" ||
-      typeof evalProbe.json.rule_evaluation?.outcome === "string",
-    `only flag_status "${evalProbe.json.flag_status}" is returned; not_eligible cannot reach the UI (Q12)`,
+  const relateFamily = await call(
+    "/api/v1/relate/family-history?patient_id=pat-synthetic-11",
+    { role: "clinical_reviewer" },
+  );
+  const relatePlans = await call(
+    "/api/v1/relate/care-plans?patient_id=pat-synthetic-11",
+    { role: "clinical_reviewer" },
+  );
+  check(
+    "Relate family-history and care-plans return candidates without authorizing",
+    relateFamily.status === 200 &&
+      Array.isArray(relateFamily.json.candidates) &&
+      relatePlans.status === 200 &&
+      Array.isArray(relatePlans.json.candidates),
+    `${relateFamily.status}/${relatePlans.status}`,
+  );
+  const relateForeign = await call(
+    "/api/v1/relate/care-plans?patient_id=pat-not-in-workspace",
+    { role: "clinical_reviewer" },
+  );
+  check(
+    "Relate does not authorize a foreign patient",
+    relateForeign.status === 403,
+    `${relateForeign.status}`,
   );
 
   // --- security: 403 and 404 must be indistinguishable to a client ---
@@ -585,7 +1019,7 @@ async function main() {
     `status ${foreignDoc.status}`,
   );
 
-  // --- analytics: server-side suppression shape ---
+  // --- analytics: one suppression family for overview and segments ---
   const overview = await call("/api/v1/analytics/overview");
   const cells: Json[] = (overview.json.pathways ?? []).flatMap((p: Json) =>
     Object.entries(p)
@@ -595,16 +1029,18 @@ async function main() {
   check("analytics reports both pathways", overview.json.pathways?.length === 2);
   check("analytics declares synthetic", overview.json.synthetic === true);
   check(
-    "suppressed cells carry no numerator or denominator",
+    "suppressed overview cells carry no numerator or denominator",
     cells
       .filter((c: Json) => c.suppressed)
       .every((c: Json) => c.numerator === null && c.denominator === null),
   );
   check(
-    "suppressed cells state a reason and threshold",
+    "suppressed overview cells state a reason and threshold ≥ 10",
     cells
       .filter((c: Json) => c.suppressed)
-      .every((c: Json) => Boolean(c.reason) && typeof c.threshold === "number"),
+      .every(
+        (c: Json) => Boolean(c.reason) && typeof c.threshold === "number" && c.threshold >= 10,
+      ),
   );
   const suppressed = cells.filter((c: Json) => c.suppressed).length;
   const published = cells.filter((c: Json) => !c.suppressed);
@@ -613,11 +1049,59 @@ async function main() {
     published.length > 0,
     `${suppressed}/${cells.length} suppressed`,
   );
+  const segments = await call("/api/v1/analytics/segments");
+  const segmentCells: Json[] = Array.isArray(segments.json.segments)
+    ? segments.json.segments
+    : [];
+  check(
+    "segments share the overview publication family",
+    segments.status === 200 &&
+      segments.json.synthetic === true &&
+      segments.json.as_of === overview.json.as_of &&
+      segments.json.threshold === overview.json.threshold &&
+      typeof segments.json.projection_version === "string" &&
+      segmentCells.length > 0,
+    `${segments.status} n=${segmentCells.length}`,
+  );
+  check(
+    "suppressed segment cells carry no count, denominator or rate",
+    segmentCells
+      .filter((c: Json) => c.suppressed)
+      .every(
+        (c: Json) =>
+          c.count === null && c.denominator === null && c.rate === null,
+      ),
+  );
+  const overviewByPathway = Object.fromEntries(
+    (overview.json.pathways ?? []).map((p: Json) => [p.pathway, p]),
+  );
+  const segmentFlagsMatch = segmentCells.every((cell: Json) => {
+    const pathway = overviewByPathway[cell.segment];
+    if (!pathway) return false;
+    const key = cell.metric_id === "follow-up" ? "follow_up" : cell.metric_id;
+    const overviewCell = pathway[key] as Json | undefined;
+    if (!overviewCell) return false;
+    return Boolean(overviewCell.suppressed) === Boolean(cell.suppressed);
+  });
+  check(
+    "segment suppression flags match the overview cells of the same family",
+    segmentFlagsMatch,
+  );
   console.log(
     `NOTE  ${suppressed}/${cells.length} analytics cells suppressed at this seed size`,
   );
 
   // --- reset restores the seed for this session only ---
+  const otherBeforeReset = await call("/api/v1/cases/case-0002", {
+    session: session2,
+  });
+  check(
+    "a second session still has the unmutated seed before reset",
+    otherBeforeReset.json.stage === "booked" &&
+      otherBeforeReset.json.revision === 4,
+    `${otherBeforeReset.json.stage}/rev${otherBeforeReset.json.revision}`,
+  );
+
   const reset = await call("/api/v1/demo/reset", { method: "POST" });
   check("reset restores the seed", reset.json.cases_restored === 6);
   const afterReset = await call("/api/v1/cases/case-0002");
@@ -625,10 +1109,16 @@ async function main() {
     "reset returns case-0002 to booked at rev 4",
     afterReset.json.stage === "booked" && afterReset.json.revision === 4,
   );
-
-  console.log(
-    `\n${pass} passed, ${fail} failed, ${pending} pending (agreed but not implemented)`,
+  const otherAfterReset = await call("/api/v1/cases/case-0002", {
+    session: session2,
+  });
+  check(
+    "reset of this session does not rewrite the second session",
+    otherAfterReset.json.stage === "booked" &&
+      otherAfterReset.json.revision === 4,
   );
+
+  console.log(`\n${pass} passed, ${fail} failed`);
   if (fail > 0) process.exit(1);
 }
 

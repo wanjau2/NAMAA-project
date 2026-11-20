@@ -373,6 +373,8 @@ for (const op of [
   "fact_review",
   "evaluation_run",
   "context_retrieve",
+  "audit_read",
+  "outbox_read",
 ] as const) {
   check(
     `${op}: 403 and 404 are indistinguishable to the user`,
@@ -390,6 +392,15 @@ check(
   /not a clinical finding/i.test(
     describeSecurityOutcome(403, "proposal_disclose").caveat ?? "",
   ),
+);
+check(
+  "a denied audit or outbox read is marked an access outcome, not a clinical finding",
+  /not a clinical finding/i.test(
+    describeSecurityOutcome(403, "audit_read").caveat ?? "",
+  ) &&
+    /not a clinical finding/i.test(
+      describeSecurityOutcome(403, "outbox_read").caveat ?? "",
+    ),
 );
 check(
   "409 is stale and offers a non-destructive recovery",

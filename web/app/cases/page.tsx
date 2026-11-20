@@ -183,7 +183,7 @@ export default function WorklistPage() {
                 return (
                   <li
                     key={row.id}
-                    className="rounded-lg border border-border bg-surface p-4 hover:bg-canvas"
+                    className="rounded-lg border border-border bg-surface p-4 hover:bg-canvas focus-within:border-s-[3px] focus-within:border-s-brand focus-within:bg-subtle"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -392,8 +392,8 @@ function Pill({
       className={cn(
         "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
         active
-          ? "border-brand bg-brand text-white"
-          : "border-border bg-surface text-ink hover:bg-subtle",
+          ? "border-brand bg-subtle text-ink"
+          : "border-border bg-surface text-ink hover:bg-canvas",
       )}
     >
       {children}

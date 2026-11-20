@@ -1,24 +1,26 @@
 "use client";
 
 /**
- * Minimal navigation strip. A6 refines this into the full shell; for now it
- * exists so the worklist and population view are reachable without typing URLs.
+ * Persistent navigation. Selected state uses a brand underline and subtle
+ * fill (D002 §5), not a dark teal fill. Current page is announced.
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-
-const LINKS = [
-  { href: "/cases", label: "Worklist" },
-  { href: "/metrics", label: "Population view" },
-] as const;
+import { chrome } from "@/lib/copy";
+import { useDemoSession } from "@/lib/demo-session";
 
 export function MainNav() {
   const pathname = usePathname();
+  const { locale } = useDemoSession();
 
-  // Hide on guest entry: the session has not started yet.
   if (pathname === "/") return null;
+
+  const links = [
+    { href: "/cases", label: chrome(locale, "worklist") },
+    { href: "/metrics", label: chrome(locale, "population") },
+  ] as const;
 
   return (
     <nav
@@ -26,7 +28,7 @@ export function MainNav() {
       className="border-b border-border bg-surface px-4 sm:px-6"
     >
       <ul className="mx-auto flex max-w-6xl gap-1">
-        {LINKS.map((link) => {
+        {links.map((link) => {
           const active =
             pathname === link.href || pathname.startsWith(`${link.href}/`);
           return (
@@ -35,13 +37,19 @@ export function MainNav() {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "inline-block border-b-2 px-3 py-2.5 text-sm font-medium",
+                  "inline-flex items-center border-b-2 px-3 py-2.5 text-sm font-medium",
                   active
-                    ? "border-brand text-ink"
-                    : "border-transparent text-ink-muted hover:text-ink",
+                    ? "border-brand bg-subtle text-ink"
+                    : "border-transparent text-ink-muted hover:bg-canvas hover:text-ink",
                 )}
               >
                 {link.label}
+                {active ? (
+                  <span className="sr-only">
+                    {" "}
+                    — {chrome(locale, "currentPage")}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

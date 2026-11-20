@@ -17,17 +17,24 @@ case detail (partial).
 
 ## Phase A — Finish the screen set
 
-**Progress: A1, A2, A4 complete** (plus a minimal nav from A6). Next: A3 or A5.
+**Progress: A1, A2, A4, A5 (limited inspector), A6 complete.** Next: A3.
 
 **Alfred's frontend handoff complete 2026-11-19** — typed extraction contract rendering and
-the assembled-context panel are built ([evidence](../03-evidence/F-contracts/checks.md)). The
-frontend side of his M0–M3 is as far as it can go without Q10, Q12, M2 and C3.
+the assembled-context panel are built ([evidence](../03-evidence/F-contracts/checks.md)). Q10,
+Q12 and C3 later landed on the running API (2026-11-20 notes).
 
 **Alfred's contract work started 2026-11-18** — code-point offsets and the four-outcome
 display layer are done ([evidence](../03-evidence/F-contracts/checks.md)); the enum itself is Q12.
 
 **Delivery assets 2026-11-18** — demo footage and the 12-slide deck are done (E3 footage, E4);
 see [E-delivery](../03-evidence/E-delivery/README.md). E5 is blocked on the standalone question.
+
+**M15–M19 (2026-11-20)** — selected/current-page nav, D002 hover/selected, reset `alertdialog`,
+`verify:contrast` plus reduced-motion; chrome dictionary with unreviewed Arabic (Q2 still open;
+clinical copy stays English); inspector from live audit/outbox without HAPI claims; dated
+evidence addenda (footage/narration/deck-share not re-cut); `available_actions` and
+`GET /cases/{id}/documents` as the live display path. **E5** startup path landed with M14
+(`npm start` → standalone server).
 
 **Browser pass complete 2026-11-18** — see [M04](M04-browser-verification.md). D3–D6 and E1–E2
 done; six defects found and fixed.
@@ -37,7 +44,7 @@ done; six defects found and fixed.
 **Phase C landed 2026-11-18** — see [M03](M03-api-integration.md). The local transition layer is
 deleted; the server is authoritative. B1, B4, B5, B6 and C1/C2/C4 came with it.
 
-No backend required. Builds on contract-matching mocks, per the work plan's dependency-slip rule.
+Phase A screens now read the live API. Remaining A3 (patient overview) can still ship inside case detail.
 
 | # | Step | Acceptance | Est. |
 | --- | --- | --- | --- |
@@ -45,8 +52,8 @@ No backend required. Builds on contract-matching mocks, per the work plan's depe
 | ~~A2~~ | ~~**Action forms**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A2-action-forms/checks.md) | 26/26 transition checks pass (`npm run verify:actions`); offered actions verified per state | 1.5h |
 | A3 | **Patient overview** — clinical history, caregiver information, contact preferences | Caregiver authority shown separately from relationship | 0.75h |
 | ~~A4~~ | ~~**`/metrics` population dashboard**~~ — **DONE 2026-11-17** · [evidence](../03-evidence/A4-population-dashboard/checks.md) | 53/53 definition + suppression checks pass (`npm run verify:metrics`). Q8 now **demonstrated**: hidden counts are readable in the JS bundle | 1.25h |
-| A5 | **FHIR / audit inspector drawer** — resource JSON, references, versions, validation results | Scope depends on Q1. Currently a stub | 0.75h |
-| A6 | **Navigation shell** — persistent nav across worklist / metrics / inspector, with selected state | Keyboard reachable; current page announced | 0.5h |
+| ~~A5~~ | ~~**FHIR / audit inspector**~~ — **DONE 2026-11-20, limited scope** · application ids + live `GET /audit/events` and `GET /ops/outbox`. Not HAPI; case revision is a concurrency token, not `CarePlan/{id}` · rev | Q1: HAPI deferred (D003). Stub gateway labelled on screen | 0.75h |
+| ~~A6~~ | ~~**Navigation shell**~~ — **DONE 2026-11-20** · selected underline + subtle fill (D002 §5); `aria-current="page"` | Keyboard reachable; current page announced | 0.5h |
 
 Suppression rendering in A4 can be *built* now but cannot be *claimed* until Q8 is decided.
 
@@ -63,16 +70,17 @@ Built against a stub client so Phase C becomes a swap, not a rewrite.
 | ~~B5~~ | ~~**No optimistic state**~~ — **DONE 2026-11-18** | Server echo is the only state source | 0.25h |
 | ~~B6~~ | ~~**Reset wired**~~ — **DONE 2026-11-18** · `POST /api/v1/demo/reset` | Session-scoped; seed restored | 0.25h |
 
-## Phase C — Connect to the backend (F4) — BLOCKED
+## Phase C — Connect to the backend (F4)
 
 Q1 and Q5 were answered by [D003](../02-decisions/D003-backend-stack-and-api.md). The gating is
-no longer cosmetic: the server validates every transition. C3 is the remaining item.
+no longer cosmetic: the server validates every transition. C3 has a reporting cohort (2026-11-20);
+the threshold stays ≥ 10.
 
 | # | Step | Depends on |
 | --- | --- | --- |
 | ~~C1~~ | ~~Swap mocks for the real API~~ — **DONE 2026-11-18**; `case-actions.ts` deleted | — |
 | ~~C2~~ | ~~Verify revision conflicts and duplicate request IDs~~ — **DONE**; 34/34 contract checks | — |
-| C3 | Render suppression from server flags — **API side done**, but 16/16 cells suppressed at the current seed. Blocked on a cohort decision | Ismail + Alfred |
+| ~~C3~~ | ~~Render suppression from server flags~~ — **DONE 2026-11-20** · reporting cohort publishes; `/metrics` is live overview + segments; 16/16 on the 18 November seed is historical | Threshold stays ≥ 10. Shrinking the cohort re-locks the family |
 | ~~C4~~ | ~~Replace `generateStaticParams` on `/cases/[id]`~~ — **DONE 2026-11-18** | — |
 
 Estimated 3h once unblocked.
@@ -81,13 +89,13 @@ Estimated 3h once unblocked.
 
 | # | Step | Acceptance | Est. |
 | --- | --- | --- | --- |
-| D1 | Extract all strings into a dictionary | No hardcoded copy left in components | 1h |
-| D2 | Integrate Arabic copy with `Unreviewed demo translation` badges | Gated on Q2. Unreviewed copy is never presented as clinically approved | 0.75h |
+| D1 | Extract all strings into a dictionary — **PARTIAL 2026-11-20** · chrome (nav/session) in `web/lib/copy.ts`. Clinical explanations stay English in components | Q2 open; not a full i18n extract | 1h |
+| D2 | Integrate Arabic copy with `Unreviewed demo translation` badges — **PARTIAL 2026-11-20** · unreviewed chrome only; badge and safety banner stay English | Gated on Q2. Direction change is not a completed translation | 0.75h |
 | ~~D3~~ | ~~RTL audit~~ — **DONE 2026-11-18** | Every `.font-mono-tech` node verified `direction: ltr; unicode-bidi: isolate` under `dir="rtl"` | 0.75h |
 | ~~D4~~ | ~~Keyboard pass~~ — **DONE 2026-11-18** | Tab-to-link, Enter activation, visible focus, `aria-disabled` controls reachable with announced reasons | 0.75h |
 | ~~D5~~ | ~~axe-core via Playwright~~ — **DONE 2026-11-18** | Zero critical or serious on 4 pages × 2 viewports | 0.5h |
 | ~~D6~~ | ~~Responsive pass~~ — **DONE 2026-11-18** | No horizontal scroll at 390px; simulation bar collapse verified | 0.5h |
-| D7 | Re-verify contrast on the final badge set; confirm reduced-motion | Ratios recomputed, not estimated | 0.25h |
+| ~~D7~~ | ~~Re-verify contrast / reduced-motion~~ — **DONE 2026-11-20** · `npm run verify:contrast` reads `globals.css`; `prefers-reduced-motion` short-circuits pulse | Ratios computed, not estimated | 0.25h |
 
 ## Phase E — Delivery assets (F6)
 
@@ -97,25 +105,25 @@ Estimated 3h once unblocked.
 | ~~E2~~ | ~~Guest journey on a clean browser session~~ — **DONE 2026-11-18** | Fresh context per test; no credentials required | 0.5h |
 | ~~E3~~ | ~~Record the demonstration~~ — **FOOTAGE DONE 2026-11-18** · [50s walkthrough](../03-evidence/E-delivery/recording/namaa-demo-walkthrough.webm) | Reproducible via `npm run demo`; narration still to record over it | 0.75h |
 | ~~E4~~ | ~~Assemble deck and screenshots~~ — **DONE 2026-11-18** · [12-slide deck](https://claude.ai/artifact/XCVbNx8Kf2Gy8q8XEJi4nE) · 18 screenshots | Built / simulated / not built separated on slide 9 | 0.5h |
-| E5 | Deployment instructions and local fallback — **blocked**: `output: "standalone"` makes `next start` unsupported; the command to document is unsettled | A fresh reviewer can start the UI from the guide | 0.25h |
+| ~~E5~~ | ~~Deployment instructions and local fallback~~ — **DONE 2026-11-20** · `npm start` → `scripts/start-standalone.mjs`; Docker already `node server.js`. Q7 hosting still open | A fresh reviewer can start the UI from [web/README.md](../../web/README.md) | 0.25h |
 
 ## Polish backlog
 
-- **Hover treatment for the dark fill** — Mark asked (2026-11-17) that "that darkish base appear
-  only at hover". Which element is not yet settled: the deep teal `#0F5C5C` fill on primary
-  buttons and active filter pills, the worklist row background, or something else. Resolve
-  before D7, since it changes the contrast values to re-verify.
-- Row hover and selected-nav treatments (D002 §5).
-- Reset confirmation visual refinement.
+- ~~**Hover treatment for the dark fill**~~ — **DONE 2026-11-20**. `#0F5C5C` stays on primary
+  actions. Selected nav, filter pills and context chips use brand underline / subtle fill;
+  hover is canvas, not always-on brand fill.
+- ~~Row hover and selected-nav treatments (D002 §5)~~ — **DONE 2026-11-20**.
+- ~~Reset confirmation visual refinement~~ — **DONE 2026-11-20** (`alertdialog`, overdue tokens,
+  consequence stated).
 
 ## What the frontend needs from the team
 
 | Need | From | Blocks |
 | --- | --- | --- |
-| **Q1** stack decision | All three | Phase C, and the scope of A5 |
-| **Q5** API paths, action names, role requirements | Ismail | B1, Phase C |
-| **Q8** server-side small-cell suppression | Ismail + Alfred | C3, and the A4 suppression claim |
-| **Q2** whether Arabic copy ships | All three | D2 |
+| **Q1** stack decision | All three | Resolved (D003). A5 shipped as application-store inspector |
+| **Q5** API paths, action names, role requirements | Ismail | Resolved (D003) |
+| **Q8** server-side small-cell suppression | Ismail + Alfred | Resolved; reporting cohort publishes; threshold ≥ 10 |
+| **Q2** whether Arabic copy ships | All three | Still open. Chrome dictionary ships labelled unreviewed |
 | Reviewed patient-message copy and explanation labels | Alfred | A2 |
 | Rule explanations and uncertainty wording | Alfred | A1 |
 
@@ -137,6 +145,6 @@ Protect: **D4, D5, D6** (the accessibility claims are in the definition of done)
 
 ## Standing constraint
 
-Until Phase C lands, every role check and blocked action in the UI is **client-side only** and is
-not enforcement. The submission must describe the actual level of integration, including any
-remaining mocks.
+Phase C landed 2026-11-18: the server validates every transition. Remaining simulated pieces are
+the FHIR gateway stub, deterministic extraction (not MedGemma), and unreviewed Arabic chrome.
+The submission must describe that level of integration, including HAPI not deployed.

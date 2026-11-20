@@ -15,7 +15,10 @@ import type {
   ActionRequest,
   ActionResponse,
   AnalyticsOverview,
+  AnalyticsSegments,
   ApiProposal,
+  AuditEventOut,
+  OutboxRow,
   CaseDocumentOut,
   CaseOut,
   CaseRow,
@@ -32,8 +35,16 @@ import type {
   VerifiedContext,
 } from "@/lib/api-types";
 
+/**
+ * Browser API origin. Baked in at `next build` time.
+ *
+ * Canonical name: NEXT_PUBLIC_API_BASE_URL. NEXT_PUBLIC_API_URL is accepted
+ * only as a deprecated alias so older Compose files still resolve.
+ */
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://127.0.0.1:8000";
 
 /** Thrown for any non-2xx response, carrying the server's structured error. */
 export class ApiError extends Error {
@@ -229,6 +240,23 @@ export const api = {
       role,
       signal,
     }),
+
+  analyticsSegments: (session: string, role: Role, signal?: AbortSignal) =>
+    request<AnalyticsSegments>("/api/v1/analytics/segments", {
+      session,
+      role,
+      signal,
+    }),
+
+  listAuditEvents: (session: string, role: Role, signal?: AbortSignal) =>
+    request<AuditEventOut[]>("/api/v1/audit/events", {
+      session,
+      role,
+      signal,
+    }),
+
+  listOutbox: (session: string, role: Role, signal?: AbortSignal) =>
+    request<OutboxRow[]>("/api/v1/ops/outbox", { session, role, signal }),
 
   evaluatePatient: (
     session: string,

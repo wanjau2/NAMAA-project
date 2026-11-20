@@ -25,6 +25,10 @@ test("switching to Arabic mirrors the layout", async ({ page }) => {
   await expect(
     scope.getByText("Unreviewed demo translation").first(),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: /قائمة العمل/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Coordinator worklist" }),
+  ).toBeVisible();
 });
 
 test("technical strings stay isolated under RTL", async ({ page }) => {

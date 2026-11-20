@@ -197,6 +197,18 @@ test.describe("population view", () => {
     await expect(page.getByText(/GET \/api\/v1\/analytics\/overview/).first()).toBeVisible({
       timeout: 20_000,
     });
+    await expect(page.getByText(/GET \/api\/v1\/analytics\/segments/).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Live API segments" })).toBeVisible();
     await expect(page.getByText(/local cohort fixture/)).toHaveCount(0);
+    await expect(
+      page.getByText(/The browser does not lower the threshold/),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Design example — not in this API/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "This worklist session" }),
+    ).toBeVisible();
+    await expect(page.getByText("Not published").first()).toBeVisible();
   });
 });

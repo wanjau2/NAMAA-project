@@ -11,6 +11,7 @@
 import { useId, useState } from "react";
 import { AlertTriangle, RotateCcw, Settings2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { chrome } from "@/lib/copy";
 import { useCaseStore } from "@/lib/case-store";
 import {
   ROLES,
@@ -72,7 +73,7 @@ export function SimulationBar() {
           ) : (
             <Settings2 aria-hidden="true" className="size-3.5" />
           )}
-          Session
+          {chrome(locale, "session")}
         </button>
       </div>
 
@@ -138,7 +139,7 @@ function SessionControls({
           htmlFor={roleSelectId}
           className="text-xs font-medium text-slate-400"
         >
-          Simulated role
+          {chrome(locale, "simulatedRole")}
         </label>
         <select
           id={roleSelectId}
@@ -148,7 +149,7 @@ function SessionControls({
         >
           {ROLES.map((value) => (
             <option key={value} value={value}>
-              {ROLE_LABELS[value].en}
+              {ROLE_LABELS[value][locale]}
             </option>
           ))}
         </select>
@@ -156,8 +157,10 @@ function SessionControls({
 
       {/* Language. Arabic copy is unreviewed and is labelled as such (theme §3). */}
       <div className={group}>
-        <span className="text-xs font-medium text-slate-400">Language</span>
-        <div className="flex items-center gap-1" role="group" aria-label="Language">
+        <span className="text-xs font-medium text-slate-400">
+          {chrome(locale, "language")}
+        </span>
+        <div className="flex items-center gap-1" role="group" aria-label={chrome(locale, "language")}>
           <LangButton
             active={locale === "en"}
             onClick={() => setLocale("en")}
@@ -179,42 +182,54 @@ function SessionControls({
         </span>
       ) : null}
 
-      {/* Reset. Two-step, and it states the consequence (D002 §5). */}
+      {/* Reset. Two-step, overdue tokens, consequence stated (D002 §5). */}
       <div className={group}>
         {confirmingReset ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-300">
-              Retires this synthetic workspace and starts a new one.
+          <div
+            role="alertdialog"
+            aria-labelledby={`${roleSelectId}-reset-title`}
+            aria-describedby={`${roleSelectId}-reset-desc`}
+            className="flex flex-wrap items-center gap-2 rounded border border-status-overdue bg-status-overdue-bg px-2 py-1"
+          >
+            <span
+              id={`${roleSelectId}-reset-title`}
+              className="sr-only"
+            >
+              {chrome(locale, "resetConfirmAction")}
+            </span>
+            <span
+              id={`${roleSelectId}-reset-desc`}
+              className="text-xs font-medium text-status-overdue"
+            >
+              {chrome(locale, "resetConfirm")}
             </span>
             <button
               type="button"
               onClick={() => {
-                // Server restores the seed for THIS guest session only; the
-                // local call just returns role and language to defaults.
                 void onServerReset();
                 resetSession();
                 setConfirmingReset(false);
               }}
-              className="rounded bg-status-overdue px-2 py-1 text-xs font-semibold text-white"
+              className="rounded bg-status-overdue px-2 py-1 text-xs font-semibold text-white hover:bg-status-overdue"
             >
-              Reset session
+              {chrome(locale, "resetConfirmAction")}
             </button>
             <button
               type="button"
               onClick={() => setConfirmingReset(false)}
-              className="rounded border border-slate-600 px-2 py-1 text-xs font-medium"
+              className="rounded border border-status-overdue px-2 py-1 text-xs font-medium text-status-overdue hover:bg-status-overdue-bg"
             >
-              Cancel
+              {chrome(locale, "cancel")}
             </button>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setConfirmingReset(true)}
-            className="flex items-center gap-1.5 rounded border border-slate-600 px-2 py-1 text-xs font-medium"
+            className="flex items-center gap-1.5 rounded border border-slate-600 px-2 py-1 text-xs font-medium hover:bg-slate-800"
           >
             <RotateCcw aria-hidden="true" className="size-3.5" />
-            Reset demo
+            {chrome(locale, "resetDemo")}
           </button>
         )}
       </div>

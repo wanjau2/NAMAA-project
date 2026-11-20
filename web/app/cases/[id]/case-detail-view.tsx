@@ -22,6 +22,9 @@ import { RuleOutcomeBadge } from "@/components/rule-outcome";
 import { CanonicalEvaluationPanel } from "@/components/canonical-evaluation";
 import { resolveOutcome } from "@/lib/rule-outcomes";
 import { ActionPanel } from "@/components/action-panel";
+import { CaseInspector } from "@/components/case-inspector";
+import { CaseSubnav } from "@/components/case-subnav";
+import { chrome } from "@/lib/copy";
 import { useCase, useCaseStore } from "@/lib/case-store";
 import { useDemoSession } from "@/lib/demo-session";
 import { usePatientEvaluation } from "@/lib/use-patient-evaluation";
@@ -36,7 +39,7 @@ import {
 export function CaseDetailView({ id }: { id: string }) {
   const { case: row, loading, error, reload } = useCase(id);
   const { status, connectionMessage, sessionId, loadCase } = useCaseStore();
-  const { role, sessionEpoch } = useDemoSession();
+  const { role, sessionEpoch, locale } = useDemoSession();
   const evaluation = usePatientEvaluation(
     row?.patient_id,
     row?.pathway,
@@ -121,8 +124,9 @@ export function CaseDetailView({ id }: { id: string }) {
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to worklist
+        {chrome(locale, "backToWorklist")}
       </Link>
+      <CaseSubnav caseId={id} />
 
       {/* Patient header. Caregiver authority is kept distinct from relationship. */}
       <header className="mt-4 rounded-lg border border-border bg-surface p-5">
@@ -277,15 +281,15 @@ export function CaseDetailView({ id }: { id: string }) {
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Link
                   href={`/cases/${id}/review`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"
                 >
-                  Review source facts
+                  {chrome(locale, "reviewSource")}
                 </Link>
                 <Link
                   href={`/cases/${id}/context`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-subtle"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 text-sm font-semibold text-ink hover:bg-canvas"
                 >
-                  Retrieved context
+                  {chrome(locale, "retrievedContext")}
                 </Link>
               </div>
             </div>
@@ -361,25 +365,7 @@ export function CaseDetailView({ id }: { id: string }) {
         <aside className="space-y-4">
           <ActionPanel caseState={row} onChanged={reload} />
 
-          <section className="rounded-lg border border-border bg-subtle p-4">
-            <h2 className="text-sm font-semibold text-ink">
-              FHIR / audit inspector
-            </h2>
-            <p className="mt-1 text-xs text-ink-muted">
-              Resource references and versions. HAPI is not deployed for this
-              sprint (D003) — identifiers are FHIR-shaped synthetic ids held in
-              the application store.
-            </p>
-            <p className="mt-2 font-mono-tech text-xs text-ink-muted">
-              CarePlan/{row.care_gap_id} · rev {row.revision}
-              {row.patient_id ? (
-                <>
-                  <br />
-                  Patient/{row.patient_id}
-                </>
-              ) : null}
-            </p>
-          </section>
+          <CaseInspector caseState={row} />
         </aside>
       </div>
     </div>
@@ -387,6 +373,7 @@ export function CaseDetailView({ id }: { id: string }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const { locale } = useDemoSession();
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <Link
@@ -394,7 +381,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to worklist
+        {chrome(locale, "backToWorklist")}
       </Link>
       <div className="mt-4">{children}</div>
     </div>

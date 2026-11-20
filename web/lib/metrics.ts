@@ -1,9 +1,9 @@
 /**
  * Session-local operational counts and suppression helpers.
  *
- * Population funnel numbers come from GET /api/v1/analytics/overview.
- * Do not recompute them in the browser — hidden counts must never travel
- * in the bundle (Q8 / D003).
+ * Population funnel numbers come from GET /api/v1/analytics/overview and
+ * /segments. Do not recompute them in the browser — hidden counts must never
+ * travel in the bundle (Q8 / D003).
  */
 
 import type { CaseRow, EventOut } from "@/lib/api-types";

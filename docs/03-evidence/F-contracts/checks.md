@@ -291,3 +291,48 @@ Against current `main` API, the readiness probes should flip:
 
 Items 1, 2 and 3 of his list. The frontend is wired for all three and will start exercising them
 without further changes — the readiness gate will say so.
+
+---
+
+# 5. Integrated bridges — 2026-11-20
+
+Dated addendum. Sections 1–4 above are historical evidence from 18–19 November and must not be
+rewritten to match later counts.
+
+## What is now connected
+
+| Bridge | Status in the running demo |
+| --- | --- |
+| Nested proposals, review persist, GET fact readback | Live (FHIR gateway **stub**) |
+| Four `rule_evaluation.outcome` values, including `case: null` | Live on evaluations; worklist `flag_status` remains `gap \| needs_review` |
+| Relate + `POST /api/v1/security/verified-context` | Live records; not Alfred `AssembledContext` |
+| Analytics overview **and** segments | One `suppress_population` family; reporting cohort publishes; threshold stays ≥ 10 |
+| `GET /api/v1/cases/{id}/documents` | Authoritative source listing |
+| `available_actions` | Case panel renders the server list |
+| Audit list + outbox list on the inspector | Application store + stub gateway; not HAPI |
+
+## Checks (this build)
+
+| Suite | Result |
+| --- | --- |
+| `verify:metrics` | 8/8 (threshold ≥ 10; complementary helper only) |
+| `verify:contracts` | 24/24 |
+| `verify:shapes` | **62/62** (includes 403/404 and access-outcome caveats for audit/outbox) |
+| `verify:startup` | 12/12 |
+| `verify:contrast` | **12/12** — ratios from `globals.css`, not estimates; reduced-motion recorded |
+| `verify:api` | **104 passed, 0 failed, 0 pending** — includes `available_actions`, document listing, audit list, reviewer `outbox.read` 403 |
+| Playwright (2026-11-20) | Desktop and mobile: accessibility (incl. inspector + `outbox.read` 403), journeys, evaluations, RTL. Desktop also: context, source-review, extraction-recovery, medium-gaps. Child A `gateway stub` locator uses `.first()` because the inspector also names the stub |
+
+Older pass counts in this file (49/49, 50+6 pending, 16/16 suppressed cells) describe earlier
+builds. They are not acceptance of the current bridges.
+
+## Still not built (do not present as done)
+
+- Live HAPI / profile validation
+- Live MedGemma
+- Alfred-reviewed Arabic clinical copy (Q2)
+- Hosted deployment (Q7)
+- Narration over the demonstration footage
+
+Remaining frontend polish after this addendum is delivery assets (re-cut footage/deck share)
+and any later Alfred copy drop.

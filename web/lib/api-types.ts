@@ -191,11 +191,64 @@ export type ApiPathwayMetrics = {
   unreachable: MetricCell;
 };
 
+export type AuditEventOut = {
+  id: string;
+  timestamp: string;
+  event_type: string;
+  request_id: string | null;
+  job_id: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  patient_id: string | null;
+  decision: string | null;
+  reason_code: string | null;
+  policy_adapter: string;
+  production_authorization: boolean;
+};
+
+export type OutboxRow = {
+  id: string;
+  request_id: string;
+  action: string;
+  state: string;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  case_id: string | null;
+  created_at: string;
+  updated_at: string;
+  dead_lettered_at: string | null;
+  compensation_reason: string | null;
+};
+
 export type AnalyticsOverview = {
   synthetic: boolean;
   as_of: string;
   threshold: number;
   pathways: ApiPathwayMetrics[];
+  notice: string;
+};
+
+/** GET /api/v1/analytics/segments — same publication family as overview. */
+export type PublishedSegmentCell = {
+  metric_id: string;
+  segment: string;
+  count: number | null;
+  denominator: number | null;
+  denominator_label: string;
+  rate: number | null;
+  suppressed: boolean;
+  suppression_reason: string | null;
+};
+
+export type AnalyticsSegments = {
+  synthetic: boolean;
+  as_of: string;
+  threshold: number;
+  projection_version: string;
+  suppressed: boolean;
+  segments: PublishedSegmentCell[];
   notice: string;
 };
 

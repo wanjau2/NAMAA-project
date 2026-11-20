@@ -31,7 +31,9 @@ export type SecurityOperation =
   | "proposal_disclose"
   | "fact_review"
   | "evaluation_run"
-  | "context_retrieve";
+  | "context_retrieve"
+  | "audit_read"
+  | "outbox_read";
 
 export type SecurityOutcome = {
   state: SecurityState;
@@ -50,6 +52,8 @@ const OPERATION_NOUN: Record<SecurityOperation, string> = {
   fact_review: "this review",
   evaluation_run: "this evaluation",
   context_retrieve: "this retrieved context",
+  audit_read: "these audit events",
+  outbox_read: "this outbox",
 };
 
 /**
@@ -82,7 +86,9 @@ export function describeSecurityOutcome(
         operation === "proposal_disclose" ||
         operation === "note_retrieve" ||
         operation === "evaluation_run" ||
-        operation === "context_retrieve"
+        operation === "context_retrieve" ||
+        operation === "audit_read" ||
+        operation === "outbox_read"
           ? "This is an access outcome, not a clinical finding. It says nothing about what the record contains."
           : null,
     };

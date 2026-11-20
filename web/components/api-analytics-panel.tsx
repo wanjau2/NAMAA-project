@@ -1,18 +1,22 @@
 "use client";
 
 /**
- * Live `GET /api/v1/analytics/overview`.
+ * Live GET /api/v1/analytics/overview and /segments.
  *
  * Suppression is a server duty (Q8 / D003). Suppressed cells arrive with
- * `numerator: null, denominator: null`, so the browser never holds hidden
- * counts. Funnel numbers include a labelled reporting cohort that is not on
- * the coordinator worklist.
+ * null counts, so the browser never holds hidden numbers and must not
+ * reconstruct them from other cells, tooltips, or bar widths.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { AlertOctagon, Info, Lock, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
-import type { AnalyticsOverview, MetricCell } from "@/lib/api-types";
+import type {
+  AnalyticsOverview,
+  AnalyticsSegments,
+  MetricCell,
+  PublishedSegmentCell,
+} from "@/lib/api-types";
 import { PATHWAY_LABELS } from "@/lib/api-types";
 import { useDemoSession } from "@/lib/demo-session";
 import { useCaseStore } from "@/lib/case-store";
@@ -30,6 +34,27 @@ const FUNNEL = [
 
 const DISPOSITIONS = ["completed", "declined", "unreachable"] as const;
 
+const SEGMENT_LABELS: Record<string, string> = {
+  child_wcv: PATHWAY_LABELS.child_wcv,
+  adult_screening: PATHWAY_LABELS.adult_screening,
+};
+
+const METRIC_LABELS: Record<string, string> = {
+  invited: "Invited",
+  booked: "Booked",
+  attended: "Attended",
+  "follow-up": "Follow-up",
+  completed: "Completed care",
+  declined: "Declined",
+  unreachable: "Unreachable",
+};
+
+type LiveAnalytics = {
+  overview: AnalyticsOverview;
+  segments: AnalyticsSegments | null;
+  segmentsError: string | null;
+};
+
 export function ApiAnalyticsPanel() {
   const { role, sessionEpoch } = useDemoSession();
   return <ApiAnalyticsPanelInner key={`${role}:${sessionEpoch}`} />;
@@ -38,7 +63,7 @@ export function ApiAnalyticsPanel() {
 function ApiAnalyticsPanelInner() {
   const { role } = useDemoSession();
   const { sessionId, status } = useCaseStore();
-  const [data, setData] = useState<AnalyticsOverview | null>(null);
+  const [data, setData] = useState<LiveAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,9 +72,10 @@ function ApiAnalyticsPanelInner() {
     setLoading(true);
     setError(null);
     try {
-      setData(await api.analyticsOverview(sessionId, role));
+      setData(await fetchLiveAnalytics(sessionId, role));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Request failed.");
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -62,11 +88,12 @@ function ApiAnalyticsPanelInner() {
       setLoading(true);
       setError(null);
       try {
-        const result = await api.analyticsOverview(sessionId, role);
+        const result = await fetchLiveAnalytics(sessionId, role);
         if (!cancelled) setData(result);
       } catch (caught) {
         if (!cancelled) {
           setError(caught instanceof Error ? caught.message : "Request failed.");
+          setData(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -77,8 +104,9 @@ function ApiAnalyticsPanelInner() {
     };
   }, [status, sessionId, role]);
 
-  const allCells = data
-    ? data.pathways.flatMap((p) => [
+  const overview = data?.overview ?? null;
+  const allCells = overview
+    ? overview.pathways.flatMap((p) => [
         p.eligible,
         p.invited,
         p.booked,
@@ -100,9 +128,13 @@ function ApiAnalyticsPanelInner() {
             Straight from{" "}
             <span className="font-mono-tech">
               GET /api/v1/analytics/overview
+            </span>{" "}
+            and{" "}
+            <span className="font-mono-tech">
+              GET /api/v1/analytics/segments
             </span>
-            . Suppression is applied by the server, so hidden counts never reach
-            this page.
+            . One publication family. Suppression is applied by the server, so
+            hidden counts never reach this page.
           </p>
         </div>
         <button
@@ -122,12 +154,12 @@ function ApiAnalyticsPanelInner() {
         </p>
       ) : null}
 
-      {data ? (
+      {overview ? (
         <>
           <p className="text-xs text-ink-muted">
-            As of <span className="font-mono-tech">{data.as_of}</span> ·
+            As of <span className="font-mono-tech">{overview.as_of}</span> ·
             threshold{" "}
-            <span className="font-mono-tech">n &lt; {data.threshold}</span> ·{" "}
+            <span className="font-mono-tech">n &lt; {overview.threshold}</span> ·{" "}
             <span className="tabular font-medium text-ink">
               {suppressedCount}
             </span>
@@ -139,10 +171,19 @@ function ApiAnalyticsPanelInner() {
           </p>
           <p className="flex items-start gap-1.5 rounded-md border border-border bg-subtle p-2 text-xs text-ink-muted">
             <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-            <span>{data.notice}</span>
+            <span>{overview.notice}</span>
+          </p>
+          <p className="flex items-start gap-1.5 rounded-md border border-border bg-subtle p-2 text-xs text-ink-muted">
+            <Lock aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+            <span>
+              This demonstration keeps the current reporting cohort. Threshold
+              stays n &lt; {overview.threshold}. Ismail owns any larger
+              synthetic seed. The browser does not lower the threshold or
+              recover a hidden count by subtraction.
+            </span>
           </p>
 
-          {data.pathways.map((pathway) => (
+          {overview.pathways.map((pathway) => (
             <PathwayCard
               key={pathway.pathway}
               label={PATHWAY_LABELS[pathway.pathway]}
@@ -156,12 +197,35 @@ function ApiAnalyticsPanelInner() {
               unreachable={pathway.unreachable}
             />
           ))}
+
+          <SegmentsCard
+            segments={data?.segments ?? null}
+            error={data?.segmentsError ?? null}
+          />
         </>
       ) : !error && !loading ? (
         <p className="text-sm text-ink-muted">Waiting for a guest session.</p>
       ) : null}
     </section>
   );
+}
+
+async function fetchLiveAnalytics(
+  sessionId: string,
+  role: Parameters<typeof api.analyticsOverview>[1],
+): Promise<LiveAnalytics> {
+  const overview = await api.analyticsOverview(sessionId, role);
+  try {
+    const segments = await api.analyticsSegments(sessionId, role);
+    return { overview, segments, segmentsError: null };
+  } catch (caught) {
+    return {
+      overview,
+      segments: null,
+      segmentsError:
+        caught instanceof Error ? caught.message : "Segments request failed.",
+    };
+  }
 }
 
 function PathwayCard({
@@ -200,11 +264,11 @@ function PathwayCard({
   );
   const maxCount = Math.max(0, ...published);
   const completionRate =
-    completed.numerator !== null && completed.denominator
+    !completed.suppressed &&
+    completed.numerator !== null &&
+    completed.denominator
       ? rate(completed.numerator, completed.denominator)
-      : completed.value !== null
-        ? completed.value * 100
-        : null;
+      : null;
 
   return (
     <section className="rounded-lg border border-border bg-surface p-5">
@@ -251,15 +315,22 @@ function PathwayCard({
                 <span className="text-ink">{cell.label}</span>
                 <CellValue cell={cell} />
               </div>
-              <div
-                className="mt-1 h-2 w-full overflow-hidden rounded-full bg-subtle"
-                role="presentation"
-              >
+              {cell.suppressed ? (
                 <div
-                  className="h-full rounded-full bg-brand"
-                  style={{ width: `${width}%` }}
+                  className="mt-1 h-2 w-full rounded-full border border-dashed border-border bg-subtle"
+                  role="presentation"
                 />
-              </div>
+              ) : (
+                <div
+                  className="mt-1 h-2 w-full overflow-hidden rounded-full bg-subtle"
+                  role="presentation"
+                >
+                  <div
+                    className="h-full rounded-full bg-brand"
+                    style={{ width: `${width}%` }}
+                  />
+                </div>
+              )}
             </li>
           );
         })}
@@ -295,6 +366,105 @@ function PathwayCard({
       </ul>
     </section>
   );
+}
+
+function SegmentsCard({
+  segments,
+  error,
+}: {
+  segments: AnalyticsSegments | null;
+  error: string | null;
+}) {
+  const grouped = groupSegments(segments?.segments ?? []);
+
+  return (
+    <section className="rounded-lg border border-border bg-surface p-5">
+      <h3 className="text-lg text-ink">Live API segments</h3>
+      <p className="mt-1 text-sm text-ink-muted">
+        Same publication family as overview. Do not recover a hidden count by
+        combining these views.
+      </p>
+      {error ? (
+        <p className="mt-3 flex items-start gap-1.5 rounded-md border border-status-overdue bg-status-overdue-bg p-2 text-xs text-status-overdue">
+          <AlertOctagon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+          <span>{error}</span>
+        </p>
+      ) : null}
+      {segments ? (
+        <>
+          <p className="mt-3 text-xs text-ink-muted">
+            Projection{" "}
+            <span className="font-mono-tech">{segments.projection_version}</span>{" "}
+            · threshold{" "}
+            <span className="font-mono-tech">n &lt; {segments.threshold}</span>
+            {segments.suppressed ? " · family suppressed" : ""}
+          </p>
+          <p className="mt-2 flex items-start gap-1.5 rounded-md border border-border bg-subtle p-2 text-xs text-ink-muted">
+            <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+            <span>{segments.notice}</span>
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {grouped.map(([segment, cells]) => (
+              <div key={segment} className="rounded-md border border-border p-3">
+                <h4 className="text-sm font-semibold text-ink">
+                  {SEGMENT_LABELS[segment] ?? segment}
+                </h4>
+                <ul className="mt-2 divide-y divide-border">
+                  {cells.map((cell) => (
+                    <li
+                      key={`${cell.segment}:${cell.metric_id}`}
+                      className="flex items-center justify-between gap-2 py-1.5 text-sm"
+                    >
+                      <span className="text-ink">
+                        {METRIC_LABELS[cell.metric_id] ?? cell.metric_id}
+                      </span>
+                      <SegmentValue cell={cell} threshold={segments.threshold} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : !error ? (
+        <p className="mt-3 text-sm text-ink-muted">Segments not loaded.</p>
+      ) : null}
+    </section>
+  );
+}
+
+function groupSegments(cells: PublishedSegmentCell[]) {
+  const map = new Map<string, PublishedSegmentCell[]>();
+  for (const cell of cells) {
+    const list = map.get(cell.segment) ?? [];
+    list.push(cell);
+    map.set(cell.segment, list);
+  }
+  return [...map.entries()];
+}
+
+function SegmentValue({
+  cell,
+  threshold,
+}: {
+  cell: PublishedSegmentCell;
+  threshold: number;
+}) {
+  if (cell.suppressed) {
+    return (
+      <span className="flex items-center gap-1 text-xs text-ink-muted">
+        <Lock aria-hidden="true" className="size-3" />
+        <span className="font-mono-tech">Suppressed (n &lt; {threshold})</span>
+      </span>
+    );
+  }
+  const shown =
+    cell.count !== null
+      ? cell.denominator !== null
+        ? `${cell.count} / ${cell.denominator}`
+        : String(cell.count)
+      : "—";
+  return <span className="tabular font-medium text-ink">{shown}</span>;
 }
 
 function CellValue({ cell, large }: { cell: MetricCell; large?: boolean }) {

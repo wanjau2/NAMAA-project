@@ -197,6 +197,13 @@ Q9 proposes server-returned `available_actions`; it has not become a frontend bl
 
 Evidence for M15–M19: [frontend roadmap](../01-milestones/frontend-roadmap.md), [open questions](../02-decisions/OPEN-QUESTIONS.md), [case detail/inspector](../../web/app/cases/[id]/case-detail-view.tsx), [source resolver](../../web/lib/source-documents.ts), [F-contracts evidence and bridge update](../03-evidence/F-contracts/checks.md), [delivery assets](../03-evidence/E-delivery/README.md).
 
+**Implementation note (2026-11-20).** Frontend work for M15–M19 is in this tree: selected/current-page
+nav, hover, reset `alertdialog`, contrast and reduced-motion checks; `LANGUAGE_SCOPE` plus a chrome
+dictionary (Q2 still open; clinical copy stays English); inspector from `GET /audit/events` and
+`GET /ops/outbox` without HAPI or `CarePlan/{id}` version claims; dated evidence addenda (footage,
+narration, and deck-share were not re-cut); `available_actions` and `GET /cases/{id}/documents` as
+the live display path. The gap descriptions above are the 19 November draft.
+
 ## Ownership boundary and suggested order
 
 Mark owns frontend wiring, truthful state/error presentation, frontend integration/browser evidence, accessibility, and demonstration assets. He does **not** own implementing the PDP/AuthZEN codec, backend authorization/audit durability, clinical rules, durable canonical evaluation storage, reviewed-fact ingestion, HAPI commits, or model hosting.

@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Namaa web (synthetic demo)
 
-## Getting Started
+**Not for clinical use.** The UI talks to the Namaa API. Extraction is an
+offline fixture; FHIR commit is a gateway stub.
 
-First, run the development server:
+## Prerequisites
+
+The API must be running on the origin baked into the browser build (default
+`http://127.0.0.1:8000`). See [api/README.md](../api/README.md).
+
+`NAMAA_CORS_ORIGINS` on the API must include this UI's origin (scheme, host,
+and port). The API default allows ports 3000. Playwright uses 3200 and sets
+CORS itself.
+
+## Development
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. `NEXT_PUBLIC_API_BASE_URL` defaults to
+`http://127.0.0.1:8000` when unset.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Production-like standalone
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This app builds with Next `output: "standalone"`. After `npm run build`:
 
-## Learn More
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000 npm run build
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+`npm start` copies `.next/static` and `public` into the standalone folder and
+runs `node server.js` (same as Docker). The API origin is compiled in at
+**build** time; changing the env var afterwards does not retarget the browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`npm run start:next` runs `next start` and is what Playwright uses. Prefer
+`npm start` for a reviewer walkthrough.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Deprecated alias: `NEXT_PUBLIC_API_URL` is still read if
+`NEXT_PUBLIC_API_BASE_URL` is unset.
 
-## Deploy on Vercel
+## Checks
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run verify
+npm run verify:api   # API must already be on :8000
+npx playwright test --project=desktop
+```

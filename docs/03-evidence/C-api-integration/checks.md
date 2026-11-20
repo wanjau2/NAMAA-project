@@ -107,3 +107,20 @@ The skeleton now covers `status === "connecting"` as well. Verified: first paint
    contract suite, not from a real browser session — that is D4/D5/E1.
 5. HAPI is not deployed (D003). The submission must say so: the clinical store is application
    SQLite with FHIR-shaped synthetic identifiers.
+
+---
+
+# Addendum — 2026-11-20
+
+The 34/34 table and the open-gap list above are 18 November evidence. Do not rewrite them.
+
+| Later change | Status |
+| --- | --- |
+| `available_actions` on `GET /cases/{id}` | Live display path; `displayWhen` is last-resort only |
+| `GET /cases/{id}/documents` | Authoritative listing; fallback map deleted |
+| Fact review persist | Live in the application store; FHIR Provenance still stub |
+| Analytics reporting cohort | Publishes; threshold stays ≥ 10 |
+| `/metrics` | Live overview + segments; local fixture removed |
+| Source review | API + SSE; the “not yet server-backed” banner is gone |
+
+HAPI is still not deployed.

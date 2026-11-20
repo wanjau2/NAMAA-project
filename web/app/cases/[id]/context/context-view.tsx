@@ -18,6 +18,8 @@ import Link from "next/link";
 import { ArrowLeft, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextPanel, type ContextState } from "@/components/context-panel";
+import { CaseSubnav } from "@/components/case-subnav";
+import { chrome } from "@/lib/copy";
 import { useCase, useCaseStore } from "@/lib/case-store";
 import { useDemoSession } from "@/lib/demo-session";
 import {
@@ -35,7 +37,7 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 
 export function ContextView({ id }: { id: string }) {
-  const { role, sessionEpoch } = useDemoSession();
+  const { role, sessionEpoch, locale } = useDemoSession();
   const { sessionId } = useCaseStore();
   const { case: row, error } = useCase(id);
   const [mode, setMode] = useState<Mode>("live");
@@ -70,8 +72,9 @@ export function ContextView({ id }: { id: string }) {
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to case detail
+        {chrome(locale, "backToCase")}
       </Link>
+      <CaseSubnav caseId={id} />
 
       <header className="mt-4">
         <h1 className="text-2xl text-ink">Retrieved context</h1>
@@ -107,8 +110,8 @@ export function ContextView({ id }: { id: string }) {
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium",
               mode === option.id
-                ? "border-brand bg-brand text-white"
-                : "border-border bg-surface text-ink hover:bg-subtle",
+                ? "border-brand bg-subtle text-ink"
+                : "border-border bg-surface text-ink hover:bg-canvas",
             )}
           >
             {option.label}

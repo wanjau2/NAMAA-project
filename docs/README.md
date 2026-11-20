@@ -62,7 +62,12 @@ can *truthfully claim*, document it.
 
 ## Current status
 
-**Frontend foundation built** (Next.js 16 + Tailwind 4 + shadcn/ui in [web/](../web/)), running on
-labelled mock data — see [M01](01-milestones/M01-frontend-foundation.md).
-**Backend demo API scaffolded** (FastAPI + SQLite in [api/](../api/)) — see [M02](01-milestones/M02-backend-foundation.md)
-and stack lock [D003](02-decisions/D003-backend-stack-and-api.md). Mark still on mocks until F4/Phase C.
+**Frontend is API-backed** (Next.js 16 + Tailwind 4 + shadcn/ui in [web/](../web/)). Worklist,
+actions, source review, evaluations, verified context, analytics, and the inspector read
+`/api/v1`. Chrome may switch to unreviewed Arabic; clinical copy stays English (Q2). See
+[frontend-roadmap](01-milestones/frontend-roadmap.md) (updated 2026-11-20) and
+[M01](01-milestones/M01-frontend-foundation.md) for the original foundation.
+
+**Backend demo API** (FastAPI + SQLite in [api/](../api/)) — [M02](01-milestones/M02-backend-foundation.md)
+and stack lock [D003](02-decisions/D003-backend-stack-and-api.md). HAPI and MedGemma are not
+deployed. The local transition layer was deleted in Phase C (2026-11-18).

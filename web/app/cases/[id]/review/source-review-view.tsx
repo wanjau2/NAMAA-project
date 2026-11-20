@@ -22,6 +22,8 @@ import {
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
 import type { EpistemicState } from "@/components/status-badge";
+import { CaseSubnav } from "@/components/case-subnav";
+import { chrome } from "@/lib/copy";
 import { useDemoSession } from "@/lib/demo-session";
 import { useCase, useCaseStore } from "@/lib/case-store";
 import { useSourceReview } from "@/lib/use-source-review";
@@ -116,7 +118,7 @@ const RELATIONSHIP_LABELS: Record<Relationship, string> = {
 };
 
 export function SourceReviewView({ id }: { id: string }) {
-  const { role, sessionEpoch } = useDemoSession();
+  const { role, sessionEpoch, locale } = useDemoSession();
   const { sessionId } = useCaseStore();
   const { case: row } = useCase(id);
   const review = useSourceReview(row, sessionId, role, sessionEpoch);
@@ -341,8 +343,9 @@ export function SourceReviewView({ id }: { id: string }) {
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-muted hover:text-ink"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Back to case detail
+        {chrome(locale, "backToCase")}
       </Link>
+      <CaseSubnav caseId={id} />
 
       <header className="mt-4 flex flex-wrap items-start justify-between gap-3">
         <div>

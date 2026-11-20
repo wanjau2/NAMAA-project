@@ -75,8 +75,16 @@ beyond the deck for the submission form and the written narrative.
 ## Still outstanding for delivery
 
 - Narration and the two presenter segments recorded over the footage (E3 proper).
-- **E5** deployment instructions — blocked on the `output: "standalone"` question, since
-  `next start` is not the supported command for that build mode.
 - The deck must be shared before anyone else can open it.
-- Figures on slide 9 and 10 need re-checking if the analytics seed or the fact-review endpoint
-  lands before submission.
+- Footage, screenshots, and slide 9/10 figures are dated **2026-11-18**. They were not re-cut
+  for the 2026-11-20 integration (live segments, inspector, chrome dictionary, `available_actions`).
+  Re-run `npm run demo` before submission if the frames must match the current UI.
+
+## Update — E5 startup path (2026-11-20)
+
+`output: "standalone"` is unchanged. `npm start` now runs
+`node scripts/start-standalone.mjs`, which copies static assets and launches
+`.next/standalone/server.js`. Docker already used `node server.js`. The 18 November note that
+E5 was blocked is historical. Hosting Q7 is still open. See [web/README.md](../../../web/README.md)
+and [DOCKER.md](../../../DOCKER.md). The client variable is `NEXT_PUBLIC_API_BASE_URL`, baked in
+at `next build`.

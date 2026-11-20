@@ -171,6 +171,7 @@ test("demonstration walkthrough", async ({ page }) => {
   await expect(page.getByText(/GET \/api\/v1\/analytics\/overview/).first()).toBeVisible({
     timeout: 20_000,
   });
+  await expect(page.getByRole("heading", { name: "Live API segments" })).toBeVisible();
   await beat(page, 2200);
   await shot(page, "15-metrics-live-api");
 

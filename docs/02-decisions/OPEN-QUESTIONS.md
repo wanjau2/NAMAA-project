@@ -10,7 +10,7 @@ decision. Recommendations below are suggestions, not settled calls.
 | ID | Question | Status |
 | --- | --- | --- |
 | Q1 | Which stack do we actually build? | **Resolved for sprint** — [D003](D003-backend-stack-and-api.md): FastAPI + SQLite; HAPI deferred |
-| Q2 | English only, or bilingual EN/AR with RTL? | **Open** — implementation half settled by [D002](D002-ui-theme-addendum.md) |
+| Q2 | English only, or bilingual EN/AR with RTL? | **Open** — RTL and chrome toggle ship; clinical copy stays English (2026-11-20 note) |
 | Q3 | Is MedGemma extraction in the demo or deferred? | **Deferred for sprint** — deterministic rules only (D003); revisit if Q6 clears |
 | Q4 | What is the real submission deadline and required file list? | **Open — Alfred to verify portal** |
 | Q5 | Which API path convention is authoritative? | **Resolved** — [D003](D003-backend-stack-and-api.md): `/api/v1/...` |
@@ -60,6 +60,12 @@ properties (`ms-*`, `pe-*`, `text-start`) from the first component, since retrof
 expensive and they cost nothing now. Then decide separately whether Arabic *copy* ships. If it
 does, every unreviewed string carries the `Unreviewed demo translation` badge and is never
 presented as clinically approved.
+
+**Frontend demonstration scope (2026-11-20).** Q2 stays open for Alfred-reviewed clinical
+wording. The UI ships RTL mechanics and an EN/AR chrome toggle. Navigation and session chrome
+may switch to unreviewed Arabic; rule outcomes, source notes and explanations stay English.
+Changing `dir` is not a completed translation. The safety banner and the unreviewed-copy badge
+stay in English.
 
 ## Q3 — Is MedGemma extraction in the demo or deferred?
 
@@ -159,7 +165,8 @@ deleted and the panel would render exactly what the server permits.
 
 **Shipped:** `CaseOut.available_actions` is `{ id, permitted_role, blocked_reason }[]` for
 actions whose stage predicate applies. Preconditions and a pending FHIR completion fill
-`blocked_reason`. The action panel renders that list; `displayWhen` remains a fallback.
+`blocked_reason`. The action panel renders that list. `displayWhen` is a last-resort display
+hint only when `available_actions` is absent — an empty array means none, not “use predicates”.
 `GET /api/v1/meta/actions` is still the catalog-drift check.
 
 ## Q10 — Are there proposal / fact-review endpoints this sprint?
@@ -179,6 +186,11 @@ proposal read + review write endpoints backed by the existing seed, with no mode
 
 **Recommendation:** (b) if time allows, since human review of proposed facts is the concept's
 central safety claim. Otherwise (a), stated plainly.
+
+**Resolved in the running API (2026-11-20).** `GET /api/v1/facts/{id}` and
+`POST /api/v1/facts/{id}/review` persist accept / correct / reject in the application store.
+FHIR Provenance commit remains the gateway stub. The paragraphs above describe the 18 November
+gap.
 
 ## Q11 — How does a client find a case's source documents?
 
@@ -201,6 +213,11 @@ fallback map in `web/lib/source-documents.ts`, and in both paths verifies the re
 the fallback map. Separately, either seed the cited documents for `case-0002` / `case-0006` or
 stop citing them in those cases' factors, because a care gap that references a note nobody can
 open is confusing in a demo about transparent evidence.
+
+**Resolved in the running API (2026-11-20).** `GET /api/v1/cases/{id}/documents` is live. The
+web client uses that listing only — no citation probe and no fallback map. The seed now
+includes the previously missing notes (`doc-synthetic-01`, `doc-synthetic-06`). The table
+above is historical.
 
 ### Also for Alfred — restore the mismatched-quote fixture
 

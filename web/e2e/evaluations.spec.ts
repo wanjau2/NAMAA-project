@@ -26,7 +26,7 @@ test("Child A shows needs_review from the canonical evaluation", async ({
     page.getByText(/Pending and rejected facts are not rule inputs/),
   ).toBeVisible();
   await expect(page.getByText("Identified", { exact: true })).toBeVisible();
-  await expect(page.getByText("gateway stub", { exact: false })).toBeVisible();
+  await expect(page.getByText(/gateway stub/i).first()).toBeVisible();
 });
 
 test("Child B shows gap_identified from the canonical evaluation", async ({

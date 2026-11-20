@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { setRole, waitForWorklist } from "./helpers";
+import { openSessionPanel, setRole, waitForWorklist } from "./helpers";
 
 /**
  * D4 / D5 — keyboard operability and automated accessibility.
@@ -107,4 +107,79 @@ test("focus is visible on interactive controls", async ({ page }) => {
   expect(outline).not.toBeNull();
   expect(outline!.style).not.toBe("none");
   expect(parseFloat(outline!.width)).toBeGreaterThanOrEqual(1);
+});
+
+test("the current page is announced on the main nav and case subnav", async ({
+  page,
+}) => {
+  await page.goto("/cases");
+  await waitForWorklist(page);
+  await expect(page.getByRole("link", { name: /Worklist/ })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await page.goto("/cases/case-0001/review");
+  await expect(page.getByRole("heading", { name: "Source review" })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(
+    page.getByRole("link", { name: /Review source facts/ }),
+  ).toHaveAttribute("aria-current", "page");
+});
+
+test("reset confirmation uses overdue tokens and states the consequence", async ({
+  page,
+}) => {
+  await page.goto("/cases");
+  const scope = await openSessionPanel(page);
+  await scope.getByRole("button", { name: "Reset demo" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText(/Retires this synthetic workspace/);
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("reduced motion stops the worklist skeleton pulse", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/cases");
+  const duration = await page.evaluate(() => {
+    const pulse = document.querySelector(".animate-pulse");
+    if (!pulse) return "none";
+    return getComputedStyle(pulse).animationDuration;
+  });
+  if (duration !== "none") {
+    expect(parseFloat(duration)).toBeLessThan(0.05);
+  }
+});
+
+test("the inspector does not present application ids as HAPI resources", async ({
+  page,
+}) => {
+  await page.goto("/cases/case-0001");
+  await expect(
+    page.getByRole("heading", { name: "Identifiers, audit and outbox" }),
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/HAPI is not deployed/)).toBeVisible();
+  await expect(page.getByText(/concurrency token, not a resource version/)).toBeVisible();
+  await expect(page.getByText("CarePlan/", { exact: false })).toHaveCount(0);
+});
+
+test("the inspector shows an access outcome when outbox.read is denied", async ({
+  page,
+}) => {
+  await page.goto("/cases/case-0001");
+  await expect(
+    page.getByRole("heading", { name: "Identifiers, audit and outbox" }),
+  ).toBeVisible({ timeout: 20_000 });
+  await setRole(page, "clinical_reviewer");
+  await expect(
+    page.getByRole("heading", { name: "Identifiers, audit and outbox" }),
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Outbox (this case)")).toBeVisible();
+  await expect(page.getByText(/not available to you here/i)).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByText(/access outcome, not a clinical finding/i)).toBeVisible();
 });
