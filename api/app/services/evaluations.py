@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.ai_runtime import ensure_namaa_ai
 from app.config import get_settings
 from app.errors import AppError
-from app.models import CareGap, Case, Event, Patient, RuleEvaluation
+from app.models import CareGap, Case, Event, OutboxEntry, Patient, RuleEvaluation
 from app.schemas import EvaluationResult, MissingItem, SourceFact
 from app.security.context import TrustedRequestContext
 from app.security.enforce import authorize
@@ -27,6 +27,7 @@ from namaa_ai.handoff import prepare_rule_handoff  # noqa: E402
 from namaa_ai.rules import evaluate  # noqa: E402
 
 CASE_OUTCOMES = {"gap_identified": "gap", "needs_review": "needs_review"}
+_PENDING_COMPLETION = ("pending", "processing", "compensating")
 
 
 def _as_of(demo_now: str) -> date:
@@ -54,6 +55,59 @@ def _missing(evaluation) -> list[MissingItem]:
         )
         for item in evaluation.missing_information
     ]
+
+
+def _open_case(
+    db: Session,
+    *,
+    workspace_id: str,
+    patient_id: str,
+    pathway: str,
+    rule_id: str,
+) -> Case | None:
+    return (
+        db.query(Case)
+        .filter(
+            Case.workspace_id == workspace_id,
+            Case.patient_id == patient_id,
+            Case.pathway == pathway,
+            Case.rule_id_version == rule_id,
+            Case.stage != "closed",
+        )
+        .one_or_none()
+    )
+
+
+def _completion_in_flight(db: Session, *, workspace_id: str, case_id: str) -> bool:
+    return (
+        db.query(OutboxEntry.pk)
+        .filter(
+            OutboxEntry.workspace_id == workspace_id,
+            OutboxEntry.case_id == case_id,
+            OutboxEntry.action == "close_as_completed",
+            OutboxEntry.state.in_(_PENDING_COMPLETION),
+        )
+        .first()
+        is not None
+    )
+
+
+def _write_gap(
+    gap: CareGap,
+    *,
+    flag_status: str,
+    factors: list[SourceFact],
+    missing: list[MissingItem],
+    uncertainty: str,
+    explanation: str,
+    suggested: str,
+) -> None:
+    gap.flag_status = flag_status
+    gap.factors_json = json.dumps([f.model_dump() for f in factors])
+    gap.missing_json = json.dumps([m.model_dump() for m in missing])
+    gap.uncertainty = uncertainty
+    gap.explanation = explanation
+    gap.suggested_review_action = suggested
 
 
 def _suggested(evaluation) -> str:
@@ -159,87 +213,93 @@ def run_evaluation(
 
     case_out = None
     case_flag = CASE_OUTCOMES.get(evaluation.outcome)
-    if case_flag is not None:
-        open_case = (
-            db.query(Case)
-            .filter(
-                Case.workspace_id == workspace_id,
-                Case.patient_id == patient_id,
-                Case.pathway == chosen,
-                Case.rule_id_version == evaluation.rule_id,
-                Case.stage != "closed",
-            )
-            .one_or_none()
-        )
-        if open_case is None:
-            gap_id = f"gap-{uuid.uuid4().hex[:8]}"
-            case_id = f"case-{uuid.uuid4().hex[:8]}"
-            db.add(
-                CareGap(
-                    id=gap_id,
-                    workspace_id=workspace_id,
-                    patient_id=patient_id,
-                    pathway=chosen,
-                    rule_id_version=evaluation.rule_id,
-                    flag_status=case_flag,
-                    factors_json=json.dumps([f.model_dump() for f in factors]),
-                    missing_json=json.dumps([m.model_dump() for m in missing]),
-                    uncertainty=uncertainty,
-                    explanation=explanation,
-                    suggested_review_action=suggested,
-                )
-            )
-            case = Case(
-                id=case_id,
+    open_case = _open_case(
+        db,
+        workspace_id=workspace_id,
+        patient_id=patient_id,
+        pathway=chosen,
+        rule_id=evaluation.rule_id,
+    )
+    pending_completion = open_case is not None and _completion_in_flight(
+        db, workspace_id=workspace_id, case_id=open_case.id
+    )
+
+    if case_flag is not None and open_case is None:
+        gap_id = f"gap-{uuid.uuid4().hex[:8]}"
+        case_id = f"case-{uuid.uuid4().hex[:8]}"
+        db.add(
+            CareGap(
+                id=gap_id,
                 workspace_id=workspace_id,
-                care_gap_id=gap_id,
                 patient_id=patient_id,
-                patient_label=patient.label,
-                age_band=patient.age_band,
                 pathway=chosen,
                 rule_id_version=evaluation.rule_id,
                 flag_status=case_flag,
-                stage="identified",
-                disposition="active",
-                owner="Coordinator 1",
-                next_action=suggested,
-                due_time=None if evaluation.due_date is None else f"{evaluation.due_date.isoformat()}T09:00:00Z",
-                overdue=False,
-                revision=1,
-                eligible=evaluation.outcome != "not_eligible",
+                factors_json=json.dumps([f.model_dump() for f in factors]),
+                missing_json=json.dumps([m.model_dump() for m in missing]),
+                uncertainty=uncertainty,
+                explanation=explanation,
+                suggested_review_action=suggested,
             )
-            db.add(case)
-            db.add(
-                Event(
-                    id=f"evt-{uuid.uuid4().hex[:12]}",
-                    workspace_id=workspace_id,
-                    case_id=case_id,
-                    timestamp=settings.demo_now,
-                    actor_role="system",
-                    action="rule_evaluation",
-                    prior_state="",
-                    new_state="identified/active",
-                    reason=explanation,
-                    request_id=eval_id,
-                )
+        )
+        case = Case(
+            id=case_id,
+            workspace_id=workspace_id,
+            care_gap_id=gap_id,
+            patient_id=patient_id,
+            patient_label=patient.label,
+            age_band=patient.age_band,
+            pathway=chosen,
+            rule_id_version=evaluation.rule_id,
+            flag_status=case_flag,
+            stage="identified",
+            disposition="active",
+            owner="Coordinator 1",
+            next_action=suggested,
+            due_time=None if evaluation.due_date is None else f"{evaluation.due_date.isoformat()}T09:00:00Z",
+            overdue=False,
+            revision=1,
+            eligible=True,
+            worklist=True,
+        )
+        db.add(case)
+        db.add(
+            Event(
+                id=f"evt-{uuid.uuid4().hex[:12]}",
+                workspace_id=workspace_id,
+                case_id=case_id,
+                timestamp=settings.demo_now,
+                actor_role="system",
+                action="rule_evaluation",
+                prior_state="",
+                new_state="identified/active",
+                reason=explanation,
+                request_id=eval_id,
+                outcome=evaluation.outcome,
             )
-            db.flush()
-            case_out = case_to_out(db, case)
-        else:
-            gap = (
-                db.query(CareGap)
-                .filter(
-                    CareGap.workspace_id == workspace_id,
-                    CareGap.id == open_case.care_gap_id,
-                )
-                .one()
+        )
+        db.flush()
+        case_out = case_to_out(db, case)
+    elif open_case is not None and not pending_completion:
+        gap = (
+            db.query(CareGap)
+            .filter(
+                CareGap.workspace_id == workspace_id,
+                CareGap.id == open_case.care_gap_id,
             )
-            gap.flag_status = case_flag
-            gap.factors_json = json.dumps([f.model_dump() for f in factors])
-            gap.missing_json = json.dumps([m.model_dump() for m in missing])
-            gap.uncertainty = uncertainty
-            gap.explanation = explanation
-            gap.suggested_review_action = suggested
+            .one()
+        )
+        prior = f"{open_case.stage}/{open_case.disposition}"
+        if case_flag is not None:
+            _write_gap(
+                gap,
+                flag_status=case_flag,
+                factors=factors,
+                missing=missing,
+                uncertainty=uncertainty,
+                explanation=explanation,
+                suggested=suggested,
+            )
             claimed = db.execute(
                 update(Case)
                 .where(
@@ -250,16 +310,63 @@ def run_evaluation(
                 .values(
                     flag_status=case_flag,
                     next_action=suggested,
-                    revision=Case.revision + 1,
+                    worklist=True,
+                    eligible=True,
                 )
                 .execution_options(synchronize_session=False)
             )
-            if claimed.rowcount != 1:
-                case_out = None
-            else:
+            if claimed.rowcount == 1:
                 db.refresh(open_case)
                 db.flush()
                 case_out = case_to_out(db, open_case)
+        else:
+            _write_gap(
+                gap,
+                flag_status=handoff.legacy_flag_status or "not_eligible",
+                factors=factors,
+                missing=missing,
+                uncertainty=uncertainty,
+                explanation=explanation,
+                suggested=suggested,
+            )
+            # Keep the workflow open (D006). Drop it from the worklist so an
+            # outdated gap/needs_review flag is no longer actionable.
+            claimed = db.execute(
+                update(Case)
+                .where(
+                    Case.pk == open_case.pk,
+                    Case.workspace_id == workspace_id,
+                    Case.stage != "closed",
+                )
+                .values(
+                    next_action=suggested,
+                    worklist=False,
+                    eligible=evaluation.outcome != "not_eligible",
+                    overdue=False,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if claimed.rowcount == 1:
+                db.add(
+                    Event(
+                        id=f"evt-{uuid.uuid4().hex[:12]}",
+                        workspace_id=workspace_id,
+                        case_id=open_case.id,
+                        timestamp=settings.demo_now,
+                        actor_role="system",
+                        action="rule_evaluation",
+                        prior_state=prior,
+                        new_state=prior,
+                        reason=explanation,
+                        request_id=eval_id,
+                        outcome=evaluation.outcome,
+                    )
+                )
+                db.flush()
+    elif open_case is not None and pending_completion and case_flag is not None:
+        # Leave revision/stage/disposition untouched so the completion CAS still
+        # matches the command snapshot. The evaluation itself is already stored.
+        case_out = case_to_out(db, open_case)
 
     db.commit()
     legacy = handoff.legacy_flag_status or "not_eligible"

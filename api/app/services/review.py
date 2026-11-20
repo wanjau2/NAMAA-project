@@ -55,6 +55,17 @@ def _payload_hash(*, proposal_id: str, body: dict[str, Any]) -> str:
     ).hexdigest()
 
 
+def review_outbox_request_id(request_id: str) -> str:
+    """64-char FHIR/outbox key that stays unique for distinct review request_ids.
+
+    Prefixing then truncating (`review.{id}`[:64]) collapsed any two 64-char ids
+    that shared the first 57 characters onto one transaction, so the second
+    accept replayed the first stub write.
+    """
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()[:57]
+    return f"review.{digest}"
+
+
 def _bound_reviewer(ctx: TrustedRequestContext, supplied: str | None) -> str:
     if ctx.membership_role != "clinical_reviewer":
         raise AppError(
@@ -336,7 +347,7 @@ def apply_review(
     outbox_id = None
     if decision.fact is not None:
         transaction = propose_transaction(decision.fact)
-        outbox_request_id = f"review.{request_id}"[:64]
+        outbox_request_id = review_outbox_request_id(request_id)
         entry = enqueue_outbox(
             db,
             workspace_id=ctx.workspace_id,
